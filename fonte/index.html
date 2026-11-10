@@ -64,6 +64,8 @@
   #menu p{opacity:.8;margin:0 0 18px}
   #menu input[type=text]{width:100%;font-size:20px;padding:12px 14px;border-radius:12px;border:2px solid #7fd3ff66;background:#0b1a2a;color:#fff;text-align:center;user-select:text;-webkit-user-select:text}
   #menu button{margin-top:14px;width:100%;font-size:22px;font-weight:800;padding:14px;border:0;border-radius:12px;background:linear-gradient(180deg,#ffd23a,#ff9a2a);color:#3a1d00;cursor:pointer}
+  #menu button.pvp{background:linear-gradient(180deg,#ff6a4a,#c0392b);color:#fff}
+  #dicaDec{left:50%;top:26%;transform:translateX(-50%);font-size:17px;font-weight:700;background:#0b1a2acc;padding:6px 14px;border-radius:10px;display:none;text-align:center}
   #menu label{display:block;margin-top:12px;font-size:14px;opacity:.85}
   #menu .dica{font-size:13px;opacity:.65;margin-top:16px;line-height:1.5}
   #erro{color:#ff8a7a;margin-top:10px;font-size:14px;min-height:1em}
@@ -86,6 +88,7 @@
 <div id="bVisao" title="Trocar visão (V)">👁️</div>
 <div class="hud" id="feed"></div>
 <div class="hud" id="aviso">⚠️ Volte para a área de combate!</div>
+<div class="hud" id="dicaDec">🛫 Decolando… <b>puxe o manche</b> (S / ↓ ou arraste p/ baixo) a partir de 230 km/h · 🔥 turbo acelera</div>
 <div class="hud" id="barras">
   <div id="info"><span id="tVel">0 km/h</span><span id="tAlt">0 m</span></div>
   <div class="barra" id="bVida"><i></i></div>
@@ -112,10 +115,12 @@
     <p>Combate aéreo multiplayer</p>
     <input type="text" id="nome" maxlength="16" placeholder="Seu nome de piloto" autocomplete="off">
     <label><input type="checkbox" id="inverter"> Inverter subir/descer</label>
-    <button id="decolar">DECOLAR 🚀</button>
+    <button id="decolar">🤖 SALA COM BOTS</button>
+    <button id="salaPvp" class="pvp">⚔️ SALA SEM BOTS · bases</button>
     <div id="erro"></div>
     <div class="dica">
       📱 <b>Celular:</b> arraste no lado esquerdo para pilotar · 🎯 atira · 🚀 míssil (trave a mira 1 s) · ✨ flare · 🔥 turbo<br>
+      ⚔️ <b>Sala sem bots:</b> você decola da sua base; chegar perto da base dos outros = míssil terra-ar 🛡️<br>
       ⌨️ <b>Teclado:</b> W/S desce/sobe · A/D gira · Q/E leme · Espaço atira · F míssil · X flare · Shift turbo · V cabine · Esc sai
     </div>
   </div>

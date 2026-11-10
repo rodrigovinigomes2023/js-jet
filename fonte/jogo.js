@@ -38,17 +38,51 @@ const mar=new THREE.Mesh(new THREE.PlaneGeometry(40000,40000),new THREE.MeshStan
 mar.rotation.x=-Math.PI/2;cena.add(mar);
 const ILHAS=[];{const r=rnd(20251109);ILHAS.push({x:300,z:-200,r:1100,h:420});
   for(let i=0;i<16;i++){const a=r()*Math.PI*2,d=900+r()*4200;ILHAS.push({x:Math.cos(a)*d,z:Math.sin(a)*d,r:220+r()*700,h:60+r()*330});}}
-function relevo(x,z){let h=0;for(const I of ILHAS){const d=Math.hypot(x-I.x,z-I.z);if(d<I.r)h=Math.max(h,I.h*(0.5+0.5*Math.cos(Math.PI*d/I.r)));}return h;}
+// (10/11) bases da sala sem bots: as mesmas do servidor (anel de 7,2 km, 4 no máximo), cada uma numa ilha plana com pista apontada p/ o centro
+const BASE_R=7200,BASE_H=18,BASE_PLANO=760,BASE_ILHA=1050,PISTA=1300;
+const BASES=[45,135,225,315].map((g,i)=>{const a=g*Math.PI/180,x=Math.cos(a)*BASE_R,z=Math.sin(a)*BASE_R;return{i,x,z,dx:-Math.cos(a),dz:-Math.sin(a),yaw:Math.atan2(z,-x)};});
+let SALA='bots',MINHA_BASE=null,ZONA=3800,R_SAM=3000,LIMITE=5200;
+function alturaBase(d){return d<BASE_PLANO?BASE_H:d<BASE_ILHA?BASE_H*(0.5+0.5*Math.cos(Math.PI*(d-BASE_PLANO)/(BASE_ILHA-BASE_PLANO))):0;}
+function relevo(x,z){let h=0;for(const I of ILHAS){const d=Math.hypot(x-I.x,z-I.z);if(d<I.r)h=Math.max(h,I.h*(0.5+0.5*Math.cos(Math.PI*d/I.r)));}
+  for(const B of BASES){const d=Math.hypot(x-B.x,z-B.z);if(d<BASE_ILHA)h=Math.max(h,alturaBase(d));}return h;}
 {const cA=new THREE.Color('#d9c48f'),cV=new THREE.Color('#3f8a3c'),cE=new THREE.Color('#2c5e2c'),cP=new THREE.Color('#7a7466');
   for(const I of ILHAS){const pts=[];for(let k=0;k<=18;k++){const d=I.r*1.04*(1-k/18);pts.push(new THREE.Vector2(d,Math.max(-4,I.h*(0.5+0.5*Math.cos(Math.PI*Math.min(1,d/I.r)))-(d>I.r?4:0))));}
     const g=new THREE.LatheGeometry(pts,40),pos=g.attributes.position,cor=new Float32Array(pos.count*3),c=new THREE.Color();
     for(let i=0;i<pos.count;i++){const y=pos.getY(i),u=y/I.h;if(y<7)c.copy(cA);else if(u<0.55)c.copy(cV).lerp(cE,u/0.55);else c.copy(cE).lerp(cP,(u-0.55)/0.45*(I.h>250?1:0.3));
       c.convertSRGBToLinear();cor[i*3]=c.r;cor[i*3+1]=c.g;cor[i*3+2]=c.b;}
     g.setAttribute('color',new THREE.BufferAttribute(cor,3));g.computeVertexNormals();
-    const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.95,flatShading:true,side:THREE.DoubleSide}));m.position.set(I.x,0,I.z);cena.add(m);}}
+    const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.95,flatShading:true,side:THREE.DoubleSide}));m.position.set(I.x,0,I.z);cena.add(m);}
+  // ilhas planas das bases
+  const mB=new THREE.MeshStandardMaterial({color:new THREE.Color('#4f8a45').convertSRGBToLinear(),roughness:0.95,flatShading:true,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-8});
+  const mBa=new THREE.MeshStandardMaterial({color:new THREE.Color('#d9c48f').convertSRGBToLinear(),roughness:0.95,flatShading:true});
+  for(const B of BASES){const pts=[];for(let k=0;k<=14;k++){const d=BASE_ILHA*1.03*(1-k/14);pts.push(new THREE.Vector2(d,Math.max(-4,alturaBase(d)-(d>BASE_ILHA?4:0))));}
+    const praia=new THREE.Mesh(new THREE.LatheGeometry(pts,48),mBa);praia.position.set(B.x,0,B.z);cena.add(praia);
+    const topo=new THREE.Mesh(new THREE.CircleGeometry(BASE_PLANO+20,48),mB);topo.rotation.x=-Math.PI/2;topo.position.set(B.x,BASE_H+0.05,B.z);cena.add(topo);}}
 {const r=rnd(77),mN=new THREE.SpriteMaterial({map:texFumo(),color:0xffffff,transparent:true,opacity:0.85,depthWrite:false,fog:true});
   for(let i=0;i<70;i++){const a=r()*Math.PI*2,d=r()*6500,y=900+r()*900;for(let k=0;k<3;k++){const s=new THREE.Sprite(mN),e=260+r()*380;
     s.scale.set(e*1.6,e*0.7,1);s.position.set(Math.cos(a)*d+(r()-0.5)*400,y+(r()-0.5)*80,Math.sin(a)*d+(r()-0.5)*400);cena.add(s);}}}
+
+// ------------------------------------------------ (10/11) as bases: pista, pátio, hangares, torre, bandeira do dono e lançadores SAM
+{const po=(m)=>{m=m.clone();m.polygonOffset=true;m.polygonOffsetFactor=-4;m.polygonOffsetUnits=-16;return m;};
+  const mAs=po(M('#3a3d42',0.9)),mBr=po(M('#f2f2f2',0.6)),mPa=po(M('#6b6f73',0.9)),mHa=M('#8d969c',0.6),mTe=M('#5a6066',0.7),mVi=M('#9fd4ff',0.2),mOl=M('#55603f',0.8),mPo=M('#cfcfcf',0.5);
+  for(const B of BASES){const g=new THREE.Group();g.position.set(B.x,BASE_H,B.z);g.rotation.y=B.yaw;cena.add(g);B.g=g;
+    box(PISTA,0.3,42,mAs,0,0.15,0,g);
+    for(let x=-590;x<=590;x+=50)box(22,0.34,1.2,mBr,x,0.17,0,g);   // faixa central
+    for(const s of[-1,1])for(let k=-3;k<=3;k++)if(k)box(30,0.34,2.4,mBr,s*615,0.17,k*5,g);   // cabeceiras
+    box(320,0.26,120,mPa,-40,0.13,150,g);box(40,0.26,70,mPa,100,0.13,62,g);   // pátio + taxiway
+    for(let i=0;i<3;i++){box(62,14,42,mHa,-150+i*80,7,195,g);box(64,1.2,44,mTe,-150+i*80,14.6,195,g);box(40,10,0.4,M('#2a2d31',0.8),-150+i*80,5,173.8,g);}
+    const tr=cil(4,5,26,mHa,160,13,-90,g);box(12,6,12,mVi,160,29,-90,g);box(13,0.8,13,mTe,160,32.4,-90,g);
+    cil(0.35,0.35,24,mPo,60,12,-70,g);B.mBand=new THREE.MeshStandardMaterial({color:0x888888,roughness:0.7,side:THREE.DoubleSide});
+    const band=new THREE.Mesh(new THREE.PlaneGeometry(9,5.5),B.mBand);band.position.set(64.5,21,-70);g.add(band);
+    for(const [x,z] of[[-320,-120],[320,-120],[0,-190]]){box(9,2.2,6,mOl,x,1.1,z,g);
+      for(let k=0;k<4;k++){const t=cil(0.7,0.7,7,mOl,x+(k%2?1.6:-1.6),4.6,z+(k<2?1.3:-1.3),g,8);t.rotation.z=-0.75;}}}
+  // anéis no mar: zona de combate (amarelo) e alcance dos SAM de cada base (vermelho; o da minha base fica verde)
+  const anel=(r,cor,x,z)=>{const m=new THREE.Mesh(new THREE.RingGeometry(r-14,r+14,160),new THREE.MeshBasicMaterial({color:cor,transparent:true,opacity:0.45,depthWrite:false,side:THREE.DoubleSide}));
+    m.rotation.x=-Math.PI/2;m.position.set(x,1.5,z);m.visible=false;cena.add(m);return m;};
+  BASES.zonaAnel=anel(3800,0xffd23a,0,0);for(const B of BASES)B.anel=anel(3000,0xff3b30,B.x,B.z);}
+function mostrarBases(){const pvp=SALA==='pvp';BASES.zonaAnel.visible=pvp;BASES.zonaAnel.geometry.dispose();BASES.zonaAnel.geometry=new THREE.RingGeometry(ZONA-14,ZONA+14,160);
+  for(const B of BASES){B.anel.visible=pvp;B.anel.material.color.set(B.i===MINHA_BASE?0x3cd070:0xff3b30);B.g.visible=true;}}
+function corBandeiras(l){for(const B of BASES){const d=l.find(x=>x.base===B.i);B.mBand.color.set(d?d.cor:'#888888');B.dono=d||null;}}
 
 // ------------------------------------------------ o caça (o mesmo delta-canard do show do ônibus; nariz em +x, asa direita em +z)
 function texCocar(){const c=cv(128,128),g=c.getContext('2d');[['#1f9a3d',62],['#ffd21a',44],['#1f4fb3',27]].forEach(([cor,r])=>{g.fillStyle=cor;g.beginPath();g.arc(64,64,r,0,7);g.fill();});
@@ -152,7 +186,22 @@ function entrada(){const inv=$('#inverter').checked?1:-1;   // (09/11) padrão d
 // ------------------------------------------------ voo (modelo arcade) e tiro
 function frente(q,v=_f){return v.set(1,0,0).applyQuaternion(q);}
 let ULT_I=null;
+// (10/11) decolagem: nasce parado na cabeceira da pista; acelera sozinho (turbo acelera mais), com 230 km/h puxa o manche e sobe.
+// Se ninguém puxar, a 360 km/h o avião levanta o nariz sozinho (no celular ninguém bate no fim da pista).
+function decolar(dt,I){const B=BASES[MINHA_BASE];
+  EU.vel=Math.min(EU.vel+(I.turbo?30:18)*dt,200);
+  const podeSubir=EU.vel>=64;let alvoArf=0;
+  if(podeSubir&&(I.p>0.2||EU.vel>=100))alvoArf=0.22;
+  EU.arf+=(alvoArf-EU.arf)*Math.min(1,dt*2.5);
+  EU.q.setFromAxisAngle(_v1.set(0,1,0),B.yaw).multiply(_dq.setFromAxisAngle(_v2.set(0,0,1),EU.arf));
+  const fw=frente(EU.q);EU.pos.addScaledVector(fw,EU.vel*dt);
+  const chao=relevo(EU.pos.x,EU.pos.z)+1.9;
+  if(EU.pos.y<chao)EU.pos.y=chao;
+  if(EU.pos.y>chao+8){EU.solo=false;$('#dicaDec').style.display='none';}   // decolou: daqui em diante é voo normal
+  JATO.position.copy(EU.pos);JATO.quaternion.copy(EU.q);JATO.userData.pc.visible=!!I.turbo;JATO.userData.pc.scale.y=0.8+Math.random()*0.4;
+  SOM.motor(EU.vel,I.turbo,true);}
 function voar(dt){const I=entrada();ULT_I=I;
+  if(EU.solo){decolar(dt,I);return;}
   const fw=frente(EU.q),up=_u.set(0,1,0).applyQuaternion(EU.q),dir=_r.set(0,0,1).applyQuaternion(EU.q);
   let roll=I.r*2.5;if(Math.abs(I.r)<0.1&&up.y>0)roll+=dir.y*1.4;   // sem comando, nivela as asas sozinho
   _dq.setFromEuler(_eu.set(roll*dt,I.y*0.5*dt,I.p*1.3*dt,'XYZ'));EU.q.multiply(_dq).normalize();
@@ -162,7 +211,11 @@ function voar(dt){const I=entrada();ULT_I=I;
   JATO.position.copy(EU.pos);JATO.quaternion.copy(EU.q);JATO.userData.pc.visible=turbo;JATO.userData.pc.scale.y=0.8+Math.random()*0.4;
   // colisão com mar/ilha e limite da arena
   if(EU.pos.y<relevo(EU.pos.x,EU.pos.z)+3){morrer(null,true);return;}
-  const rh=Math.hypot(EU.pos.x,EU.pos.z);EU.fora=rh>5200||EU.pos.y>4500?EU.fora+dt:0;$('#aviso').style.display=EU.fora>0?'block':'none';
+  const rh=Math.hypot(EU.pos.x,EU.pos.z);EU.fora=rh>LIMITE||EU.pos.y>4500?EU.fora+dt:0;
+  let aviso=EU.fora>0?'⚠️ Volte para a área de combate!':'';
+  if(SALA==='pvp'&&!aviso)for(const B of BASES){if(B.i===MINHA_BASE)continue;const d=Math.hypot(EU.pos.x-B.x,EU.pos.z-B.z);
+    if(d<R_SAM){aviso='🛡️ DEFESA ANTIAÉREA INIMIGA! Saia já';break;}if(d<R_SAM+700)aviso='⚠️ Perto da base inimiga';}
+  const av=$('#aviso');av.style.display=aviso?'block':'none';if(av.textContent!==aviso)av.textContent=aviso;
   if(EU.fora>6){morrer(null,true);return;}
   if(I.fogo&&performance.now()>=proxTiro){proxTiro=performance.now()+80;atirar(fw);}
   travar(dt,fw);
@@ -217,35 +270,40 @@ function flares(id){const o=id===EU.id?{pos:EU.pos,q:EU.q}:OUT.get(id);if(!o)ret
   if(o.pos.distanceTo(EU.pos)<1500)SOM.flare();}
 
 // ------------------------------------------------ morte / renascer
-function morrer(porQuem,caiu){if(!EU.vivo)return;EU.vivo=false;EU.mortoEm=performance.now();EU.porQuem=porQuem;JATO.visible=false;explosao(EU.pos,true);
-  if(caiu)envia({t:'caiu'});SOM.motor(0,false,false);
-  const m=$('#morte');m.style.display='block';m.innerHTML=(caiu?'💥 Você caiu!':'💥 Abatido por <span style="color:'+(porQuem?.cor||'#fff')+'">'+esc(porQuem?.nome||'?')+'</span>')+'<small>renascendo…</small>';}
-function nascer(){const a=Math.random()*Math.PI*2,r=2200+Math.random()*1200;EU.pos.set(Math.cos(a)*r,700+Math.random()*400,Math.sin(a)*r);
-  const yaw=Math.atan2(EU.pos.z,-EU.pos.x);EU.q.setFromAxisAngle(_v1.set(0,1,0),yaw);   // nariz (+x) apontando pro centro
-  EU.vel=140;EU.vida=100;EU.turbo=1;MUN=2;TRAVA.id=0;TRAVA.t=0;EU.vivo=true;EU.fora=0;JATO.visible=true;$('#morte').style.display='none';
+function morrer(porQuem,caiu,arma){if(!EU.vivo)return;EU.vivo=false;EU.solo=false;EU.mortoEm=performance.now();EU.porQuem=porQuem;JATO.visible=false;explosao(EU.pos,true);
+  if(caiu)envia({t:'caiu'});SOM.motor(0,false,false);$('#dicaDec').style.display='none';$('#aviso').style.display='none';
+  const m=$('#morte');m.style.display='block';m.innerHTML=(caiu?'💥 Você caiu!':arma==='sam'?'🛡️ Abatido pela defesa antiaérea!':'💥 Abatido por <span style="color:'+(porQuem?.cor||'#fff')+'">'+esc(porQuem?.nome||'?')+'</span>')+'<small>'+(SALA==='pvp'?'voltando para a pista…':'renascendo…')+'</small>';}
+function nascer(){EU.vel=140;EU.solo=false;EU.arf=0;
+  if(SALA==='pvp'&&MINHA_BASE!==null){const B=BASES[MINHA_BASE];   // (10/11) sala sem bots: sempre na cabeceira da pista da minha base
+    EU.pos.set(B.x-B.dx*(PISTA/2-50),BASE_H+1.9,B.z-B.dz*(PISTA/2-50));EU.q.setFromAxisAngle(_v1.set(0,1,0),B.yaw);EU.vel=0;EU.solo=true;$('#dicaDec').style.display='block';}
+  else{const a=Math.random()*Math.PI*2,r=2200+Math.random()*1200;EU.pos.set(Math.cos(a)*r,700+Math.random()*400,Math.sin(a)*r);
+    const yaw=Math.atan2(EU.pos.z,-EU.pos.x);EU.q.setFromAxisAngle(_v1.set(0,1,0),yaw);}   // nariz (+x) apontando pro centro
+  EU.vida=100;EU.turbo=1;MUN=2;TRAVA.id=0;TRAVA.t=0;EU.vivo=true;EU.fora=0;JATO.visible=true;$('#morte').style.display='none';
   envia({t:'renascer',p:arr(EU.pos,1)});}
 
 // ------------------------------------------------ rede
 function envia(m){if(ws&&ws.readyState===1)ws.send(JSON.stringify(m));}
 function conectar(){const url=(location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws';
   ws=new WebSocket(url);
-  ws.onopen=()=>{conectado=true;envia({t:'entrar',nome:EU.nome});};
+  ws.onopen=()=>{conectado=true;envia({t:'entrar',nome:EU.nome,sala:SALA});};
   ws.onclose=()=>{const era=conectado;conectado=false;if(jogando){jogando=false;document.body.classList.remove('jogando');$('#menu').style.display='flex';
       $('#erro').textContent=era?'⚠️ Conexão perdida. Toque em DECOLAR para voltar.':'⚠️ Não consegui falar com o servidor.';}};
   ws.onmessage=e=>{let d;try{d=JSON.parse(e.data);}catch{return;}
-    if(d.t==='bemvindo'){EU.id=d.id;EU.cor=d.cor;if(JATO)cena.remove(JATO);JATO=criarJato(d.cor);nascer();}
+    if(d.t==='bemvindo'){EU.id=d.id;EU.cor=d.cor;SALA=d.sala||'bots';MINHA_BASE=d.base??null;if(d.zona)ZONA=d.zona;if(d.rsam)R_SAM=d.rsam;LIMITE=SALA==='pvp'?9500:5200;mostrarBases();
+      if(JATO)cena.remove(JATO);JATO=criarJato(d.cor);nascer();}
     else if(d.t==='placar')recebePlacar(d.l);
     else if(d.t==='snap')recebeSnap(d.j);
     else if(d.t==='tiro'){const o=OUT.get(d.id);_v1.fromArray(d.p);_v2.fromArray(d.d).multiplyScalar(VEL_BALA);if(o)_v2.add(o.vel);bala(_v1,_v2,false);
       const dist=_v1.distanceTo(EU.pos);if(dist<1400)SOM.tiro(true);}
     else if(d.t==='abate')recebeAbate(d);
-    else if(d.t==='missil'){const o=d.dono===EU.id?EU:OUT.get(d.dono);if(o)SOM.lanca(d.dono===EU.id||o.pos.distanceTo(EU.pos)<800);}
+    else if(d.t==='missil'){if(d.base!==undefined){const B=BASES[d.base];if(B){_v1.set(B.x,BASE_H,B.z);SOM.lanca(_v1.distanceTo(EU.pos)<1500);fx(_v1.setY(BASE_H+8),0xffc060,30,0.8,2);}}
+      else{const o=d.dono===EU.id?EU:OUT.get(d.dono);if(o)SOM.lanca(d.dono===EU.id||o.pos.distanceTo(EU.pos)<800);}}
     else if(d.t==='boom'){_v1.fromArray(d.p);const dd=_v1.distanceTo(EU.pos);if(d.acertou)explosao(_v1,dd<700);else fx(_v1,0xffb040,14,0.6,2.5);}
     else if(d.t==='flare')flares(d.id);
     else if(d.t==='mun'){MUN=d.m;}
     else if(d.t==='flareok'){flarePronto=performance.now()+d.espera*1000;}
     if(d.t==='snap'&&d.m)recebeMisseis(d.m);};}
-function recebePlacar(l){PLACAR=l;const ids=new Set(l.map(x=>x.id));
+function recebePlacar(l){PLACAR=l;const ids=new Set(l.map(x=>x.id));corBandeiras(l);
   for(const x of l){if(x.id===EU.id)continue;let o=OUT.get(x.id);
     if(!o){o={g:criarJato(x.cor),pos:new V3(),vel:new V3(),q:new QT(),alvoP:new V3(),alvoQ:new QT(),tRec:0,vida:100,vivo:false,novo:true};
       o.rot=document.createElement('div');o.rot.className='rot';o.rot.innerHTML='<span></span><b><i></i></b>';$('#rotulos').appendChild(o.rot);o.g.visible=false;OUT.set(x.id,o);}
@@ -262,10 +320,10 @@ function recebeSnap(j){const agora=performance.now();
     if(o.novo||voltou){o.pos.copy(o.alvoP);o.q.copy(o.alvoQ);o.novo=false;}
     o.g.visible=o.vivo;}}
 function recebeAbate(d){const por=PLACAR.find(x=>x.id===d.por),alvo=PLACAR.find(x=>x.id===d.alvo);
-  if(d.alvo===EU.id)morrer(por,false);
+  if(d.alvo===EU.id)morrer(por,false,d.arma);
   else{const o=OUT.get(d.alvo);if(o){o.vivo=false;o.g.visible=false;_v1.fromArray(d.p);explosao(o.pos.lengthSq()?o.pos:_v1,o.pos.distanceTo(EU.pos)<700);}}
   const n=x=>x?`<b style="color:${x.cor}">${esc(x.nome)}</b>`:'';
-  const div=document.createElement('div');div.innerHTML=por?`${n(por)} ${d.arma==='missil'?'🚀':'🔥'} abateu ${n(alvo)}`:`${n(alvo)} 💥 caiu`;$('#feed').prepend(div);
+  const div=document.createElement('div');div.innerHTML=por?`${n(por)} ${d.arma==='missil'?'🚀':'🔥'} abateu ${n(alvo)}`:d.arma==='sam'?`🛡️ a defesa antiaérea derrubou ${n(alvo)}`:`${n(alvo)} 💥 caiu`;$('#feed').prepend(div);
   setTimeout(()=>div.remove(),4000);while($('#feed').children.length>4)$('#feed').lastChild.remove();}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
@@ -320,6 +378,12 @@ function hud(dt){const W=innerWidth,H=innerHeight;
   const ponto=(x,z,cor,r)=>{const dx=x-EU.pos.x,dz=z-EU.pos.z,a=Math.atan2(dz,dx)-hd,d=Math.min(c-6,Math.hypot(dx,dz)*esc2);
     rctx.fillStyle=cor;rctx.beginPath();rctx.arc(c+Math.sin(a)*d,c-Math.cos(a)*d,r,0,7);rctx.fill();};
   rctx.fillStyle='#3f8a3c88';for(const I of ILHAS){const dx=I.x-EU.pos.x,dz=I.z-EU.pos.z,a=Math.atan2(dz,dx)-hd,d=Math.hypot(dx,dz)*esc2;if(d<c+I.r*esc2){rctx.beginPath();rctx.arc(c+Math.sin(a)*d,c-Math.cos(a)*d,Math.max(2,I.r*esc2),0,7);rctx.fill();}}
+  if(SALA==='pvp'){   // (10/11) zona de combate e bases (a minha em verde; as outras em vermelho com o alcance dos SAM)
+    const anelR=(x,z,r,cor)=>{const dx=x-EU.pos.x,dz=z-EU.pos.z,a=Math.atan2(dz,dx)-hd,d=Math.hypot(dx,dz)*esc2;rctx.strokeStyle=cor;rctx.lineWidth=2;rctx.beginPath();rctx.arc(c+Math.sin(a)*d,c-Math.cos(a)*d,r*esc2,0,7);rctx.stroke();};
+    rctx.save();rctx.beginPath();rctx.arc(c,c,c-1,0,7);rctx.clip();anelR(0,0,ZONA,'#ffd23a99');
+    for(const B of BASES)if(B.i!==MINHA_BASE)anelR(B.x,B.z,R_SAM,'#ff3b3099');rctx.restore();
+    for(const B of BASES){const dx=B.x-EU.pos.x,dz=B.z-EU.pos.z,a=Math.atan2(dz,dx)-hd,d=Math.min(c-8,Math.hypot(dx,dz)*esc2);
+      rctx.fillStyle=B.i===MINHA_BASE?'#3cd070':'#ff3b30';rctx.fillRect(c+Math.sin(a)*d-5,c-Math.cos(a)*d-5,10,10);}}
   for(const o of OUT.values())if(o.vivo)ponto(o.pos.x,o.pos.z,o.cor,6);
   for(const m of MISV.values())ponto(m.pos.x,m.pos.z,m.alvo===EU.id?'#ff2020':'#ffffff',3);
   rctx.fillStyle='#fff';rctx.beginPath();rctx.moveTo(c,c-9);rctx.lineTo(c+6,c+6);rctx.lineTo(c-6,c+6);rctx.fill();}
@@ -423,7 +487,8 @@ requestAnimationFrame(quadro);
 
 // ------------------------------------------------ menu
 try{$('#nome').value=localStorage.getItem('jsjet-nome')||'';$('#inverter').checked=localStorage.getItem('jsjet-inv')==='1';}catch(e){}
-$('#decolar').addEventListener('click',async()=>{const nome=$('#nome').value.trim()||'Piloto '+Math.floor(Math.random()*900+100);EU.nome=nome;
+$('#salaPvp').addEventListener('click',()=>{SALA='pvp';$('#decolar').dataset.sala='pvp';$('#decolar').click();});
+$('#decolar').addEventListener('click',async()=>{SALA=$('#decolar').dataset.sala||'bots';delete $('#decolar').dataset.sala;const nome=$('#nome').value.trim()||'Piloto '+Math.floor(Math.random()*900+100);EU.nome=nome;
   try{localStorage.setItem('jsjet-nome',$('#nome').value.trim());localStorage.setItem('jsjet-inv',$('#inverter').checked?'1':'0');}catch(e){}
   SOM.ini();$('#erro').textContent='';
   if(TOQUE){try{await document.documentElement.requestFullscreen?.();}catch(e){}try{await screen.orientation?.lock?.('landscape');}catch(e){}}
@@ -439,6 +504,6 @@ function sair(){jogando=false;document.body.classList.remove('jogando');
   if(ws){ws.onclose=null;try{ws.close();}catch(e){}ws=null;}conectado=false;EU.vivo=false;SOM.motor(0,false,false);
   for(const o of OUT.values()){cena.remove(o.g);o.rot.remove();}OUT.clear();for(const m of MISV.values())cena.remove(m.g);MISV.clear();
   if(JATO){cena.remove(JATO);JATO=null;}for(const k in TEC)TEC[k]=false;
-  for(const id of['#mira','#seta','#trava','#alerta','#aviso','#morte'])$(id).style.display='none';
+  for(const id of['#mira','#seta','#trava','#alerta','#aviso','#morte','#dicaDec'])$(id).style.display='none';
   $('#placar').innerHTML='';$('#feed').innerHTML='';$('#erro').textContent='';$('#menu').style.display='flex';$('#nome').focus();}
 $('#bVisao').addEventListener('pointerdown',e=>{e.stopPropagation();trocaVisao();});

@@ -29,3 +29,11 @@ Novo projeto do Gomes (09/11/2026), nascido do show do caça do Ônibus da Ilha.
 - **Esc** volta ao menu · **V** / 👁️ troca câmera de trás ⇄ cabine
 - Cabine: painel com 3 telas (radar, horizonte, estado), HUD verde (escada, velocidade, altitude, rumo, LOCK), manche que mexe, acelerador, pernas/mãos do piloto
 - Desenhada numa cena separada por cima do mundo (`cenaCab`), sem briga de profundidade
+
+## 🛫 v0.4 (10/11) — salas e bases
+- Menu: **🤖 Sala com bots** (igual antes) ou **⚔️ Sala sem bots** (só gente, com bases)
+- Sala sem bots: 4 bases no máximo, num anel a 7,2 km; a **zona de combate** é o círculo amarelo de 3,8 km no meio
+- Cada um nasce **parado na cabeceira da pista** da sua base; acelera, puxa o manche (a partir de ~230 km/h) e decola (a 360 km/h o nariz sobe sozinho)
+- Base dos outros: a menos de 3 km = **míssil terra-ar (SAM)** a cada 3,5 s (80 de dano, flare desvia); a sua base não atira em você
+- 2 jogadores ficam em bases opostas; a bandeira da base tem a cor do dono; radar mostra bases (verde = sua) e os anéis
+- Teste: `node testes/bases.js` · backup antes das bases em `backups/v0.3b/`

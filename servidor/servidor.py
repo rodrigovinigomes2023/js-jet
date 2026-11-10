@@ -24,6 +24,17 @@ ARENA = 4200
 AV = {}            # id -> Aviao
 _prox = [1]
 
+# (10/11) salas: 'bots' (como antes, completa com bots) e 'pvp' (sem bots, com bases)
+SALAS = ('bots', 'pvp')
+# Bases da sala pvp: 4 no máximo, num anel fora da zona de combate (círculo no meio do mapa).
+# Cada um nasce na pista da sua base; chegar perto de base alheia = míssil terra-ar (SAM).
+BASE_R, ZONA, R_SAM = 7200, 3800, 3000
+BASE_H = 18.0
+BASES = [[math.cos(math.radians(a)) * BASE_R, BASE_H, math.sin(math.radians(a)) * BASE_R] for a in (45, 135, 225, 315)]
+ORDEM_BASES = (0, 2, 1, 3)       # 2 jogadores ficam em bases opostas
+SAM_ESPERA, DANO_SAM = 3.5, 80
+T_SAM = [0.0] * len(BASES)       # último disparo de cada base
+
 
 def norm(v):
     n = math.sqrt(v[0] ** 2 + v[1] ** 2 + v[2] ** 2) or 1.0
@@ -82,10 +93,21 @@ def ponto_nascer():
     return p, norm([-p[0], 0, -p[2]])
 
 
+def escolher_base():
+    """Base com menos jogadores (empate: ordem que deixa os 2 primeiros em lados opostos)."""
+    conta = [0] * len(BASES)
+    for a in AV.values():
+        if a.sala == 'pvp' and a.base is not None:
+            conta[a.base] += 1
+    return min(ORDEM_BASES, key=lambda i: (conta[i], ORDEM_BASES.index(i)))
+
+
 class Aviao:
-    def __init__(self, nome, bot=False, ws=None):
+    def __init__(self, nome, bot=False, ws=None, sala='bots'):
         self.id = _prox[0]; _prox[0] += 1
-        usadas = {a.cor for a in AV.values()}
+        self.sala = sala
+        self.base = escolher_base() if sala == 'pvp' else None
+        usadas = {a.cor for a in AV.values() if a.sala == sala}
         livres = [c for c in CORES if c not in usadas] or CORES
         self.cor = livres[0]
         self.nome, self.bot, self.ws = nome, bot, ws
@@ -107,14 +129,23 @@ class Aviao:
 
 
 class Missil:
-    def __init__(self, dono, alvo):
+    def __init__(self, dono, alvo, base=None):
         self.id = _prox_m[0]; _prox_m[0] += 1
-        self.dono, self.alvo = dono, alvo
+        self.dono, self.alvo, self.base = dono, alvo, base
+        self.t = 0.0
+        if base is not None:   # SAM: sai da base subindo em direção ao alvo
+            b = BASES[base]
+            self.sala = 'pvp'
+            self.p = [b[0], b[1] + 8, b[2]]
+            d = norm([alvo.p[i] - self.p[i] for i in range(3)])
+            self.f = norm([d[0], d[1] + 1.2, d[2]])
+            self.vel = 120.0
+            return
+        self.sala = dono.sala
         f = norm(dono.v) if dot(dono.v, dono.v) > 1 else [1, 0, 0]
         self.p = [dono.p[i] + f[i] * 12 - (0, 3, 0)[i] for i in range(3)]
         self.f = f
         self.vel = max(150.0, math.sqrt(dot(dono.v, dono.v)))
-        self.t = 0.0
 
 
 async def mandar(a, msg):
@@ -126,14 +157,16 @@ async def mandar(a, msg):
         pass
 
 
-async def todos(msg, exceto=None):
+async def todos(msg, sala, exceto=None):
     s = json.dumps(msg, separators=(',', ':'))
-    await asyncio.gather(*(mandar(a, s) for a in list(AV.values()) if not a.bot and a is not exceto))
+    await asyncio.gather(*(mandar(a, s) for a in list(AV.values()) if not a.bot and a is not exceto and a.sala == sala))
 
 
-async def placar():
-    await todos({'t': 'placar', 'l': [{'id': a.id, 'nome': a.nome, 'cor': a.cor, 'bot': a.bot,
-                                         'pontos': a.pontos, 'mortes': a.mortes} for a in AV.values()]})
+async def placar(sala):
+    l = [a for a in AV.values() if a.sala == sala]
+    msg = {'t': 'placar', 'l': [{'id': a.id, 'nome': a.nome, 'cor': a.cor, 'bot': a.bot,
+                                 'pontos': a.pontos, 'mortes': a.mortes, 'base': a.base} for a in l]}
+    await todos(msg, sala)
 
 
 async def matar(alvo, por, arma='canhao'):
@@ -144,8 +177,8 @@ async def matar(alvo, por, arma='canhao'):
     alvo.t_morte = time.monotonic()
     if por is not None and por is not alvo:
         por.pontos += 1
-    await todos({'t': 'abate', 'alvo': alvo.id, 'por': por.id if por and por is not alvo else None, 'p': alvo.p, 'arma': arma})
-    await placar()
+    await todos({'t': 'abate', 'alvo': alvo.id, 'por': por.id if por and por is not alvo else None, 'p': alvo.p, 'arma': arma}, alvo.sala)
+    await placar(alvo.sala)
 
 
 async def dano(alvo, qto, por, arma='canhao'):
@@ -158,7 +191,7 @@ async def dano(alvo, qto, por, arma='canhao'):
 
 def pode_travar(a, alvo):
     """Confere a trava pelo lado do servidor: alvo vivo, até 3 km e na frente do nariz (cone de 40°)."""
-    if not alvo or alvo is a or not alvo.vivo or not a.vivo:
+    if not alvo or alvo is a or not alvo.vivo or not a.vivo or alvo.sala != a.sala:
         return False
     d = math.dist(a.p, alvo.p)
     if d > 3000 or d < 1:
@@ -175,7 +208,7 @@ async def lancar(a, alvo):
     a.misseis -= 1
     m = Missil(a, alvo)
     MIS[m.id] = m
-    await todos({'t': 'missil', 'id': m.id, 'dono': a.id, 'alvo': alvo.id})
+    await todos({'t': 'missil', 'id': m.id, 'dono': a.id, 'alvo': alvo.id}, a.sala)
     if not a.bot:
         await mandar(a, {'t': 'mun', 'm': a.misseis})
 
@@ -188,7 +221,7 @@ async def soltar_flare(a):
     for m in MIS.values():
         if m.alvo is a and random.random() < 0.7:   # 70% dos mísseis vão atrás do flare
             m.alvo = None
-    await todos({'t': 'flare', 'id': a.id})
+    await todos({'t': 'flare', 'id': a.id}, a.sala)
     if not a.bot:
         await mandar(a, {'t': 'flareok', 'espera': ESPERA_FLARE})
 
@@ -208,12 +241,14 @@ async def voar_misseis(dt, agora):
         m.p = [m.p[i] + m.f[i] * m.vel * dt for i in range(3)]
         acabou = m.t > 9 or m.p[1] < 0
         if alvo and math.dist(alvo.p, m.p) < 20:
-            await todos({'t': 'boom', 'p': [round(x, 1) for x in m.p], 'acertou': alvo.id})
-            dono = AV.get(m.dono.id)
-            await dano(alvo, DANO_MISSIL, dono, 'missil')
+            await todos({'t': 'boom', 'p': [round(x, 1) for x in m.p], 'acertou': alvo.id}, m.sala)
+            if m.base is not None:
+                await dano(alvo, DANO_SAM, None, 'sam')
+            else:
+                await dano(alvo, DANO_MISSIL, AV.get(m.dono.id), 'missil')
             acabou = True
         elif acabou:
-            await todos({'t': 'boom', 'p': [round(x, 1) for x in m.p], 'acertou': 0})
+            await todos({'t': 'boom', 'p': [round(x, 1) for x in m.p], 'acertou': 0}, m.sala)
         if acabou:
             MIS.pop(m.id, None)
     for a in AV.values():   # recarga dos mísseis: um a cada RECARGA_MISSIL
@@ -224,8 +259,24 @@ async def voar_misseis(dt, agora):
                 await mandar(a, {'t': 'mun', 'm': a.misseis})
 
 
+async def defesa_bases(agora):
+    """(10/11) SAM: base atira em quem chega a menos de R_SAM dela, menos no dono da base."""
+    for a in AV.values():
+        if a.sala != 'pvp' or a.bot or not a.vivo:
+            continue
+        for i, b in enumerate(BASES):
+            if i == a.base or math.hypot(a.p[0] - b[0], a.p[2] - b[2]) > R_SAM or a.p[1] > 6000:
+                continue
+            if agora - T_SAM[i] < SAM_ESPERA or any(m.base == i and m.alvo is a for m in MIS.values()):
+                continue
+            T_SAM[i] = agora
+            m = Missil(None, a, base=i)
+            MIS[m.id] = m
+            await todos({'t': 'missil', 'id': m.id, 'dono': 0, 'base': i, 'alvo': a.id}, 'pvp')
+
+
 async def ajustar_bots():
-    humanos = sum(1 for a in AV.values() if not a.bot)
+    humanos = sum(1 for a in AV.values() if not a.bot and a.sala == 'bots')
     bots = [a for a in AV.values() if a.bot]
     falta = (MIN_AVIOES - humanos - len(bots)) if humanos else -len(bots)
     if falta > 0:
@@ -245,7 +296,7 @@ async def voar_bot(b, dt, agora):
             b.p, b.f = ponto_nascer()
             b.vida, b.vivo, b.bank = 100, True, 0.0
         return
-    vivos = [a for a in AV.values() if a.vivo and a is not b]
+    vivos = [a for a in AV.values() if a.vivo and a is not b and a.sala == b.sala]
     humanos = [a for a in vivos if not a.bot]
     cand = humanos if humanos and random.random() > 0.0 else vivos
 
@@ -298,7 +349,7 @@ async def voar_bot(b, dt, agora):
         dirr = norm([alvo.p[i] - b.p[i] for i in range(3)])
         if d < 850 and dot(f1, dirr) > math.cos(math.radians(6)) and agora - b.ult_tiro > 0.1:
             b.ult_tiro = agora
-            await todos({'t': 'tiro', 'id': b.id, 'p': [round(x, 1) for x in b.p], 'd': [round(x, 3) for x in f1]})
+            await todos({'t': 'tiro', 'id': b.id, 'p': [round(x, 1) for x in b.p], 'd': [round(x, 3) for x in f1]}, b.sala)
             if random.random() < 0.16:
                 await dano(alvo, 6, b)
 
@@ -311,12 +362,15 @@ async def laco(app):
             for b in [a for a in AV.values() if a.bot]:
                 await voar_bot(b, dt, t0)
             await voar_misseis(dt, t0)
-            if any(not a.bot for a in AV.values()):
+            await defesa_bases(t0)
+            for sala in SALAS:
+                if not any(not a.bot and a.sala == sala for a in AV.values()):
+                    continue
                 j = [[a.id] + [round(x, 1) for x in a.p] + [round(x, 4) for x in a.q] + [round(x, 1) for x in a.v]
-                     + [a.vida, 1 if a.vivo else 0] for a in AV.values()]
+                     + [a.vida, 1 if a.vivo else 0] for a in AV.values() if a.sala == sala]
                 m = [[x.id] + [round(v, 1) for v in x.p] + [round(x.f[i] * x.vel, 1) for i in range(3)]
-                     + [x.alvo.id if x.alvo else 0] for x in MIS.values()]
-                await todos({'t': 'snap', 'j': j, 'm': m})
+                     + [x.alvo.id if x.alvo else 0] for x in MIS.values() if x.sala == sala]
+                await todos({'t': 'snap', 'j': j, 'm': m}, sala)
         except Exception as e:  # o laço nunca pode morrer
             print('laço:', e, flush=True)
         await asyncio.sleep(max(0.0, dt - (time.monotonic() - t0)))
@@ -338,12 +392,14 @@ async def ws_jogo(req):
             t = d.get('t')
             if t == 'entrar' and a is None:
                 nome = str(d.get('nome') or 'Piloto').strip()[:16] or 'Piloto'
-                a = Aviao(nome, ws=ws)
+                sala = d.get('sala') if d.get('sala') in SALAS else 'bots'
+                a = Aviao(nome, ws=ws, sala=sala)
                 AV[a.id] = a
-                print(f'entrou {a.id} {nome}', flush=True)
+                print(f'entrou {a.id} {nome} sala={sala} base={a.base}', flush=True)
                 await ajustar_bots()
-                await mandar(a, {'t': 'bemvindo', 'id': a.id, 'cor': a.cor})
-                await placar()
+                await mandar(a, {'t': 'bemvindo', 'id': a.id, 'cor': a.cor, 'sala': sala, 'base': a.base,
+                                 'bases': BASES, 'zona': ZONA, 'rsam': R_SAM})
+                await placar(sala)
             elif a is None:
                 continue
             elif t == 'e':
@@ -353,12 +409,12 @@ async def ws_jogo(req):
             elif t == 'tiro' and a.vivo:
                 p, dd = nums(d.get('p', []), 3), nums(d.get('d', []), 3, 2)
                 if p and dd:
-                    await todos({'t': 'tiro', 'id': a.id, 'p': p, 'd': dd}, exceto=a)
+                    await todos({'t': 'tiro', 'id': a.id, 'p': p, 'd': dd}, a.sala, exceto=a)
             elif t == 'acerto' and a.vivo:
                 alvo = AV.get(d.get('alvo'))
                 agora = time.monotonic()
                 a.acertos = [x for x in a.acertos if agora - x < 1]
-                if alvo and alvo is not a and alvo.vivo and len(a.acertos) < 18 and math.dist(a.p, alvo.p) < 1500:
+                if alvo and alvo is not a and alvo.vivo and alvo.sala == a.sala and len(a.acertos) < 18 and math.dist(a.p, alvo.p) < 1500:
                     a.acertos.append(agora)
                     await dano(alvo, DANO_TIRO, a)
             elif t == 'missil' and a.vivo:
@@ -384,7 +440,7 @@ async def ws_jogo(req):
                     m.alvo = None
             print(f'saiu {a.id} {a.nome}', flush=True)
             await ajustar_bots()
-            await placar()
+            await placar(a.sala)
     return ws
 
 
