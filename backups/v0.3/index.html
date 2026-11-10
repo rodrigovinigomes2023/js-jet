@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0d1420">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>JS-JET</title>
+<link rel="icon" href="data:,">
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+  html,body{margin:0;height:100%;overflow:hidden;background:#0d1420;color:#fff;font-family:system-ui,"Segoe UI",Roboto,Arial,sans-serif;touch-action:none}
+  canvas#tela{display:block;position:fixed;inset:0;width:100%;height:100%}
+  .hud{position:fixed;pointer-events:none;text-shadow:0 1px 3px #000a}
+  #mira{width:34px;height:34px;margin:-17px 0 0 -17px;border:2px solid #fffc;border-radius:50%;left:50%;top:50%}
+  #mira::after{content:"";position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px;background:#fff;border-radius:50%}
+  #mira.acertou{border-color:#ff4b3a;transform:scale(1.25)}
+  #radar{left:max(10px,env(safe-area-inset-left));top:10px;width:118px;height:118px;border-radius:50%;background:#0b1a2acc;border:2px solid #7fd3ff66}
+  #placar{right:max(10px,env(safe-area-inset-right));top:10px;font-size:13px;background:#0b1a2acc;border-radius:10px;padding:6px 10px;min-width:130px}
+  #placar div{display:flex;justify-content:space-between;gap:10px;line-height:1.5}
+  #placar .eu{font-weight:800}
+  #bVisao{position:fixed;left:max(47px,calc(env(safe-area-inset-left) + 37px));top:136px;width:44px;height:44px;border-radius:50%;background:#0b1a2acc;border:2px solid #7fd3ff66;display:none;align-items:center;justify-content:center;font-size:22px;cursor:pointer;z-index:2}
+  body.jogando #bVisao{display:flex}
+  body.cabine #barras,body.cabine #mira{display:none!important}
+  #feed{left:50%;top:10px;transform:translateX(-50%);font-size:14px;text-align:center}
+  #feed div{background:#0b1a2acc;border-radius:8px;padding:3px 10px;margin-bottom:4px;animation:some 4s forwards}
+  @keyframes some{0%,80%{opacity:1}100%{opacity:0}}
+  #barras{left:50%;bottom:12px;transform:translateX(-50%);width:min(320px,46vw);font-size:12px}
+  .barra{height:9px;background:#0008;border-radius:5px;overflow:hidden;margin-top:4px}
+  .barra i{display:block;height:100%;width:100%;border-radius:5px;transition:width .15s}
+  #bVida i{background:linear-gradient(90deg,#3ad07a,#9be15d)}
+  #bTurboB i{background:linear-gradient(90deg,#ff9a2a,#ffd23a)}
+  #info{display:flex;justify-content:space-between;font-weight:700}
+  #aviso{left:50%;top:32%;transform:translateX(-50%);font-size:20px;font-weight:800;color:#ffd23a;text-align:center;display:none}
+  #dor{inset:0;box-shadow:inset 0 0 120px 40px #ff1e1e;opacity:0;transition:opacity .25s}
+  .rot{position:fixed;transform:translate(-50%,-100%);font-size:12px;font-weight:700;white-space:nowrap;pointer-events:none;text-align:center;text-shadow:0 1px 3px #000}
+  .rot b{display:block;height:3px;background:#0008;margin-top:2px;border-radius:2px;overflow:hidden}
+  .rot b i{display:block;height:100%;background:#ff5a4a}
+  #trava{left:0;top:0;width:58px;height:58px;border:3px solid #ffd23a;border-radius:6px;display:none;transition:transform .08s}
+  #trava.ok{border-color:#ff3b30;box-shadow:0 0 12px #ff3b30}
+  #alerta{left:50%;top:22%;transform:translateX(-50%);font-size:24px;font-weight:900;color:#fff;background:#d01c1ccc;padding:6px 16px;border-radius:10px;display:none;animation:pisca .3s infinite alternate}
+  @keyframes pisca{from{opacity:1}to{opacity:.45}}
+  #tMis{font-weight:700;text-align:center;margin-top:3px;font-size:12px}
+  #bMissil{right:max(30px,env(safe-area-inset-right));bottom:136px;width:70px;height:70px;font-size:20px}
+  #bMissil.pronto{background:#ff3b3066;border-color:#ff3b30;box-shadow:0 0 14px #ff3b30}
+  #bFlare{right:max(136px,calc(env(safe-area-inset-right) + 114px));bottom:100px;width:58px;height:58px;font-size:22px}
+  .bt.vazio{opacity:.35}
+  #seta{width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-bottom:22px solid #ff5a4a;display:none;filter:drop-shadow(0 0 3px #000)}
+  /* controles de toque */
+  #toque{display:none}
+  body.toque #toque{display:block}
+  #zonaJoy{position:fixed;left:0;top:0;bottom:0;width:50%}
+  #joy{position:fixed;width:130px;height:130px;margin:-65px 0 0 -65px;border-radius:50%;border:2px solid #fff5;background:#fff1;display:none;pointer-events:none}
+  #joyK{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px;border-radius:50%;background:#fff6}
+  .bt{position:fixed;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;background:#ffffff22;border:2px solid #fff6}
+  .bt.on{background:#ffffff55}
+  #bFogo{right:max(22px,env(safe-area-inset-right));bottom:26px;width:96px;height:96px;background:#ff4b3a44;border-color:#ff8a7a}
+  #bTurbo{right:max(136px,calc(env(safe-area-inset-right) + 114px));bottom:22px;width:66px;height:66px;font-size:22px}
+  /* menu */
+  #menu{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 30%,#1c3d63,#0d1420 70%);z-index:5;padding:16px}
+  #menu .card{width:min(380px,100%);text-align:center}
+  #menu h1{font-size:46px;margin:0 0 4px;letter-spacing:2px}
+  #menu p{opacity:.8;margin:0 0 18px}
+  #menu input[type=text]{width:100%;font-size:20px;padding:12px 14px;border-radius:12px;border:2px solid #7fd3ff66;background:#0b1a2a;color:#fff;text-align:center;user-select:text;-webkit-user-select:text}
+  #menu button{margin-top:14px;width:100%;font-size:22px;font-weight:800;padding:14px;border:0;border-radius:12px;background:linear-gradient(180deg,#ffd23a,#ff9a2a);color:#3a1d00;cursor:pointer}
+  #menu label{display:block;margin-top:12px;font-size:14px;opacity:.85}
+  #menu .dica{font-size:13px;opacity:.65;margin-top:16px;line-height:1.5}
+  #erro{color:#ff8a7a;margin-top:10px;font-size:14px;min-height:1em}
+  #morte{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);text-align:center;font-size:26px;font-weight:800;display:none;text-shadow:0 2px 6px #000}
+  #morte small{display:block;font-size:16px;font-weight:600;opacity:.85;margin-top:6px}
+  #girar{position:fixed;inset:0;background:#0d1420ee;display:none;align-items:center;justify-content:center;text-align:center;font-size:20px;z-index:6;padding:24px}
+  @media (orientation:portrait){body.toque.jogando #girar{display:flex}}
+</style>
+</head>
+<body>
+<canvas id="tela"></canvas>
+
+<div class="hud" id="dor"></div>
+<div class="hud" id="mira"></div>
+<div class="hud" id="seta"></div>
+<div class="hud" id="trava"></div>
+<div class="hud" id="alerta">⚠️ MÍSSIL! solte ✨ flares</div>
+<canvas class="hud" id="radar" width="236" height="236"></canvas>
+<div class="hud" id="placar"></div>
+<div id="bVisao" title="Trocar visão (V)">👁️</div>
+<div class="hud" id="feed"></div>
+<div class="hud" id="aviso">⚠️ Volte para a área de combate!</div>
+<div class="hud" id="barras">
+  <div id="info"><span id="tVel">0 km/h</span><span id="tAlt">0 m</span></div>
+  <div class="barra" id="bVida"><i></i></div>
+  <div class="barra" id="bTurboB"><i></i></div>
+  <div id="tMis"></div>
+</div>
+<div id="rotulos"></div>
+<div id="morte"></div>
+
+<div id="toque">
+  <div id="zonaJoy"></div>
+  <div id="joy"><div id="joyK"></div></div>
+  <div class="bt" id="bTurbo">🔥</div>
+  <div class="bt" id="bFogo">🎯</div>
+  <div class="bt" id="bMissil">🚀2</div>
+  <div class="bt" id="bFlare">✨</div>
+</div>
+
+<div id="girar">📱↻<br>Vire o celular deitado para voar melhor</div>
+
+<div id="menu">
+  <div class="card">
+    <h1>✈️ JS-JET</h1>
+    <p>Combate aéreo multiplayer</p>
+    <input type="text" id="nome" maxlength="16" placeholder="Seu nome de piloto" autocomplete="off">
+    <label><input type="checkbox" id="inverter"> Inverter subir/descer</label>
+    <button id="decolar">DECOLAR 🚀</button>
+    <div id="erro"></div>
+    <div class="dica">
+      📱 <b>Celular:</b> arraste no lado esquerdo para pilotar · 🎯 atira · 🚀 míssil (trave a mira 1 s) · ✨ flare · 🔥 turbo<br>
+      ⌨️ <b>Teclado:</b> W/S desce/sobe · A/D gira · Q/E leme · Espaço atira · F míssil · X flare · Shift turbo · V cabine · Esc sai
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="jogo.js"></script>
+</body>
+</html>
