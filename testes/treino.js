@@ -1,0 +1,21 @@
+// (10/11) tutorial de voo de ponta a ponta (offline).  node testes/treino.js  [TOQUE=1 p/ celular]
+const {chromium}=require('/home/gomes/Área de Trabalho/tnb/node_modules/playwright-core');
+(async()=>{const b=await chromium.launch({executablePath:process.env.HOME+'/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome',args:['--use-gl=swiftshader','--enable-unsafe-swiftshader','--mute-audio']});
+  const T=!!process.env.TOQUE;const pg=await b.newPage(T?{viewport:{width:800,height:370},hasTouch:true,isMobile:true}:{viewport:{width:1100,height:620}});pg.on('pageerror',e=>console.log('ERRO',e.message));
+  await pg.goto('http://localhost:'+(process.env.PORTA||8791)+'/'+(T?'?toque':''));await pg.waitForTimeout(1500);await pg.click('#bConvidado');await pg.waitForTimeout(400);await pg.click('#bTreino');await pg.waitForTimeout(1500);
+  const passo=()=>pg.evaluate(()=>JJ.TREINO.passo+' '+document.querySelector('#treino b').textContent+' | '+(document.querySelector('#tExtra')?.textContent||'')+' | '+Math.round(JJ.EU.vel*3.6)+'km/h y'+Math.round(JJ.EU.pos.y));
+  const log=async m=>console.log(m.padEnd(16),await passo());
+  await log('início');await pg.screenshot({path:__dirname+'/f_treino1.png'});
+  await pg.keyboard.down('ShiftLeft');await pg.waitForTimeout(3000);await pg.keyboard.down('ArrowDown');await pg.waitForTimeout(2500);await pg.keyboard.up('ArrowDown');await pg.keyboard.up('ShiftLeft');await log('decolou');
+  await pg.evaluate(()=>{JJ.EU.pos.y=700;});await pg.waitForTimeout(300);await log('subiu');
+  await pg.keyboard.down('ArrowLeft');await pg.waitForTimeout(700);await pg.keyboard.up('ArrowLeft');await log('esquerda');
+  await pg.keyboard.down('ArrowRight');await pg.waitForTimeout(1300);await pg.keyboard.up('ArrowRight');await pg.waitForTimeout(1500);await log('direita');
+  await pg.waitForTimeout(500);await pg.screenshot({path:__dirname+'/f_treino_aneis.png'});
+  const atravessa=()=>pg.evaluate(()=>{const A=JJ.TREINO.alvo;if(A)JJ.EU.pos.copy(A.m.position);});
+  for(let i=0;i<3;i++){await atravessa();await pg.waitForTimeout(300);}await log('3 anéis');
+  await pg.keyboard.down('KeyD');await pg.waitForTimeout(900);await pg.keyboard.up('KeyD');await atravessa();await pg.waitForTimeout(300);await log('leme');
+  await pg.evaluate(()=>{JJ.EU.pos.y=2500;});await pg.keyboard.down('KeyE');await pg.waitForTimeout(5000);await log('freou');
+  await pg.keyboard.down('ArrowDown');await pg.waitForTimeout(2500);await log('stall');await pg.keyboard.up('ArrowDown');await pg.keyboard.up('KeyE');await pg.waitForTimeout(2500);await log('recuperou');
+  await pg.keyboard.down('ShiftLeft');await pg.waitForTimeout(6000);await pg.keyboard.up('ShiftLeft');await log('turbo');await pg.screenshot({path:__dirname+'/f_treino_pista.png'});
+  await atravessa();await pg.waitForTimeout(400);await log('rasante');await pg.screenshot({path:__dirname+'/f_treino_fim.png'});
+  await b.close();})();

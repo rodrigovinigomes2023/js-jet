@@ -1,3 +1,5 @@
 servidor/.venv/
 testes/*.png
 __pycache__/
+servidor/dados/
+scripts/tiktok/.venv/

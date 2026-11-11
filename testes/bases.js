@@ -9,7 +9,7 @@ const {chromium}=require('/home/gomes/Área de Trabalho/tnb/node_modules/playwri
   const est=()=>pg.evaluate(()=>{const {EU}=window.JJ;return{solo:EU.solo,vivo:EU.vivo,vel:Math.round(EU.vel*3.6),y:Math.round(EU.pos.y),x:Math.round(EU.pos.x),z:Math.round(EU.pos.z),aviso:document.querySelector('#aviso').style.display==='block'?document.querySelector('#aviso').textContent:''};});
   console.log('pista',JSON.stringify(await est()));await pg.screenshot({path:__dirname+'/f_pista.png'});
   await pg.keyboard.down('ShiftLeft');await pg.waitForTimeout(2500);console.log('correndo',JSON.stringify(await est()));
-  await pg.keyboard.down('KeyS');await pg.waitForTimeout(1500);await pg.keyboard.up('KeyS');console.log('subindo',JSON.stringify(await est()));
+  await pg.keyboard.down('ArrowDown');await pg.waitForTimeout(1500);await pg.keyboard.up('ArrowDown');console.log('subindo',JSON.stringify(await est()));
   await pg.screenshot({path:__dirname+'/f_decolou.png'});await pg.keyboard.up('ShiftLeft');await pg.waitForTimeout(3000);console.log('voando',JSON.stringify(await est()));
   // vai p/ perto da base 2 (oposta), a 2 km dela
   await pg.evaluate(()=>{const {EU}=window.JJ;const a=225*Math.PI/180;EU.pos.set(Math.cos(a)*5200,600,Math.sin(a)*5200);EU.q.setFromAxisAngle(new THREE.Vector3(0,1,0),Math.atan2(EU.pos.z,-EU.pos.x)+Math.PI);});
