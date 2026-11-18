@@ -1,0 +1,3 @@
+MetalPlates001 — ambientCG (https://ambientcg.com/a/MetalPlates001)
+Licença CC0 1.0 (domínio público): uso comercial livre, sem atribuição obrigatória.
+Baixado em 11/11/2026 (1K-JPG). Versões tratadas p/ o jogo em fonte/pele_*.jpg (scripts/texturas_pele.py).

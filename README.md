@@ -105,3 +105,10 @@ Novo projeto do Gomes (09/11/2026), nascido do show do caça do Ônibus da Ilha.
 - **Munição acaba** (só nesta sala): canhão 500 balas, 2 mísseis, 4 bombas, sem recarga automática. **Rasante** (< 130 m de altura, até 850 m do centro da base) na **própria base** rearma tudo e conserta. HUD mostra 🔫; sem munição aparece aviso e a seta aponta p/ casa.
 - **Bots**: tiro de verdade (bala tem que passar a < 10 m do alvo, erro de mira de 0,8° a 2° por piloto, atiram quando o "◇" deles alinha); com pouca munição ou machucados **voltam p/ casa e fazem o rasante**; virada com rotação de verdade (antes, alvo bem atrás travava a curva).
 - Testes: `testes/dm_bases.js` (nasce na base, gasta bala, rasante recarrega, base inimiga derruba) + simulações em Python.
+
+## v0.7b (11/11) — 🔥 queda em chamas, ejeção e rastro de vapor
+- **Abatido não some mais**: a carcaça (cópia do avião) cai girando, com fogo e fumaça; no **chão** explode, solta estilhaços e deixa fogo + coluna de fumaça (~14 s); na **água** espirra e some. **Navio** afunda inclinando e pegando fogo. Drones do tutorial também caem.
+- 🪂 **Piloto ejeta** (85%): assento sobe com foguete, abre paraquedas laranja e desce balançando até o chão/água.
+- Na minha morte a câmera **segue a minha carcaça** caindo (se cair direto no chão: fogo/espirro no lugar).
+- 💨 **Rastro de vapor nas pontas das asas** (fita branca que some aos poucos): aparece com G alto (> ~2,2 G) e em alta velocidade, no meu avião e nos outros.
+- Teste `testes/queda.js`; física conferida empurrando o tempo direto (cai de 800 m em ~13 s).
