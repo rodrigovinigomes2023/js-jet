@@ -5,7 +5,8 @@ Cada cliente simula o próprio caça e manda posição 20x/s; o servidor guarda 
 valida acertos e voa os bots (completa a sala até MIN_AVIOES).
 Rodar: servidor/.venv/bin/python servidor/servidor.py   (PORTA=8791 por padrão)
 """
-import asyncio, ipaddress, json, math, os, random, time
+import asyncio, base64, ipaddress, json, math, os, random, time
+from array import array
 from pathlib import Path
 from aiohttp import web, WSMsgType
 import contas   # (10/11) login e ranking
@@ -72,8 +73,74 @@ def _ilhas():
 ILHAS = _ilhas()
 
 
+def _terreno():
+    """(18/11) Relevo das ilhas-montanha: as mesmas grades que o cliente usa (fonte/terreno.js, gerado por scripts/terreno/gerar.py)."""
+    txt = (RAIZ / 'terreno.js').read_text()
+    meta = json.loads(txt.split('window.TERRENO=', 1)[1].split(';\n', 1)[0])
+    a = array('h')
+    a.frombytes(base64.b64decode(txt.split('window.TERRENO.dados="', 1)[1].split('"', 1)[0]))
+    for I in meta['ilhas']:
+        I['x1'] = I['x0'] + (I['nx'] - 1) * meta['passo']
+        I['z1'] = I['z0'] + (I['nz'] - 1) * meta['passo']
+    return meta, a
+
+
+TER, TER_A = _terreno()
+
+
+def relevo_bruto(x, z):
+    """Altura do terreno das ilhas (m); fora delas, o fundo do mar."""
+    h, p = TER['fundo'], TER['passo']
+    for I in TER['ilhas']:
+        if I['x0'] <= x <= I['x1'] and I['z0'] <= z <= I['z1']:
+            fx, fz = (x - I['x0']) / p, (z - I['z0']) / p
+            i, j = max(0, min(I['nx'] - 2, int(fx))), max(0, min(I['nz'] - 2, int(fz)))
+            u, v, o, n = fx - i, fz - j, I['of'] + j * I['nx'] + i, I['nx']
+            hi = ((TER_A[o] * (1 - u) + TER_A[o + 1] * u) * (1 - v) + (TER_A[o + n] * (1 - u) + TER_A[o + n + 1] * u) * v) * 0.25
+            h = max(h, hi)
+    return h
+
+
+def relevo(x, z):
+    """Chão (m): ilhas, ilha plana das bases ou o mar (0)."""
+    h = max(0.0, relevo_bruto(x, z))
+    if h < BASE_H and any(math.hypot(x - b[0], z - b[2]) < 760 for b in BASES):
+        h = BASE_H
+    return h
+
+
+def visada(a, b):
+    """O morro está no meio entre os pontos a e b?"""
+    dx, dz = b[0] - a[0], b[2] - a[2]
+    n = max(2, math.ceil(math.hypot(dx, dz) / 60))
+    for k in range(1, n):
+        t = k / n
+        y = a[1] + (b[1] - a[1]) * t
+        if y < 820 and relevo_bruto(a[0] + dx * t, a[2] + dz * t) > y:
+            return False
+    return True
+
+
+VIS = {}   # (18/11) cache de linha de visada entre dois aviões: (id, id) -> (validade, vê?)
+
+
+def ve(b, a, agora):
+    """O bot b enxerga a? (morro no meio = não). Recalcula a cada 0,4 s por par."""
+    k = (b.id, a.id) if b.id < a.id else (a.id, b.id)
+    c = VIS.get(k)
+    if c and agora < c[0]:
+        return c[1]
+    v = visada(b.p, a.p)
+    VIS[k] = (agora + 0.4, v)
+    if len(VIS) > 4000:
+        VIS.clear()
+    return v
+
+
 def e_mar(x, z, folga=120):
-    return all(math.hypot(x - ix, z - iz) > ir + folga for ix, iz, ir in ILHAS)
+    if any(math.hypot(x - b[0], z - b[2]) < 760 + folga for b in BASES):
+        return False
+    return all(relevo_bruto(x + dx, z + dz) < -3 for dx, dz in ((0, 0), (folga, 0), (-folga, 0), (0, folga), (0, -folga)))
 
 
 LANC_LOCAL = ((-320, -120), (320, -120), (0, -190))
@@ -340,7 +407,7 @@ async def voar_misseis(dt, agora):
             passo = 2.4 * dt
             m.f = norm([m.f[i] + (des[i] - m.f[i]) * min(1.0, passo / max(ang, 1e-6)) for i in range(3)])
         m.p = [m.p[i] + m.f[i] * m.vel * dt for i in range(3)]
-        acabou = m.t > 9 or m.p[1] < 0
+        acabou = m.t > 9 or m.p[1] < relevo(m.p[0], m.p[2])   # (18/11) míssil bate no morro
         if alvo and math.dist(alvo.p, m.p) < 20:
             await todos({'t': 'boom', 'p': [round(x, 1) for x in m.p], 'acertou': alvo.id}, m.sala)
             if m.base is not None:
@@ -376,6 +443,8 @@ async def defesa_bases(agora):
                 continue
             if i == a.base or math.hypot(a.p[0] - b[0], a.p[2] - b[2]) > R_SAM_SALA[a.sala] or a.p[1] > 6000:
                 continue
+            if not visada([b[0], b[1] + 15, b[2]], a.p):   # (18/11) atrás do morro o radar do SAM não vê
+                continue
             if agora - T_SAM[i] < SAM_ESPERA or any(m.base == i and m.alvo is a for m in MIS.values()):
                 continue
             if all(LANC_MORTO[i]):          # base com os 3 lançadores destruídos: sem defesa
@@ -396,7 +465,7 @@ async def defesa_bases(agora):
             if LANC_MORTO[i][k]:
                 continue
             boca = [lp[0], lp[1] + 6, lp[2]]
-            cand = [a for a in AV.values() if a.sala == sala and a.vivo and a.base != i and math.dist(a.p, boca) < R_AA]
+            cand = [a for a in AV.values() if a.sala == sala and a.vivo and a.base != i and math.dist(a.p, boca) < R_AA and visada(boca, a.p)]
             if not cand:
                 continue
             alvo = min(cand, key=lambda a: math.dist(a.p, boca))
@@ -460,9 +529,9 @@ async def voar_bombas(dt, agora):
         v[2] *= 1 - ARRASTO_BOMBA * dt
         for i in range(3):
             p[i] += v[i] * dt
-        chao = BASE_H if any(math.hypot(p[0] - bb[0], p[2] - bb[2]) < 760 for bb in BASES) else 0.0
+        chao = relevo(p[0], p[2])                   # (18/11) o servidor também conhece as ilhas
         if p[1] <= chao and 'toque' not in b:
-            b['toque'] = [p[0], chao, p[2]]          # onde tocou o chão (ilhas só o cliente conhece)
+            b['toque'] = [p[0], chao, p[2]]          # onde tocou o chão
         if p[1] < chao - 60 or b['t'] > 40:   # o cliente não avisou (lento ou saiu): explode onde tocou
             await explodir_bomba(bid, b.get('toque') or [p[0], 0.0, p[2]])
     for a in AV.values():   # recarga: uma bomba a cada RECARGA_BOMBA (sala com bots: só no rasante)
@@ -602,7 +671,7 @@ async def voar_bot(b, dt, agora):
             b.vida, b.vivo, b.bank = 100, True, 0.0
             b.misseis, b.bombas, b.balas = MISSEIS_MAX, BOMBAS_MAX, BALAS_MAX
         return
-    vivos = [a for a in AV.values() if a.vivo and a is not b and a.sala == b.sala]
+    vivos = [a for a in AV.values() if a.vivo and a is not b and a.sala == b.sala and ve(b, a, agora)]   # (18/11) atrás do morro o bot não vê
     furia = agora < b.furia_ate
 
     def dist(a):
@@ -650,10 +719,20 @@ async def voar_bot(b, dt, agora):
         des = norm([mira[i] - b.p[i] for i in range(3)])
     else:
         if not b.alvo_pts or math.dist(b.alvo_pts, b.p) < 300:
-            b.alvo_pts = [random.uniform(-2500, 2500), random.uniform(500, 1400), random.uniform(-2500, 2500)]
+            x, z = random.uniform(-2500, 2500), random.uniform(-2500, 2500)
+            b.rasante = random.random() < 0.35 and e_mar(x, z, 300)   # (18/11) às vezes patrulha rasante no mar (levanta água)
+            b.alvo_pts = [x, 22.0 if b.rasante else random.uniform(500, 1400), z]
         des = norm([b.alvo_pts[i] - b.p[i] for i in range(3)])
-    if b.p[1] < 420 and modo != 'casa':
-        des[1] += (420 - b.p[1]) / 120
+    # (18/11) montanhas: olha o chão embaixo e à frente (400 e 900 m) e sobe antes do morro
+    chao = max(relevo(b.p[0] + b.f[0] * k, b.p[2] + b.f[2] * k) for k in (0, 400, 900))
+    piso = max(420.0, chao + 260) if modo != 'casa' else chao + 120
+    if modo != 'casa' and chao < 1:   # (18/11) só mar à frente: pode descer p/ o rasante (patrulha baixa ou caçando alguém baixo)
+        if alvo and alvo.p[1] < 420:
+            piso = max(25.0, alvo.p[1] - 20)
+        elif not alvo and getattr(b, 'rasante', False):
+            piso = 25.0
+    if b.p[1] < piso and (modo != 'casa' or chao > 30):
+        des[1] += (piso - b.p[1]) / 120
     if b.p[1] > 2400:
         des[1] -= 0.6
     rh = math.hypot(b.p[0], b.p[2])
@@ -673,6 +752,7 @@ async def voar_bot(b, dt, agora):
     vel = 135.0 if furia else 118.0
     b.v = [f1[i] * vel for i in range(3)]
     b.p = [b.p[i] + b.v[i] * dt for i in range(3)]
+    b.p[1] = max(b.p[1], relevo(b.p[0], b.p[2]) + 12)   # (18/11) nunca atravessa o morro
     b.q = quat_de(f1, b.bank)
     if b.sala != 'bots' and any(m.alvo is b and math.dist(m.p, b.p) < 900 for m in MIS.values()) and random.random() < 0.03:
         await soltar_flare(b)

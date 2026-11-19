@@ -13,7 +13,7 @@ R.setPixelRatio(Math.min(devicePixelRatio,TOQUE?1.5:2));R.outputEncoding=THREE.s
 R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.0;   // (11/11) gráficos: cor de cinema, custo zero
 const CEU=0x9cc9ec;
 const cena=new THREE.Scene();cena.background=new THREE.Color(CEU);cena.fog=new THREE.Fog(CEU,1800,8000);
-const cam=new THREE.PerspectiveCamera(62,1,1,14000);
+const cam=new THREE.PerspectiveCamera(62,1,2,14000);   // (18/11) near 2 (era 1): o dobro de precisão de profundidade no horizonte
 // (11/11) céu em degradê + brilho do sol (sai em cor de tela; o horizonte = cor da neblina, então as ilhas somem no céu)
 const SOL_DIR=new V3(-0.5,1,0.35).normalize();
 const ceu=new THREE.Mesh(new THREE.SphereGeometry(12000,32,16),new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,fog:false,
@@ -62,10 +62,15 @@ marMat.onBeforeCompile=sh=>{marT=sh.uniforms.uT={value:0};sh.uniforms.uRef={valu
 const mar=new THREE.Mesh(new THREE.PlaneGeometry(60000,60000),marMat);
 mar.rotation.x=-Math.PI/2;cena.add(mar);
 const BASES0=[45,135,225,315].map(g=>[Math.cos(g*Math.PI/180)*18600,Math.sin(g*Math.PI/180)*18600]);   // centro das bases (= BASE_R)
-const ILHAS=[];{const r=rnd(20251109);ILHAS.push({x:300,z:-200,r:1100,h:420});
-  for(let i=0;i<16;i++){const a=r()*Math.PI*2,d=900+r()*4200;ILHAS.push({x:Math.cos(a)*d,z:Math.sin(a)*d,r:220+r()*700,h:60+r()*330});}
-  for(let i=0;i<40;i++){const a=r()*Math.PI*2,d=5600+r()*10200,x=Math.cos(a)*d,z=Math.sin(a)*d;   // (10/11) arena 4x: ilhas no anel de fora, longe das bases
-    if(BASES0.some(([bx,bz])=>Math.hypot(x-bx,z-bz)<3200))continue;ILHAS.push({x,z,r:220+r()*700,h:60+r()*330});}}
+// (18/11) ilhas no estilo "D · Montanha": grades de altura geradas por scripts/terreno/gerar.py (fonte/terreno.js), as mesmas do servidor
+const TER=(()=>{const T=window.TERRENO,b=atob(T.dados),n=b.length>>1,a=new Int16Array(n);
+  for(let i=0;i<n;i++)a[i]=(b.charCodeAt(2*i)|(b.charCodeAt(2*i+1)<<8))<<16>>16;
+  for(const I of T.ilhas){I.x1=I.x0+(I.nx-1)*T.passo;I.z1=I.z0+(I.nz-1)*T.passo;}T.a=a;delete T.dados;return T;})();
+function hIlha(I,x,z){const p=TER.passo,fx=(x-I.x0)/p,fz=(z-I.z0)/p,i=Math.max(0,Math.min(I.nx-2,Math.floor(fx))),j=Math.max(0,Math.min(I.nz-2,Math.floor(fz))),u=fx-i,v=fz-j,a=TER.a,o=I.of+j*I.nx+i;
+  return((a[o]*(1-u)+a[o+1]*u)*(1-v)+(a[o+I.nx]*(1-u)+a[o+I.nx+1]*u)*v)*0.25;}
+// linha de visada: o morro está no meio entre A e B? (radar, RWR, trava)
+function visada(a,b){const dx=b.x-a.x,dz=b.z-a.z,n=Math.max(2,Math.ceil(Math.hypot(dx,dz)/60));
+  for(let i=1;i<n;i++){const t=i/n,y=a.y+(b.y-a.y)*t;if(y>820)continue;if(relevo(a.x+dx*t,a.z+dz*t)>y)return false;}return true;}
 // (10/11) bases da sala sem bots: as mesmas do servidor (anel de 18,6 km — arena 4x maior, 4 no máximo), cada uma numa ilha plana com pista apontada p/ o centro
 const BASE_R=18600,BASE_H=18,BASE_PLANO=760,BASE_ILHA=1050,PISTA=1300;
 // (11/11) + 4 bases da sala com bots (deathmatch) a 5,8 km, no mar livre (iguais ao servidor); 4 baterias cada
@@ -75,21 +80,46 @@ const BASES=[...[45,135,225,315].map(g=>[g,BASE_R,'pvp']),...[75,165,255,345].ma
 const salaBases=()=>SALA==='treino'?'pvp':SALA;   // treino usa as bases da sala sem bots
 let SALA='bots',MINHA_BASE=null,ZONA=15200,R_SAM=3000,LIMITE=5200;
 function alturaBase(d){return d<BASE_PLANO?BASE_H:d<BASE_ILHA?BASE_H*(0.5+0.5*Math.cos(Math.PI*(d-BASE_PLANO)/(BASE_ILHA-BASE_PLANO))):0;}
-function relevo(x,z){let h=0;for(const I of ILHAS){const d=Math.hypot(x-I.x,z-I.z);if(d<I.r)h=Math.max(h,I.h*(0.5+0.5*Math.cos(Math.PI*d/I.r)));}
+function relevo(x,z){let h=0;for(const I of TER.ilhas)if(x>=I.x0&&x<=I.x1&&z>=I.z0&&z<=I.z1)h=Math.max(h,hIlha(I,x,z));
   for(const B of BASES){const d=Math.hypot(x-B.x,z-B.z);if(d<BASE_ILHA)h=Math.max(h,alturaBase(d));}return h;}
 {const cMa=new THREE.Color('#24502a'),cCa=new THREE.Color('#7f9a4a'),cA=new THREE.Color('#d9c48f'),cV=new THREE.Color('#3f8a3c'),cE=new THREE.Color('#2c5e2c'),cP=new THREE.Color('#7a7466');
-  for(const I of ILHAS){const pts=[];for(let k=0;k<=18;k++){const d=I.r*1.04*(1-k/18);pts.push(new THREE.Vector2(d,Math.max(-4,I.h*(0.5+0.5*Math.cos(Math.PI*Math.min(1,d/I.r)))-(d>I.r?4:0))));}
-    const g=new THREE.LatheGeometry(pts,40),pos=g.attributes.position,cor=new Float32Array(pos.count*3),c=new THREE.Color();
-    const rI=rnd(Math.floor(I.x*7+I.z*13)&0xffff|1);
-    for(let i=0;i<pos.count;i++){const y=pos.getY(i),u=y/I.h;if(y<7)c.copy(cA);else if(u<0.55)c.copy(cV).lerp(cE,u/0.55);else c.copy(cE).lerp(cP,(u-0.55)/0.45*(I.h>250?1:0.3));
-      // (11/11) manchas de mata/campo (ruído suave pelo ângulo/raio), rocha onde a encosta é íngreme e grão por vértice
-      const vx=pos.getX(i),vz=pos.getZ(i),dd=Math.hypot(vx,vz),an=Math.atan2(vz,vx);
-      if(y>=7){const mn=Math.sin(an*3+I.x*0.01)*Math.sin(dd*0.012+an*5+I.z*0.01);if(mn>0.25)c.lerp(cMa,Math.min(1,(mn-0.25)*2.2));else if(mn<-0.45)c.lerp(cCa,Math.min(1,(-mn-0.45)*2.5));
-        const inc=I.h*0.5*Math.PI/I.r*Math.sin(Math.PI*Math.min(1,dd/I.r));if(inc>0.75)c.lerp(cP,Math.min(0.8,(inc-0.75)*1.6));}
-      const gr=0.92+rI()*0.16;c.r*=gr;c.g*=gr;c.b*=gr;
-      c.convertSRGBToLinear();cor[i*3]=c.r;cor[i*3+1]=c.g;cor[i*3+2]=c.b;}
-    g.setAttribute('color',new THREE.BufferAttribute(cor,3));g.computeVertexNormals();
-    const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.95,flatShading:true,side:THREE.DoubleSide}));m.position.set(I.x,0,I.z);cena.add(m);}
+  // (18/11) ilhas-montanha: uma malha por ilha (PC: grade de 20 m; celular: 40 m). Cor por altura e inclinação: praia, mata, capim, rocha e neve no alto
+  {const st=TOQUE?2:1,p=TER.passo,cl=(r,g,b)=>new THREE.Color(r,g,b).convertSRGBToLinear();
+   const CN=cl(0.93,0.95,0.99),CRa=cl(0.5,0.52,0.56),CR=cl(0.33,0.34,0.37),CB=cl(0.62,0.57,0.47),CMt=cl(0.15,0.3,0.15),CCa=cl(0.4,0.43,0.35),CF=cl(0.24,0.36,0.36);
+   const mI=new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.95}),ARV=[],c=new THREE.Color();
+   const PR=[],CR4=[],IR=[];   // água rasa + espuma (só nas células da beira)
+   for(const I of TER.ilhas){const nx=Math.floor((I.nx-1)/st)+1,nz=Math.floor((I.nz-1)/st)+1,P=new Float32Array(nx*nz*3),C=new Float32Array(nx*nz*3),ix=[],HH=new Float32Array(nx*nz);
+     const H=(i,j)=>TER.a[I.of+Math.max(0,Math.min(I.nz-1,j))*I.nx+Math.max(0,Math.min(I.nx-1,i))]*0.25;
+     for(let j=0;j<nz;j++)for(let i=0;i<nx;i++){const gi=i*st,gj=j*st,h=H(gi,gj),x=I.x0+gi*p,z=I.z0+gj*p,k=(j*nx+i)*3;P[k]=x;P[k+1]=h<0?h*1.4-3:h+0.8;P[k+2]=z;HH[j*nx+i]=h;   // (18/11) afasta a beira do nível do mar: de longe não briga com a água (quadradinhos)
+
+       const dx=(H(gi+1,gj)-H(gi-1,gj))/(2*p),dz=(H(gi,gj+1)-H(gi,gj-1))/(2*p),sl=1-1/Math.sqrt(1+dx*dx+dz*dz);
+       const rn=Math.abs(Math.sin(gi*12.9898+gj*78.233+I.of)*43758.5453)%1,nv=I.hmax*0.6+70*Math.sin(x*0.006+z*0.002)*Math.sin(z*0.007-x*0.003);
+       if(h<-1)c.copy(CF);else if(h<6&&sl<0.45)c.copy(CB);else if(I.hmax>420&&h>nv&&sl<0.62)c.copy(CN);else if(sl>0.34)c.copy(h>nv-60?CRa:CR);
+       else if(h<Math.max(200,I.hmax*0.32)){c.copy(CMt);if(h>8&&sl<0.22&&rn<(TOQUE?0.07:0.16))ARV.push(x+(rn-0.5)*p,h,z+(rn*7%1-0.5)*p,rn);}else c.copy(CCa);
+       const gr=0.9+rn*0.2;C[k]=c.r*gr;C[k+1]=c.g*gr;C[k+2]=c.b*gr;}
+     // (18/11) sombra das montanhas: de cada ponto anda na direção do sol; se o morro passa por cima do raio, escurece (borda suave)
+     {const SD=sol.position.clone().normalize(),hz=Math.hypot(SD.x,SD.z),ux=SD.x/hz,uz=SD.z/hz,sobe=SD.y/hz*p;
+      for(let v=0;v<nx*nz;v++){const h=HH[v];if(h<-1)continue;const k=v*3;let x=P[k],z=P[k+2],y=h+2,oc=0;
+        while(y<I.hmax){x+=ux*p;z+=uz*p;y+=sobe;if(x<I.x0||x>I.x1||z<I.z0||z>I.z1)break;const d=hIlha(I,x,z)-y;if(d>0){oc=Math.max(oc,Math.min(1,d/25));if(oc>=1)break;}}
+        if(oc>0){const f=1-0.5*oc;C[k]*=f;C[k+1]*=f;C[k+2]*=f*1.04;}}}
+     for(let j=0;j<nz-1;j++)for(let i=0;i<nx-1;i++){const a=j*nx+i;ix.push(a,a+nx,a+1,a+1,a+nx,a+nx+1);}
+     const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(P,3));g.setAttribute('color',new THREE.BufferAttribute(C,3));g.setIndex(ix);g.computeVertexNormals();
+     cena.add(new THREE.Mesh(g,mI));
+     // água rasa: células com algum canto entre -14 m e +1 m
+     const mapa=new Int32Array(nx*nz).fill(-1),vtx=(id)=>{if(mapa[id]<0){mapa[id]=PR.length/3;const h=HH[id],k=id*3;PR.push(P[k],0.5,P[k+2]);
+         const t=Math.min(1,Math.max(0,1+h/14)),es=Math.min(1,Math.max(0,(h+2.5)/2.5));CR4.push(0.25+0.7*es,0.75+0.22*es,0.75+0.2*es,h>0.8?0:0.55*t+0.3*es);}return mapa[id];};
+     for(let j=0;j<nz-1;j++)for(let i=0;i<nx-1;i++){const a=j*nx+i,q=[a,a+1,a+nx,a+nx+1];if(!q.some(v=>HH[v]>-14&&HH[v]<1))continue;
+       const [v0,v1,v2,v3]=q.map(vtx);IR.push(v0,v2,v1,v1,v2,v3);}}
+   const gR=new THREE.BufferGeometry();gR.setAttribute('position',new THREE.Float32BufferAttribute(PR,3));gR.setAttribute('color',new THREE.Float32BufferAttribute(CR4.map((v,i)=>i%4===3?v:Math.pow(v,2.2)),4));gR.setIndex(IR);
+   const mRI=new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-16});
+   mRI.onBeforeCompile=sh=>{   // (18/11) água rasa some aos poucos de 2,5 a 5 km (de longe ela "brigava" com o mar e virava quadradinhos/traços)
+     sh.vertexShader=sh.vertexShader.replace('void main() {','varying float vDistR;\nvoid main() {').replace('#include <project_vertex>','#include <project_vertex>\n  vDistR=-mvPosition.z;');
+     sh.fragmentShader=sh.fragmentShader.replace('void main() {','varying float vDistR;\nvoid main() {').replace('#include <fog_fragment>','#include <fog_fragment>\n  gl_FragColor.a*=1.0-smoothstep(2500.0,5000.0,vDistR);');};
+   const rI=new THREE.Mesh(gR,mRI);rI.renderOrder=1;cena.add(rI);
+   // árvores (cones) na mata das encostas
+   const nA=ARV.length/4,gA=new THREE.ConeGeometry(1,1,6);gA.translate(0,0.5,0);const iA=new THREE.InstancedMesh(gA,new THREE.MeshStandardMaterial({color:cl(0.12,0.26,0.12),roughness:1}),nA);
+   const mA=new THREE.Matrix4(),qA=new THREE.Quaternion(),sA=new V3(),pA=new V3();for(let i=0;i<nA;i++){const t=12+ARV[i*4+3]*14;sA.set(t*0.38,t,t*0.38);pA.set(ARV[i*4],ARV[i*4+1]-1,ARV[i*4+2]);mA.compose(pA,qA,sA);iA.setMatrixAt(i,mA);}
+   cena.add(iA);}
   // ilhas planas das bases
   const tG=tex(texGramaC());tG.wrapS=tG.wrapT=THREE.RepeatWrapping;tG.repeat.set(40,40);tG.anisotropy=4;   // (11/11) grama com textura (repete a cada ~40 m)
   const mB=new THREE.MeshStandardMaterial({map:tG,roughness:0.95,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-8});
@@ -101,7 +131,7 @@ function relevo(x,z){let h=0;for(const I of ILHAS){const d=Math.hypot(x-I.x,z-I.
   const P=[],C=[],ix=[],anelP=(x,z,r0,r1,a0,a1,cor,y,seg)=>{const b=P.length/3;for(let k=0;k<=seg;k++){const a=k/seg*Math.PI*2,ca=Math.cos(a),sa=Math.sin(a);
       P.push(x+ca*r0,y,z+sa*r0,x+ca*r1,y,z+sa*r1);C.push(cor.r,cor.g,cor.b,a0,cor.r,cor.g,cor.b,a1);if(k<seg){const i=b+k*2;ix.push(i,i+2,i+1,i+1,i+2,i+3);}}};
   const tq=new THREE.Color('#3fc4c0').convertSRGBToLinear(),es=new THREE.Color('#f4fbfb').convertSRGBToLinear();
-  for(const [x,z,r] of [...ILHAS.map(I=>[I.x,I.z,I.r]),...BASES.map(B=>[B.x,B.z,BASE_ILHA])]){
+  for(const [x,z,r] of BASES.map(B=>[B.x,B.z,BASE_ILHA])){
     anelP(x,z,r*0.97,r*1.04,0.55,0.45,tq,0.5,48);anelP(x,z,r*1.04,r*1.32,0.45,0,tq,0.5,48);
     anelP(x,z,r*0.985,r*1.005,0.0,0.85,es,1.0,48);anelP(x,z,r*1.005,r*1.045,0.85,0,es,1.0,48);}
   const gR=new THREE.BufferGeometry();gR.setAttribute('position',new THREE.Float32BufferAttribute(P,3));gR.setAttribute('color',new THREE.Float32BufferAttribute(C,4));gR.setIndex(ix);
@@ -323,7 +353,9 @@ const SOM=(()=>{let ctx=null,mestre,branco,mot=null;
     dor(){ruido(0.12,0.12,'lowpass',500);},
     trava(travado){tom('square',travado?1650:1100,travado?0.05:0.07,0.035);},
     alarme(){tom('sawtooth',880,0.12,0.05,620);},
+    rwr(trava){tom('triangle',trava?1450:520,trava?0.06:0.09,0.03);},   // (18/11) bipe do alerta de radar (RWR)
     lanca(perto){ruido(1.1,perto?0.22:0.07,'bandpass',900,0.03);},
+    agua(k){ruido(0.22,0.035*k,'highpass',1400+k*900,0.04);},   // (18/11) chiado do rasante na água
     flare(){ruido(0.25,0.1,'highpass',2000);tom('sine',900,0.2,0.05,300);},
     boom(perto){ruido(1.4,perto?0.9:0.35,'lowpass',perto?700:400,0.01);tom('sine',90,0.9,perto?0.4:0.15,30);}};})();
 
@@ -361,6 +393,41 @@ function passoDestrocos(dt){
       if(agua)espirro(D.pos,D.esc,perto);else{explosao(D.pos.setY(h+2),perto);fumaceira(D.pos,h);for(let i=0;i<10;i++)estilhaco(D.pos);}
       cena.remove(D.g);DESTROCOS.splice(DESTROCOS.indexOf(D),1);if(MEU_DESTROCO===D)MEU_DESTROCO={pos:D.pos.clone(),fim:true};}}}
 // água: coluna de espuma branca + anel
+// (18/11) rasante no mar (v2): abaixo de ~40 m o jato rasga a água —
+//  · "rabo de galo": gotas arremessadas p/ cima e p/ os lados, que caem de volta (gravidade)
+//  · rastro de espuma branca na água que abre em V e some em ~4 s
+//  · tremida na câmera + chiado; com afterburner tudo fica maior, mais alto e mais forte
+let tSpray=0,tEspuma=0,tChiado=0,SPRAY_K=0;
+const ESPUMA=(()=>{const c=cv(128,256),g=c.getContext('2d'),r=rnd(5);
+  for(let i=0;i<260;i++){const x=64+(r()-0.5)*(40+r()*80),y=r()*256,rr=2+r()*9,gr=g.createRadialGradient(x,y,0,x,y,rr);
+    gr.addColorStop(0,'rgba(255,255,255,.9)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(x-rr,y-rr,rr*2,rr*2);}
+  const t=new THREE.CanvasTexture(c),geo=new THREE.PlaneGeometry(1,1);geo.rotateX(-Math.PI/2);const pool=[];
+  for(let i=0;i<(TOQUE?60:110);i++){const m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({map:t,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-3,polygonOffsetUnits:-12}));
+    m.visible=false;m.renderOrder=2;m.userData={t:0,dur:1,w:1,l:1,op:1};cena.add(m);pool.push(m);}
+  return{pool,i:0};})();
+function passoEspuma(dt){for(const m of ESPUMA.pool){if(!m.visible)continue;const u=(m.userData.t+=dt)/m.userData.dur;if(u>=1){m.visible=false;continue;}
+  m.scale.set(m.userData.l,1,m.userData.w*(1+u*2.2));m.material.opacity=m.userData.op*(1-u)*(1-u);}}
+function rasanteAgua(dt,fw,turbo){SPRAY_K=0;if(!EU.vivo||EU.solo)return;const k=sprayAgua(EU,EU.pos,fw,EU.vel,turbo,dt);if(!k)return;
+  SPRAY_K=k*(turbo?1:0.55);tChiado-=dt;if(tChiado<=0){tChiado=0.12;SOM.agua(SPRAY_K);}}
+// (18/11) vale p/ qualquer avião (eu, bots, outros jogadores): est guarda os cronômetros; devolve a força (0 = nada)
+function sprayAgua(est,pos,fw,vel,turbo,dt){const alt=pos.y;if(alt>40||relevo(pos.x,pos.z)>0.01)return 0;
+  const k=Math.min(1,(1-alt/40)*1.25)*Math.min(1,vel/140),tb=turbo?1:0;if(k<=0.05)return 0;
+  const hz=Math.hypot(fw.x,fw.z)||1,fx_=fw.x/hz,fz_=fw.z/hz,yaw=Math.atan2(-fz_,fx_);
+  // rastro de espuma (uma faixa a cada ~0,04 s)
+  est.tEspuma=(est.tEspuma||0)-dt;if(est.tEspuma<=0){est.tEspuma=0.04;const m=ESPUMA.pool[ESPUMA.i++%ESPUMA.pool.length],d=m.userData;
+    m.position.set(pos.x-fx_*14,0.7,pos.z-fz_*14);m.rotation.set(0,yaw,0);d.t=0;d.dur=3+tb*1.5;d.l=vel*0.05+6;d.w=(7+tb*6)*(0.5+k*0.7);d.op=0.55+tb*0.25;m.visible=true;}
+  // gotas: rabo de galo
+  est.tSpray=(est.tSpray||0)-dt*k*(TOQUE?55:90)*(1+tb*1.2)*(est===EU?1:0.6);
+  while(est.tSpray<0){est.tSpray+=1;const atras=6+Math.random()*12,lado=(Math.random()-0.5)*(6+tb*6);
+    _v1.set(pos.x-fx_*atras-fz_*lado,0.5,pos.z-fz_*atras+fx_*lado);
+    const sobe=(14+Math.random()*20)*(0.5+k*0.6)*(1+tb*1.3),abre=(Math.random()-0.5)*(10+tb*14),tras=-(vel*0.25+Math.random()*10);
+    fx(_v1,Math.random()<0.6?0xffffff:0xd8ecf6,(3+Math.random()*5)*(1+tb*0.8),1.0+Math.random()*0.9+tb*0.7,1.6+tb*0.6,false,0);
+    const f=FX[FX.length-1];f.vel=new V3(fx_*tras-fz_*abre,sobe,fz_*tras+fx_*abre);f.op=0.95;}
+  return k;}
+// outros aviões perto da câmera (até 2,5 km); "afterburner" deles = acima de ~720 km/h
+const _fwO=new V3();
+function sprayOutros(dt){for(const o of OUT.values()){if(!o.vivo||o.navio||!o.q||o.pos.y>40||o.pos.distanceToSquared(cam.position)>2500*2500)continue;
+  const v=o.vel?o.vel.length():130;sprayAgua(o,o.pos,frente(o.q,_fwO),v,v>200,dt);}}
 function espirro(p,esc=1,perto){const y=0.5;
   for(let i=0;i<14;i++){_v1.set(p.x+(Math.random()-0.5)*14*esc,y+Math.random()*10,p.z+(Math.random()-0.5)*14*esc);fx(_v1,0xf2f8ff,(14+Math.random()*16)*esc,1.6+Math.random(),2.4,false,18+Math.random()*22);}
   for(let k=0;k<16;k++){const a=k/16*Math.PI*2;_v1.set(p.x+Math.cos(a)*18*esc,y+2,p.z+Math.sin(a)*18*esc);fx(_v1,0xe6f2ff,12*esc,1.4,3,false,3);}
@@ -418,12 +485,30 @@ function explosao(p,perto){for(let i=0;i<10;i++){_v1.set(Math.random()-0.5,Math.
   for(let i=0;i<8;i++){_v1.set(Math.random()-0.5,Math.random()-0.3,Math.random()-0.5).multiplyScalar(30).add(p);fx(_v1,0x3a3a3a,20,2.4+Math.random(),2.5,false,8);}
   SOM.boom(perto);}
 function efeitos(dt){for(let i=FX.length-1;i>=0;i--){const f=FX[i];f.t+=dt;const u=f.t/f.dur;if(u>=1){cena.remove(f.s);f.s.material.dispose();FX.splice(i,1);continue;}
-  f.s.scale.setScalar(f.tam*(1+u*f.cresce));f.s.material.opacity=(1-u)*(f.s.material.blending===THREE.AdditiveBlending?1:0.7);f.s.position.y+=f.sobe*dt;if(f.vel){f.s.position.addScaledVector(f.vel,dt);f.vel.y-=9*dt;}}}
+  f.s.scale.setScalar(f.tam*(1+u*f.cresce));f.s.material.opacity=(1-u)*(f.s.material.blending===THREE.AdditiveBlending?1:0.7);if(f.op){const d=f.s.position.distanceTo(cam.position);f.s.material.opacity*=f.op*Math.min(1,d/22);}/* (18/11) spray: mais leve e some perto da câmera */f.s.position.y+=f.sobe*dt;if(f.vel){f.s.position.addScaledVector(f.vel,dt);f.vel.y-=9*dt;}}}
 
 // ------------------------------------------------ estado
 const EU={id:0,cor:'#ffd23a',nome:'',pos:new V3(),q:new QT(),vel:130,vida:100,vivo:false,turbo:1,mortoEm:0,porQuem:null,fora:0,
   trem:0,tremAlvo:0,acel:1,yawSolo:0,tParado:0,reab:false};   // (10/11) trem 0..1 (anima), acel = manete 0..1 (W/S)
 let JATO=null;   // meu caça
+// (18/11) sombra do avião no chão/mar: silhueta do Gripen projetada na direção do sol, deitada na encosta; mais fraca e maior quanto mais alto
+const SOMBRA=(()=>{const c=cv(128,128),g=c.getContext('2d');g.translate(64,64);g.filter='blur(1.5px)';g.fillStyle='#000';
+  const poli=(pts)=>{g.beginPath();pts.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.closePath();g.fill();};
+  poli([[60,0],[20,-6],[-18,-50],[-36,-50],[-44,-8],[-60,-5],[-60,5],[-44,8],[-36,50],[-18,50],[20,6]]);
+  poli([[28,-5],[14,-22],[8,-22],[10,-5]]);poli([[28,5],[14,22],[8,22],[10,5]]);
+  const t=new THREE.CanvasTexture(c),geo=new THREE.PlaneGeometry(1,1);geo.rotateX(-Math.PI/2);
+  return{t,geo,pool:[],SD:sol.position.clone().normalize(),n:new V3(),f:new V3(),qy:new THREE.Quaternion(),Y:new V3(0,1,0)};})();
+function sombraEm(i,pos,q,esc){const S=SOMBRA;let m=S.pool[i];
+  if(!m){m=new THREE.Mesh(S.geo,new THREE.MeshBasicMaterial({map:S.t,color:0x000000,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-8}));m.renderOrder=2;S.pool.push(m);cena.add(m);}
+  let x=pos.x,z=pos.z,h=relevo(x,z);for(let k=0;k<2;k++){const t=(pos.y-h)/S.SD.y;x=pos.x-S.SD.x*t;z=pos.z-S.SD.z*t;h=relevo(x,z);}
+  const alt=pos.y-h;if(alt>450||alt<-3){m.visible=false;return;}
+  m.visible=true;m.position.set(x,h+0.9,z);   // pista fica em BASE_H+0.5
+  S.n.set(relevo(x-4,z)-relevo(x+4,z),8,relevo(x,z-4)-relevo(x,z+4)).normalize();const f=frente(q,S.f);
+  S.qy.setFromAxisAngle(S.Y,Math.atan2(-f.z,f.x));m.quaternion.setFromUnitVectors(S.Y,S.n).multiply(S.qy);
+  const e=20*(esc||1)*(1+alt/700);m.scale.set(e,1,e);m.material.opacity=0.5*(1-alt/450);}
+function sombras(){let i=0;if(JATO&&JATO.visible&&EU.vivo)sombraEm(i++,EU.pos,EU.q,1);
+  for(const o of OUT.values())if(o.vivo&&!o.navio&&o.q&&o.pos.distanceToSquared(cam.position)<2500*2500)sombraEm(i++,o.pos,o.q,o.esc);
+  for(;i<SOMBRA.pool.length;i++)SOMBRA.pool[i].visible=false;}
 const OUT=new Map();   // id -> {g,pos,vel,q,alvoP,alvoQ,tRec,vida,vivo,nome,cor,bot,rot}
 const MISV=new Map();   // mísseis em voo (o servidor simula; aqui só desenha): id -> {g,pos,alvoP,vel,tRec,alvo,tFumo}
 const TRAVA={id:0,t:0,beep:0};let BALAS_N=-1,misAnt=false,bombAnt=false,BOMBAS=4,tBomba=0,MUN=2,flarePronto=0,tAlarme=0,tMissilLoc=0;
@@ -526,7 +611,7 @@ function voar(dt){const I=entrada();ULT_I=I;
   const turbo=I.turbo&&!I.freio&&EU.turbo>0.02;EU.turbo=Math.max(0,Math.min(1,EU.turbo+(turbo?-0.28:0.12)*dt));
   let alvo=I.freio?45:turbo?215:45+EU.acel*90;if(EU.trem>0.3&&!I.freio)alvo=Math.min(alvo,turbo?150:88);   // trem baixado = arrasto (≈ 320 km/h: já é velocidade de pouso)
   EU.vel+=(alvo-EU.vel)*Math.min(1,dt*(I.freio?0.7:0.9))-fw.y*32*dt;EU.vel=Math.max(VMIN,Math.min(260,EU.vel));
-  EU.pos.addScaledVector(fw,EU.vel*dt);EU.pos.y-=stall*38*dt;EU.stall=stall;
+  EU.pos.addScaledVector(fw,EU.vel*dt);EU.pos.y-=stall*38*dt;EU.stall=stall;rasanteAgua(dt,fw,turbo);
   JATO.position.copy(EU.pos);JATO.quaternion.copy(EU.q);JATO.userData.pc.visible=turbo;JATO.userData.pc.scale.y=0.8+Math.random()*0.4;
   // colisão com mar/ilha e limite da arena
   if(EU.trem>0.98&&!I.turbo){const hP=EU.pos.y-relevo(EU.pos.x,EU.pos.z);   // (10/11) ajuda no pouso: abaixo de 15 m sobre a base, arredonda e nivela sozinho
@@ -569,7 +654,7 @@ const arr=(v,d)=>{const k=10**d;return[Math.round(v.x*k)/k,Math.round(v.y*k)/k,M
 
 // ------------------------------------------------ mísseis: trava (1 s com o alvo na frente), desenho, rastro e flares
 function travar(dt,fw){let melhor=null,mc=Math.cos(22*Math.PI/180);
-  for(const [id,o] of OUT){if(!o.vivo||o.aliado||o.navio)continue;_v1.subVectors(o.pos,EU.pos);const d=_v1.length();if(d>2800)continue;const c=_v1.dot(fw)/d;if(c>mc){mc=c;melhor=id;}}
+  for(const [id,o] of OUT){if(!o.vivo||o.aliado||o.navio)continue;_v1.subVectors(o.pos,EU.pos);const d=_v1.length();if(d>2800)continue;const c=_v1.dot(fw)/d;if(c>mc&&visada(EU.pos,o.pos)){mc=c;melhor=id;}}
   if(melhor!==TRAVA.id){TRAVA.id=melhor||0;TRAVA.t=0;}else if(melhor)TRAVA.t+=dt;
   TRAVA.beep-=dt;if(TRAVA.id&&MUN>0&&TRAVA.beep<=0){const ok=TRAVA.t>=1;SOM.trava(ok);TRAVA.beep=ok?0.09:0.28;}}
 const mMis=new THREE.MeshStandardMaterial({color:0xeeeeee,roughness:0.5}),mMisP=M('#c0392b',0.6);
@@ -745,12 +830,12 @@ const camP=new V3(0,800,0),camUp=new V3(0,1,0);let camAng=0;
 let CABINE=false;try{CABINE=localStorage.getItem('jsjet-cab')==='1';}catch(e){}
 const _cabQ=new QT().setFromAxisAngle(new V3(0,1,0),-Math.PI/2),_cabOff=new V3(3.15,1.0,0).multiplyScalar(1.25);   // olho do piloto
 function trocaVisao(){CABINE=!CABINE;try{localStorage.setItem('jsjet-cab',CABINE?'1':'0');}catch(e){}camP.copy(cam.position);}
-function camera(dt){if(EU.vivo&&CABINE){cam.position.copy(_cabOff).applyQuaternion(EU.q).add(EU.pos);cam.quaternion.copy(EU.q).multiply(_cabQ);camUp.set(0,1,0).applyQuaternion(EU.q);
+function camera(dt){if(EU.vivo&&CABINE){cam.position.copy(_cabOff).applyQuaternion(EU.q).add(EU.pos);cam.quaternion.copy(EU.q).multiply(_cabQ);if(SPRAY_K>0){const a=SPRAY_K*0.004;cam.rotateX((Math.random()-0.5)*a);cam.rotateY((Math.random()-0.5)*a);}camUp.set(0,1,0).applyQuaternion(EU.q);
     const fov=(innerWidth<innerHeight?82:70)+(EU.vel-135)*0.08;if(Math.abs(cam.fov-fov)>0.2){cam.fov+=(fov-cam.fov)*Math.min(1,dt*3);cam.updateProjectionMatrix();}return;}
   if(EU.vivo){const fw=frente(EU.q),up=_u.set(0,1,0).applyQuaternion(EU.q);
     _v1.copy(EU.pos).addScaledVector(fw,-30).addScaledVector(up,7.5);camP.lerp(_v1,1-Math.exp(-9*dt));cam.position.copy(camP);
     camUp.lerp(_v2.copy(up).lerp(_v3.set(0,1,0),0.45).normalize(),1-Math.exp(-6*dt));cam.up.copy(camUp);
-    cam.lookAt(_v1.copy(EU.pos).addScaledVector(fw,60));
+    cam.lookAt(_v1.copy(EU.pos).addScaledVector(fw,60));if(SPRAY_K>0){const a=SPRAY_K*0.006;cam.rotateX((Math.random()-0.5)*a);cam.rotateY((Math.random()-0.5)*a);}   // (18/11) tremida no rasante
     const fov=(innerWidth<innerHeight?78:62)+(EU.vel-135)*0.08;if(Math.abs(cam.fov-fov)>0.2){cam.fov+=(fov-cam.fov)*Math.min(1,dt*3);cam.updateProjectionMatrix();}}
   else if(KC&&OUT.get(KC.id)?.vivo){const o=OUT.get(KC.id),k=o.navio?1:(o.esc||1),dist=o.navio?95:24*k;camAng+=dt*0.45;
     _v1.set(o.pos.x+Math.cos(camAng)*dist,o.pos.y+(o.navio?30:6*k),o.pos.z+Math.sin(camAng)*dist);camP.addScaledVector(o.vel,dt).lerp(_v1,1-Math.exp(-5*dt));
@@ -760,6 +845,16 @@ function camera(dt){if(EU.vivo&&CABINE){cam.position.copy(_cabOff).applyQuaterni
 
 // ------------------------------------------------ HUD: mira, rótulos, seta do inimigo mais perto, radar, barras
 const rctx=$('#radar').getContext('2d');let tRadar=0;
+// (18/11) radar realista: a antena só olha p/ frente (cone de ±60°) e varre de um lado p/ o outro; o alvo só aparece quando o feixe passa
+// e fica "aceso" apagando aos poucos na posição em que foi visto. Aliados chegam por datalink (sempre visíveis). RWR na borda mostra quem me ilumina.
+// (18/11) mapa das ilhas p/ o radar (1 px = 30 m), cinza-esverdeado que clareia com a altura
+const MAPA=(()=>{const R=21000,S=1400,e=S/(2*R),c=cv(S,S),g=c.getContext('2d'),img=g.createImageData(S,S),d=img.data;
+  for(const I of TER.ilhas)for(let j=0;j<I.nz;j++)for(let i=0;i<I.nx;i++){const h=TER.a[I.of+j*I.nx+i]*0.25;if(h<=0)continue;
+    const px=Math.floor((I.x0+i*TER.passo+R)*e),pz=Math.floor((I.z0+j*TER.passo+R)*e);if(px<0||pz<0||px>=S||pz>=S)continue;
+    const k=(pz*S+px)*4,t=Math.min(1,h/650);d[k]=60+t*130;d[k+1]=88+t*110;d[k+2]=72+t*135;d[k+3]=215;}
+  g.putImageData(img,0,0);return{c,R};})();
+const SETA_P=new V3(),SAM_P=new V3();const RAD={cone:60*Math.PI/180,alc:10000,ang:-1,dir:1,vel:2.1,blips:new Map(),bipe:0};
+const angRel=(a)=>{while(a>Math.PI)a-=2*Math.PI;while(a<-Math.PI)a+=2*Math.PI;return a;};
 // (11/11) mira de compensação: onde o alvo VAI estar quando a bala chegar. Alinhe a mira (○) no losango (◇) e atire.
 const _lp=new V3();let LEADD=0;
 function compensacao(W,H){const el=$('#lead');LEADD=0;if(!EU.vivo){el.style.display='none';return;}
@@ -779,7 +874,8 @@ function hud(dt){const W=innerWidth,H=innerHeight;compensacao(W,H);
   for(const o of OUT.values()){const d=o.pos.distanceTo(EU.pos);
     if(!o.vivo||agoraH-o.tRec>2500){o.rot.style.display='none';o.vis=false;continue;}if(d<dP&&!o.aliado){dP=d;perto=o;}
     _v1.copy(o.pos).y+=o.navio?34:9;_v1.project(cam);
-    if(_v1.z<1&&Math.abs(_v1.x)<1.1&&Math.abs(_v1.y)<1.1&&d<4500){o.rot.style.display='block';o.rot.style.left=((_v1.x+1)/2*W)+'px';o.rot.style.top=((1-_v1.y)/2*H)+'px';
+    if(!o.aliado&&agoraH>(o.tVis||0)){o.tVis=agoraH+250;o.semMorro=visada(EU.pos,o.pos);}   // (18/11) atrás do morro: sem rótulo (aliado vem por datalink)
+    if(_v1.z<1&&Math.abs(_v1.x)<1.1&&Math.abs(_v1.y)<1.1&&d<4500&&(o.aliado||o.semMorro!==false)){o.rot.style.display='block';o.rot.style.left=((_v1.x+1)/2*W)+'px';o.rot.style.top=((1-_v1.y)/2*H)+'px';
       o.rot.firstChild.textContent=o.nome+' · '+Math.round(d)+'m';o.rot.lastChild.firstChild.style.width=Math.min(100,o.vida*100/(o.vidaMax||100))+'%';o.vis=true;}else{o.rot.style.display='none';o.vis=false;}}
   const tv=$('#trava'),ot=TRAVA.id&&OUT.get(TRAVA.id);
   if(ot&&ot.vis&&EU.vivo&&MUN>0){_v1.copy(ot.pos).project(cam);tv.style.display='block';tv.style.left=((_v1.x+1)/2*W)+'px';tv.style.top=((1-_v1.y)/2*H)+'px';
@@ -789,7 +885,8 @@ function hud(dt){const W=innerWidth,H=innerHeight;compensacao(W,H);
   $('#tMis').textContent=(BALAS_N>=0?'🔫 '+BALAS_N+'  ':'')+'🚀 '+MUN+'  💣 '+BOMBAS+'  ✨ '+(fp?'ok':Math.ceil((flarePronto-performance.now())/1000)+'s');$('#bBomba').textContent='💣'+BOMBAS;$('#bBomba').classList.toggle('vazio',BOMBAS<=0);
   const seta=$('#seta');
   const naArena=SALA!=='pvp'||Math.hypot(EU.pos.x,EU.pos.z)<ZONA;   // (10/11) sala sem bots: seta só liga dentro do círculo da arena
-  let alvoS=perto&&!perto.vis&&naArena?perto.pos:null,corS=perto?.cor;
+  // (18/11) a seta só aponta p/ inimigo que o radar viu (o contato mais perto, na posição em que o feixe pegou)
+  let alvoS=null,corS=null,dS=1e9;if(naArena)for(const [id,b] of RAD.blips){const o=OUT.get(id);if(!o||o.vis)continue;const d=Math.hypot(b.x-EU.pos.x,b.z-EU.pos.z);if(d<dS){dS=d;alvoS=SETA_P.set(b.x,b.y,b.z);corS=b.cor;}}
   const casa=SALA==='bots'&&MINHA_BASE!==null&&(BALAS_N===0||(BALAS_N<100&&MUN===0)||EU.vida<35)?_v4.set(BASES[MINHA_BASE].x,BASE_H,BASES[MINHA_BASE].z):null;
   const fT=SALA==='treino'?(TREINO.alvo?TREINO.alvo.m.position:TREINO.foco):casa;
   if(fT){_v1.copy(fT).project(cam);alvoS=_v1.z<1&&Math.abs(_v1.x)<0.95&&Math.abs(_v1.y)<0.9?null:fT;corS=casa?'#3cd070':'#ffd23a';}
@@ -805,17 +902,46 @@ function hud(dt){const W=innerWidth,H=innerHeight;compensacao(W,H);
   const fw=frente(EU.q,_v3),hd=Math.atan2(fw.z,fw.x);
   const ponto=(x,z,cor,r)=>{const dx=x-EU.pos.x,dz=z-EU.pos.z,a=Math.atan2(dz,dx)-hd,d=Math.min(c-6,Math.hypot(dx,dz)*esc2);
     rctx.fillStyle=cor;rctx.beginPath();rctx.arc(c+Math.sin(a)*d,c-Math.cos(a)*d,r,0,7);rctx.fill();};
-  rctx.fillStyle='#3f8a3c88';for(const I of ILHAS){const dx=I.x-EU.pos.x,dz=I.z-EU.pos.z,a=Math.atan2(dz,dx)-hd,d=Math.hypot(dx,dz)*esc2;if(d<c+I.r*esc2){rctx.beginPath();rctx.arc(c+Math.sin(a)*d,c-Math.cos(a)*d,Math.max(2,I.r*esc2),0,7);rctx.fill();}}
+  rctx.save();rctx.beginPath();rctx.arc(c,c,c-1,0,7);rctx.clip();rctx.translate(c,c);rctx.scale(esc2,esc2);rctx.rotate(-Math.PI/2-hd);rctx.translate(-EU.pos.x,-EU.pos.z);   // (18/11) contorno real das ilhas
+  rctx.drawImage(MAPA.c,-MAPA.R,-MAPA.R,2*MAPA.R,2*MAPA.R);rctx.restore();
   if(SALA==='treino')for(const B of TREINO.barcos)if(B.vivo)ponto(B.g.position.x,B.g.position.z,'#ff8a3a',5);
   if(SALA==='treino')for(const A of TREINO.aneis)if(!A.feito)ponto(A.m.position.x,A.m.position.z,A===TREINO.alvo?'#ffd23a':'#ffd23a77',5);
-  if(SALA==='pvp'||SALA==='treino'){   // (10/11) zona de combate e bases (a minha em verde; as outras em vermelho com o alcance dos SAM)
+  if(BASES.some(B=>B.sala===salaBases())){   // (10/11) zona de combate e bases (a minha em verde; as outras em vermelho com o alcance dos SAM) — (18/11) também na sala com bots
     const anelR=(x,z,r,cor)=>{const dx=x-EU.pos.x,dz=z-EU.pos.z,a=Math.atan2(dz,dx)-hd,d=Math.hypot(dx,dz)*esc2;rctx.strokeStyle=cor;rctx.lineWidth=2;rctx.beginPath();rctx.arc(c+Math.sin(a)*d,c-Math.cos(a)*d,r*esc2,0,7);rctx.stroke();};
-    rctx.save();rctx.beginPath();rctx.arc(c,c,c-1,0,7);rctx.clip();anelR(0,0,ZONA,'#ffd23a99');
+    rctx.save();rctx.beginPath();rctx.arc(c,c,c-1,0,7);rctx.clip();if(SALA!=='bots')anelR(0,0,ZONA,'#ffd23a99');
     for(const B of BASES)if(B.i!==MINHA_BASE&&B.samOn&&B.sala===salaBases())anelR(B.x,B.z,B.rsam,'#ff3b3099');rctx.restore();
     for(const B of BASES){if(B.sala!==salaBases())continue;const dx=B.x-EU.pos.x,dz=B.z-EU.pos.z,a=Math.atan2(dz,dx)-hd,d=Math.min(c-8,Math.hypot(dx,dz)*esc2);
-      rctx.fillStyle=B.i===MINHA_BASE?'#3cd070':'#ff3b30';rctx.fillRect(c+Math.sin(a)*d-5,c-Math.cos(a)*d-5,10,10);}}
-  for(const o of OUT.values())if(o.vivo)ponto(o.pos.x,o.pos.z,o.cor,6);
-  for(const m of MISV.values())ponto(m.pos.x,m.pos.z,m.alvo===EU.id?'#ff2020':'#ffffff',3);
+      const dist=Math.hypot(dx,dz),fora=dist*esc2>c-8,minha=B.i===MINHA_BASE;
+      if(minha&&fora){   // (18/11) base de origem fora do alcance: seta verde na borda apontando p/ ela + distância
+        const sx=Math.sin(a),sy=-Math.cos(a),px=c+sx*(c-12),py=c+sy*(c-12);rctx.save();rctx.translate(px,py);rctx.rotate(a);
+        rctx.fillStyle='#3cd070';rctx.strokeStyle='#04210f';rctx.lineWidth=2;rctx.beginPath();rctx.moveTo(0,-11);rctx.lineTo(9,5);rctx.lineTo(-9,5);rctx.closePath();rctx.stroke();rctx.fill();rctx.restore();
+        const tx=c+sx*(c-34),ty=c+sy*(c-34);rctx.font='bold 17px sans-serif';rctx.textAlign='center';rctx.textBaseline='middle';rctx.lineWidth=4;rctx.strokeStyle='#04210f';
+        const txt='🏠'+(dist/1000).toFixed(1);rctx.strokeText(txt,tx,ty);rctx.fillStyle='#7dffa8';rctx.fillText(txt,tx,ty);rctx.textAlign='start';rctx.textBaseline='alphabetic';continue;}
+      rctx.fillStyle=minha?'#3cd070':'#ff3b30';rctx.fillRect(c+Math.sin(a)*d-5,c-Math.cos(a)*d-5,10,10);}}
+  // (18/11) cone do radar + feixe varrendo
+  const ang0=RAD.ang;RAD.ang+=RAD.dir*RAD.vel*0.1;if(Math.abs(RAD.ang)>RAD.cone){RAD.ang=Math.sign(RAD.ang)*RAD.cone;RAD.dir*=-1;}
+  const amin=Math.min(ang0,RAD.ang)-0.02,amax=Math.max(ang0,RAD.ang)+0.02,agora=performance.now()/1000;
+  rctx.fillStyle='#7fd3ff14';rctx.beginPath();rctx.moveTo(c,c);rctx.arc(c,c,c-1,-Math.PI/2-RAD.cone,-Math.PI/2+RAD.cone);rctx.closePath();rctx.fill();
+  rctx.strokeStyle='#7fd3ff55';rctx.lineWidth=1.5;rctx.stroke();
+  rctx.strokeStyle='#9fe4ffcc';rctx.lineWidth=2.5;rctx.beginPath();rctx.moveTo(c,c);rctx.lineTo(c+Math.sin(RAD.ang)*(c-2),c-Math.cos(RAD.ang)*(c-2));rctx.stroke();
+  const rel=(p)=>{const dx=p.x-EU.pos.x,dz=p.z-EU.pos.z;return[angRel(Math.atan2(dz,dx)-hd),Math.hypot(dx,dz)];};
+  for(const [id,o] of OUT){if(!o.vivo){RAD.blips.delete(id);continue;}
+    if(o.aliado){ponto(o.pos.x,o.pos.z,o.cor,6);continue;}   // datalink do time
+    const [a,d]=rel(o.pos);if(Math.abs(a)<=RAD.cone&&d<RAD.alc&&a>=amin&&a<=amax&&visada(EU.pos,o.pos))RAD.blips.set(id,{x:o.pos.x,y:o.pos.y,z:o.pos.z,t:agora,cor:o.cor});}
+  for(const [id,b] of RAD.blips){const idade=agora-b.t;if(idade>2.4||!OUT.has(id)){RAD.blips.delete(id);continue;}
+    rctx.globalAlpha=Math.max(0.15,1-idade/2.4);ponto(b.x,b.z,b.cor,6);rctx.globalAlpha=1;}
+  for(const m of MISV.values()){const [a]=rel(m.pos);if(m.alvo!==EU.id&&Math.abs(a)<=RAD.cone)ponto(m.pos.x,m.pos.z,'#ffffff',3);}
+  // (18/11) RWR na borda: âmbar = radar inimigo me procurando, vermelho = travado em mim, vermelho piscando = míssil vindo / SAM
+  let pior=0;const pisca=agora%0.5<0.25;
+  const marca=(x,z,nivel)=>{const [a]=rel({x,z});pior=Math.max(pior,nivel);if(nivel===3&&!pisca)return;
+    const r1=c-3,r2=c-(nivel>=2?20:14);rctx.strokeStyle=nivel>=2?'#ff3b30':'#ffb020';rctx.lineWidth=nivel>=2?6:4;rctx.lineCap='round';
+    rctx.beginPath();rctx.moveTo(c+Math.sin(a)*r1,c-Math.cos(a)*r1);rctx.lineTo(c+Math.sin(a)*r2,c-Math.cos(a)*r2);rctx.stroke();rctx.lineCap='butt';};
+  if(EU.vivo){
+    for(const o of OUT.values()){if(!o.vivo||o.aliado||!o.q)continue;_v1.subVectors(EU.pos,o.pos);const d=_v1.length();if(d>6000)continue;
+      const cs=_v1.dot(frente(o.q,_v2))/d;if(cs>0.5&&!visada(o.pos,EU.pos))continue;if(cs>Math.cos(22*Math.PI/180)&&d<2800)marca(o.pos.x,o.pos.z,2);else if(cs>Math.cos(60*Math.PI/180))marca(o.pos.x,o.pos.z,1);}
+    for(const B of BASES)if(B.sala===salaBases()&&B.i!==MINHA_BASE&&B.samOn&&Math.hypot(B.x-EU.pos.x,B.z-EU.pos.z)<B.rsam&&visada(SAM_P.set(B.x,BASE_H+15,B.z),EU.pos))marca(B.x,B.z,3);
+    for(const m of MISV.values())if(m.alvo===EU.id)marca(m.pos.x,m.pos.z,3);}
+  RAD.bipe-=0.1;if(pior===2&&RAD.bipe<=0){SOM.rwr(true);RAD.bipe=0.5;}else if(pior===1&&RAD.bipe<=0){SOM.rwr(false);RAD.bipe=1.6;}
   rctx.fillStyle='#fff';rctx.beginPath();rctx.moveTo(c,c-9);rctx.lineTo(c+6,c+6);rctx.lineTo(c-6,c+6);rctx.fill();}
 
 // ------------------------------------------------ (09/11) cabine por dentro: painel com 3 telas, HUD verde, canopi, e o piloto (pernas, braços, manche e acelerador)
@@ -938,7 +1064,7 @@ function quadro(){requestAnimationFrame(quadro);const agora=performance.now(),dt
   EU.trem+=Math.sign(EU.tremAlvo-EU.trem)*Math.min(Math.abs(EU.tremAlvo-EU.trem),0.4*dt);poeTrem(JATO,Math.round(EU.trem*50)/50);
   for(const o of OUT.values()){o.trem=(o.trem||0)+Math.sign((o.tremAlvo||0)-(o.trem||0))*Math.min(Math.abs((o.tremAlvo||0)-(o.trem||0)),0.4*dt);poeTrem(o.g,Math.round(o.trem*50)/50);}
   if(jogando)atualizaILS();else ILS.aneis.forEach(m=>m.visible=false);
-  outros(dt);balas(dt);misseis(dt);bombas(dt);efeitos(dt);efeitosQueda(dt);if(jogando)mostraCcip();else ccip.visible=false;
+  outros(dt);sombras();sprayOutros(dt);passoEspuma(dt);balas(dt);misseis(dt);bombas(dt);efeitos(dt);efeitosQueda(dt);if(jogando)mostraCcip();else ccip.visible=false;
   if(jogando&&JATO){camera(dt);hud(dt);}
   if(Q.has('foto')&&GRIPEN){if(!window.__fJ){window.__fJ=criarJato('#3cd070');window.__fJ.position.set(0,3000,0);}   // ?foto: Gripen parado p/ conferir o modelo
     const f=window.__foto||[-20,6,14];cam.position.set(f[0],3000+f[1],f[2]);cam.up.set(0,1,0);cam.lookAt(0,3000,0);}
