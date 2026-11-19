@@ -4,3 +4,4 @@ __pycache__/
 servidor/dados/
 scripts/tiktok/.venv/
 backups/*.db
+scripts/kc390/zip*/

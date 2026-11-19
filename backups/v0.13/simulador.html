@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Simulador da Live</title>
+<style>
+  :root{--fundo:#0b1a2a;--card:#132a42;--txt:#eaf4ff;--borda:#7fd3ff44}
+  body{margin:0;background:var(--fundo);color:var(--txt);font:15px system-ui,sans-serif;padding:16px;max-width:640px;margin:auto}
+  h1{font-size:22px;margin:4px 0 2px}p{opacity:.8;margin:0 0 12px}
+  .card{background:var(--card);border:1px solid var(--borda);border-radius:12px;padding:12px;margin-bottom:12px}
+  .card h2{font-size:15px;margin:0 0 8px}
+  .g{display:flex;flex-wrap:wrap;gap:8px}
+  button{font:inherit;font-weight:800;padding:10px 12px;border:0;border-radius:10px;background:#ffffff1a;color:var(--txt);border:2px solid var(--borda);cursor:pointer;flex:1 1 auto}
+  button.az{border-color:#4aa3ff}button.vm{border-color:#e8443a}button.on{background:linear-gradient(180deg,#ffd23a,#ff9a2a);color:#3a1d00}
+  input{font:inherit;padding:9px 10px;border-radius:10px;border:2px solid var(--borda);background:#0b1a2a;color:var(--txt);flex:1 1 140px;min-width:0}
+  #log{font:12px monospace;white-space:pre-wrap;max-height:180px;overflow:auto;opacity:.85}
+</style></head><body>
+<h1>📺 Simulador da Live</h1>
+<p>Finge comentários e presentes do TikTok na <b>SALA DA LIVE</b>. Entre na sala pelo celular e aperte os botões aqui.</p>
+
+<div class="card"><h2>👤 Quem está fazendo</h2>
+  <div class="g"><input id="nome" placeholder="nome (vazio = sorteia)"><button id="sorteia">🎲 outro nome</button></div></div>
+
+<div class="card"><h2>💬 Chat</h2><div class="g">
+  <button data-ev="comentario">💬 comentar</button>
+  <button class="az" data-ev="comentario" data-txt="!time azul">🟦 !time azul</button>
+  <button class="vm" data-ev="comentario" data-txt="!time vermelho">🟥 !time vermelho</button>
+  <button data-ev="zerar">🔄 zerar placar (live nova)</button>
+  <button id="auto">🤖 chat automático: OFF</button></div></div>
+
+<div class="card"><h2>❤️ Interações</h2><div class="g">
+  <button data-ev="curtida" data-n="100">❤️ +100 curtidas</button>
+  <button data-ev="seguir">⭐ seguir</button>
+  <button data-ev="compartilhar">🔁 compartilhar</button></div></div>
+
+<div class="card"><h2>🎁 Presentes</h2><div class="g">
+  <button data-ev="presente" data-p="Rosa" data-m="1">🌹 Rosa · 1</button>
+  <button data-ev="presente" data-p="Donut" data-m="30">🍩 Donut · 30</button>
+  <button data-ev="presente" data-p="Corgi" data-m="299">🚢 Corgi · 299</button>
+  <button data-ev="presente" data-p="Galáxia" data-m="1000">🌌 Galáxia · 1000</button>
+  <button data-ev="presente" data-p="Leão" data-m="29999">🦁 Leão · 29999</button></div></div>
+
+<div class="card"><h2>📜 Enviados</h2><div id="log"></div></div>
+<script>
+const NOMES=['ana.flor','zé_da_lancha','manezinho48','bia_surf','tainha_voadora','joao.pedro','dona_cida','pescador_sc','lu.ribeirao','kaique77','mari_campeche','seu_valdir','gabi.lagoa','rafa_jet','tio_berbigao'];
+const FRASES=['bora!','derruba ele!','kkkkk','vai Gripen','mira direito','que avião lindo','tô chegando','salve salve','foge!!','👏👏'];
+const $=s=>document.querySelector(s),sorteia=a=>a[Math.floor(Math.random()*a.length)];
+function quem(){const n=$('#nome').value.trim();return n||sorteia(NOMES);}
+$('#sorteia').onclick=()=>{$('#nome').value=sorteia(NOMES);};
+async function manda(ev){try{const r=await fetch('api/live',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(ev)});
+    const j=await r.json();log(`${ev.tipo} · ${ev.nome}${ev.texto?' · '+ev.texto:''}${ev.presente?' · '+ev.presente:''} → ✈️ ${j.avioes??'?'} aviões`);}
+  catch(e){log('⚠️ erro: '+e);}}
+function log(t){const l=$('#log');l.textContent=new Date().toLocaleTimeString()+'  '+t+'\n'+l.textContent.slice(0,4000);}
+for(const b of document.querySelectorAll('button[data-ev]'))b.onclick=()=>{const n=quem(),ev={tipo:b.dataset.ev,id:n,nome:n};
+  if(ev.tipo==='comentario')ev.texto=b.dataset.txt||sorteia(FRASES);
+  if(ev.tipo==='curtida')ev.n=+b.dataset.n;
+  if(ev.tipo==='presente'){ev.presente=b.dataset.p;ev.moedas=+b.dataset.m;}
+  manda(ev);};
+let auto=null;$('#auto').onclick=()=>{const b=$('#auto');if(auto){clearInterval(auto);auto=null;b.textContent='🤖 chat automático: OFF';b.classList.remove('on');return;}
+  b.textContent='🤖 chat automático: ON';b.classList.add('on');
+  auto=setInterval(()=>{const n=sorteia(NOMES),r=Math.random();
+    if(r<0.75)manda({tipo:'comentario',id:n,nome:n,texto:sorteia(FRASES)});else if(r<0.93)manda({tipo:'curtida',id:n,nome:n,n:20});
+    else manda({tipo:'presente',id:n,nome:n,presente:'Rosa',moedas:1});},1800);};
+</script></body></html>

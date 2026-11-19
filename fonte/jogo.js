@@ -521,7 +521,7 @@ const _v1=new V3(),_v2=new V3(),_v3=new V3(),_v4=new V3(),_f=new V3(),_u=new V3(
 // ------------------------------------------------ entrada: teclado + joystick flutuante + botões
 const TEC={};
 let TOQUE_B=false;   // toque rápido no B não se perde entre quadros
-addEventListener('keydown',e=>{if(e.code==='Escape'&&jogando){sair();return;}if(e.code==='KeyB'&&!e.repeat)TOQUE_B=true;if(e.code==='KeyG'&&!e.repeat&&jogando)trocaTrem();if(e.code==='KeyV'&&jogando&&!e.repeat)trocaVisao();TEC[e.code]=true;if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)&&jogando)e.preventDefault();});
+addEventListener('keydown',e=>{if(e.code==='Escape'&&jogando){sair();return;}if((e.code==='KeyB'||e.code==='KeyQ')&&!e.repeat)TOQUE_B=true;if(e.code==='KeyG'&&!e.repeat&&jogando)trocaTrem();if(e.code==='KeyV'&&jogando&&!e.repeat)trocaVisao();TEC[e.code]=true;if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)&&jogando)e.preventDefault();});
 addEventListener('keyup',e=>{TEC[e.code]=false;});
 addEventListener('blur',()=>{for(const k in TEC)TEC[k]=false;});
 const JOY={id:null,ox:0,oy:0,x:0,y:0};
@@ -552,7 +552,7 @@ function entrada(){const inv=$('#inverter').checked?1:-1;   // (09/11) padrão d
   // joystick: curva suave perto do centro (ajuda a mirar)
   const cx=Math.sign(JOY.x)*JOY.x*JOY.x,cy=Math.sign(JOY.y)*JOY.y*JOY.y;
   p-=cy;r+=cx;y-=cx*0.35;y-=LEME.x;   // leme: direita = nariz p/ direita
-  return{p:Math.max(-1,Math.min(1,p))*inv,r:Math.max(-1,Math.min(1,r)),y,fogo:!!(TEC.Space||TEC.KeyJ||BT.fogo),turbo:!!(TEC.ShiftLeft||TEC.ShiftRight||BT.turbo),missil:!!(TEC.KeyF||TEC.KeyR||BT.missil),flare:!!(TEC.KeyX||TEC.KeyC||BT.flare),freio:!!(TEC.KeyE||BT.freio),bomba:!!(TEC.KeyB||BT.bomba||TOQUE_B),ac:(TEC.KeyW?1:0)-(TEC.KeyS?1:0)};}
+  return{p:Math.max(-1,Math.min(1,p))*inv,r:Math.max(-1,Math.min(1,r)),y,fogo:!!(TEC.Space||TEC.KeyJ||BT.fogo),turbo:!!(TEC.ShiftLeft||TEC.ShiftRight||BT.turbo),missil:!!(TEC.KeyF||TEC.KeyR||BT.missil),flare:!!(TEC.KeyX||TEC.KeyC||BT.flare),freio:!!(TEC.KeyE||BT.freio),bomba:!!(TEC.KeyQ||TEC.KeyB||BT.bomba||TOQUE_B),ac:(TEC.KeyW?1:0)-(TEC.KeyS?1:0)};}
 
 // ------------------------------------------------ voo (modelo arcade) e tiro
 function frente(q,v=_f){return v.set(1,0,0).applyQuaternion(q);}
@@ -650,7 +650,7 @@ function balas(dt){for(const b of BALAS){if(!b.ativa)continue;b.t+=dt;b.ant.copy
   if(b.t>VIDA_BALA){b.ativa=false;b.m.visible=false;continue;}
   if(b.p.y<relevo(b.p.x,b.p.z)){b.ativa=false;b.m.visible=false;if(b.minha&&b.p.distanceTo(EU.pos)<900)fx(b.p,0xffffff,6,0.4,2,false);continue;}
   if(!b.minha)continue;
-  for(const [id,o] of OUT){if(!o.vivo||o.aliado)continue;if(distSeg(o.navio?_v4.copy(o.pos).setY(8):o.pos,b.ant,b.p)<(o.navio?24:10*(o.esc||1))){b.ativa=false;b.m.visible=false;if(id<0)treinoAcerto(id,o);else envia({t:'acerto',alvo:id});
+  for(const [id,o] of OUT){if(!o.vivo||o.aliado)continue;if(distSeg(o.navio?_v4.copy(o.pos).setY(o.pos.y+8):o.pos,b.ant,b.p)<(o.navio?24:10*(o.esc||1))){b.ativa=false;b.m.visible=false;if(id<0)treinoAcerto(id,o);else envia({t:'acerto',alvo:id});
     fx(b.p,0xffd070,7,0.25,2);SOM.acerto();tAcerto=0.15;break;}}}}
 function distSeg(c,a,b){_v1.subVectors(b,a);const l2=_v1.lengthSq()||1;let t=_v2.subVectors(c,a).dot(_v1)/l2;t=Math.max(0,Math.min(1,t));return _v2.copy(a).addScaledVector(_v1,t).distanceTo(c);}
 const arr=(v,d)=>{const k=10**d;return[Math.round(v.x*k)/k,Math.round(v.y*k)/k,Math.round(v.z*k)/k];};
@@ -742,7 +742,7 @@ function conectar(){const url=(location.protocol==='https:'?'wss://':'ws://')+lo
       $('#erro').textContent=EXPULSO||(era?'⚠️ Conexão perdida. Escolha a sala para voltar.':'⚠️ Não consegui falar com o servidor.');EXPULSO='';}};
   ws.onmessage=e=>{let d;try{d=JSON.parse(e.data);}catch{return;}
     if(d.t==='expulso'){EXPULSO='⚠️ '+d.msg;}
-    if(d.t==='bemvindo'){EU.id=d.id;EU.cor=d.cor;if(d.nome)EU.nome=d.nome;SALA=d.sala||'bots';MINHA_BASE=d.base??null;if(d.zona)ZONA=d.zona;if(d.rsam)R_SAM=d.rsam;LIMITE=SALA==='pvp'||SALA==='missao'?20900:SALA==='bots'?7600:5200;MEU_TIME=d.time||(SALA==='live'?'azul':null);NASCE=d.nasce||null;if(SALA==='missao'){$('#placar').innerHTML='';radio('Torre','Garoupa 1, decolagem autorizada. Aguarde instruções.');}VS_ANT=null;placarVs(SALA==='live'?[0,0]:null);mostrarBases();
+    if(d.t==='bemvindo'){EU.id=d.id;EU.cor=d.cor;if(d.nome)EU.nome=d.nome;SALA=d.sala||'bots';MINHA_BASE=d.base??null;if(d.zona)ZONA=d.zona;if(d.rsam)R_SAM=d.rsam;LIMITE=SALA==='pvp'||SALA==='missao'?20900:SALA==='bots'?7600:5200;MEU_TIME=d.time||(SALA==='live'?'azul':null);NASCE=d.nasce||null;tempestade(d.clima==='tempestade');if(SALA==='missao'){$('#placar').innerHTML='';radio('Torre','Harpia 1, decolagem autorizada. Aguarde instruções.');}VS_ANT=null;placarVs(SALA==='live'?[0,0]:null);mostrarBases();
       if(JATO)cena.remove(JATO);JATO=criarJato(d.cor);nascer();}
     else if(d.t==='placar')recebePlacar(d.l);
     else if(d.t==='snap')recebeSnap(d.j);
@@ -768,10 +768,10 @@ function conectar(){const url=(location.protocol==='https:'?'wss://':'ws://')+lo
     if(d.t==='snap'&&d.m)recebeMisseis(d.m);};}
 function recebePlacar(l){PLACAR=l;const ids=new Set(l.map(x=>x.id));corBandeiras(l);
   for(const x of l){if(x.id===EU.id)continue;let o=OUT.get(x.id);
-    if(!o){o={g:x.navio?criarNavio(x.cor):criarJato(x.cor),navio:!!x.navio,pos:new V3(),vel:new V3(),q:new QT(),alvoP:new V3(),alvoQ:new QT(),tRec:0,vida:100,vivo:false,novo:true};
+    if(!o){o={g:x.navio?(x.tipo==='radar'?criarRadar(x.cor,x.id):criarNavio(x.cor,x.id)):x.tipo==='carga'?(()=>{const c=criarCargueiro(x.cor);cena.add(c);return c;})():criarJato(x.cor),navio:!!x.navio,pos:new V3(),vel:new V3(),q:new QT(),alvoP:new V3(),alvoQ:new QT(),tRec:0,vida:100,vivo:false,novo:true};
       o.rot=document.createElement('div');o.rot.className='rot';o.rot.innerHTML='<span></span><b><i></i></b>';$('#rotulos').appendChild(o.rot);o.g.visible=false;OUT.set(x.id,o);}
-    if(o.cor&&o.cor!==x.cor&&!o.navio){const j=criarJato(x.cor);j.visible=o.g.visible;cena.remove(o.g);o.g=j;}   // (10/11) live: seguiu = vira dourado
-    o.nome=(x.time&&x.time===MEU_TIME?'🟦 ':'')+x.nome;o.cor=x.cor;o.bot=x.bot;o.aliado=!!(x.time&&x.time===MEU_TIME);o.esc=x.esc||1;o.vidaMax=x.vm&&x.vm!==100?x.vm:o.esc>1?400:100;o.g.scale.setScalar(o.navio?1:1.25*o.esc);if(o.navio&&!o.anel){o.anel=anelNavio(x.time===MEU_TIME);}
+    if(o.cor&&o.cor!==x.cor&&!o.navio&&x.tipo!=='carga'){const j=criarJato(x.cor);j.visible=o.g.visible;cena.remove(o.g);o.g=j;}   // (10/11) live: seguiu = vira dourado
+    o.nome=(x.time&&x.time===MEU_TIME?'🟦 ':'')+x.nome;o.cor=x.cor;o.bot=x.bot;o.aliado=!!(x.time&&x.time===MEU_TIME);o.esc=x.esc||1;o.vidaMax=x.vm&&x.vm!==100?x.vm:o.esc>1?400:100;o.g.scale.setScalar(o.navio||x.tipo==='carga'?1:1.25*o.esc);o.carga=x.tipo==='carga';if(o.navio&&!o.anel&&x.tipo!=='radar'){o.anel=anelNavio(x.time===MEU_TIME);}
     o.rot.firstChild.textContent=o.nome;o.rot.style.color=x.cor;o.kh=x.kh||0;
     if(SALA==='live'&&o.bot&&x.time!==MEU_TIME&&o.avK!==(x.av||x.nome)){o.avK=x.av||x.nome;o.av=x.av;o.rav?.remove();o.rav=document.createElement('span');o.rav.className='rav';o.rav.innerHTML=avHTML(x.av,x.nome);o.rot.insertBefore(o.rav,o.rot.lastChild);}}
   for(const [id,o] of OUT)if(!ids.has(id)){cena.remove(o.g);if(o.anel)cena.remove(o.anel);o.rot.remove();o.aq?.remove();OUT.delete(id);}
@@ -816,10 +816,170 @@ function liveTop(){if(SALA!=='live'||!LIVE_RANK)return'';const m=['🥇','🥈',
   return (LIVE_RANK.derrubou.length?'<small>💀 quem mais te derrubou: '+f(LIVE_RANK.derrubou)+'</small>':'')+(LIVE_RANK.moedas.length?'<small>🎁 '+f(LIVE_RANK.moedas)+' 🪙</small>':'');}
 // (10/11) navio do chat: casco + ponte + metralhadora antiaérea; anel vermelho na água = alcance da metralhadora (900 m)
 const ALC_NAVIO=900;
-function criarNavio(cor){const g=new THREE.Group(),mC=M('#5f6a72',0.7),mE=M('#8a949b',0.6),mR=M('#9e2b25',0.8),mF=M(cor,0.6);
-  box(70,6,16,mR,0,1,0,g);box(70,5,16,mC,0,6.5,0,g);box(18,9,11,mE,-12,13,0,g);box(8,4,8,mF,-12,19.5,0,g);cil(1.6,1.6,8,mC,6,13,0,g);
-  const t=new THREE.Group();t.position.set(20,10,0);g.add(t);cil(3,3.5,3,mE,0,0,0,t);box(9,1,1,mC,4,2.2,1.2,t);box(9,1,1,mC,4,2.2,-1.2,t);t.rotation.z=0.6;
-  cena.add(g);return g;}
+// (19/11) navios e radares novos (aprovados na prévia previa_modelos.html): 3 de cada, o id escolhe qual
+function dupla(m){return m.userData.d||(m.userData.d=Object.assign(m.clone(),{side:THREE.DoubleSide}));}   // prato (meia-esfera aberta) visível dos dois lados
+function casco(comp,larg,alt,proa,mat,pai,y=0){   // casco com proa em ponta (vista de cima), extrudado p/ cima
+  const s=new THREE.Shape(),c=comp/2,l=larg/2;
+  s.moveTo(-c,-l*0.85);s.lineTo(-c,l*0.85);s.lineTo(-c+2,l);s.lineTo(c-proa,l);s.quadraticCurveTo(c-proa*0.3,l*0.7,c,0);
+  s.quadraticCurveTo(c-proa*0.3,-l*0.7,c-proa,-l);s.lineTo(-c+2,-l);s.closePath();
+  const g=new THREE.ExtrudeGeometry(s,{depth:alt,bevelEnabled:false});g.rotateX(-Math.PI/2);
+  const m=new THREE.Mesh(g,mat);m.position.y=y;pai.add(m);return m;}
+function gira(obj,vel){const m=obj.isMesh?obj:obj.children.find(c=>c.isMesh);if(m)m.onBeforeRender=()=>{obj.rotation.y+=vel;};}
+function torreCanhao(mat,matC,x,y,pai,cano=12,esc=1){const t=new THREE.Group();t.position.set(x,y,0);t.scale.setScalar(esc);pai.add(t);
+  cil(3.4,4,2.6,mat,0,1.3,0,t,12);box(5,2.4,5.4,mat,0.6,3.4,0,t);const c=cil(0.5,0.6,cano,matC,cano/2+2.5,3.6,0,t,8);c.rotation.z=Math.PI/2-0.08;return t;}
+function bandeira(cor,x,y,pai){box(0.3,7,0.3,M('#3a3f44',0.6),x,y+3.5,0,pai);box(0.2,2.6,4,M(cor,0.7),x,y+5.6,2.1,pai);}
+
+// Navio A · Destróier moderno: proa em ponta, faixa vermelha na linha d'água, ponte em degraus, mastro com radar girando, canhão, mísseis, heliponto
+function navioA(cor){const g=new THREE.Group(),cz=M('#7d878f',0.65),cz2=M('#a3adb5',0.55),esc_=M('#4b545c',0.7),ver=M('#9e2b25',0.8),pr=M('#1d2328',0.5),fx=M(cor,0.6);
+  casco(78,15,4,16,ver,g,-1.5);casco(78,15,6,16,cz,g,2.5);casco(74,13.4,0.4,15,esc_,g,8.5);
+  box(16,6,11,cz2,-4,11.5,0,g);box(10,4,9,cz2,-2,16.5,0,g);box(6.5,1.2,9.2,pr,1.4,16.8,0,g);       // ponte + janelas
+  box(1.2,0.6,11.2,fx,-4,14.6,0,g);                                                                    // faixa do time
+  cil(0.5,0.8,12,esc_,-4,24.5,0,g,6);const pr1=new THREE.Group();pr1.position.set(-4,29,0);g.add(pr1);box(1.2,1.8,7,cz2,0,0,0,pr1);gira(pr1,0.03);
+  box(6,5,7,cz,-15,11,0,g);cil(2.2,2.6,5,esc_,-15,15.5,0,g,10);box(4.6,0.8,5.2,fx,-15,17.6,0,g);   // chaminé com a cor do time
+  box(9,1.2,8,M('#5b646b',0.6),16,9.1,0,g);for(let i=0;i<4;i++)for(let k=0;k<3;k++)box(1.6,0.4,1.6,pr,12.5+i*2.3,9.8,-2.4+k*2.4,g);   // células de míssil
+  torreCanhao(cz2,esc_,26,8.7,g,11);
+  esf(2.2,M('#e9ecef',0.4),-24,13,0,g);cil(2,2.4,3,cz2,-24,10.4,0,g);                                  // CIWS (domo branco)
+  box(14,0.3,12.4,M('#59626a',0.8),-31,8.9,0,g);const anel=new THREE.Mesh(new THREE.RingGeometry(3.2,3.8,24),M('#f2f2f2',0.6));anel.rotation.x=-Math.PI/2;anel.position.set(-31,9.1,0);g.add(anel);
+  bandeira(cor,-37,8.7,g);return g;}
+
+// Navio B · Fragata furtiva: blocos com paredes inclinadas (tronco), mastro integrado baixo, cinza-escuro
+function tronco(w,h,d,k,mat,x,y,z,pai,kz){const g=new THREE.BoxGeometry(w,h,d),p=g.attributes.position;   // caixa com o topo encolhido (paredes inclinadas)
+  for(let i=0;i<p.count;i++)if(p.getY(i)>0){p.setX(i,p.getX(i)*k);p.setZ(i,p.getZ(i)*(kz??k));}g.computeVertexNormals();
+  const m=new THREE.Mesh(g,mat);m.position.set(x,y,z);pai.add(m);return m;}
+function navioB(cor){const g=new THREE.Group(),cz=M('#646d75',0.6),cz2=M('#757f87',0.55),esc_=M('#3c444b',0.7),ver=M('#2b2f33',0.8),pr=M('#1b2126',0.4),fx=M(cor,0.6);
+  casco(80,14,4,22,ver,g,-1.5);casco(80,14,6,22,cz,g,2.5);
+  tronco(34,6,12.6,0.86,cz2,-4,11.5,0,g,0.8);                    // casa baixa e larga
+  tronco(14,5,9.6,0.8,cz2,0,17,0,g,0.78);box(4.6,1,7.2,pr,5.2,17.6,0,g);   // ponte (janelas na frente)
+  tronco(7,9,6.4,0.55,cz2,-3,24,0,g,0.55);                        // mastro integrado (painéis de radar)
+  for(const z of[-1,1])box(3.2,3.2,0.2,pr,-3,23.5,z*2.4,g);box(0.2,3.2,3.2,pr,-0.2,23.5,0,g);
+  cil(0.25,0.25,6,esc_,-3,31,0,g,5);const d=new THREE.Group();d.position.set(-3,34,0);g.add(d);box(0.5,0.5,4,esc_,0,0,0,d);gira(d,0.05);
+  box(0.6,2.2,12.8,fx,-12,12,0,g);                                 // faixa do time na lateral da casa
+  tronco(7,4,6,0.6,esc_,-18,16,0,g);                               // chaminé baixa inclinada
+  const t=new THREE.Group();t.position.set(23,8.5,0);g.add(t);tronco(6,2.4,5.6,0.6,cz2,0,1.2,0,t);const c=cil(0.45,0.55,8,esc_,6,1.6,0,t,8);c.rotation.z=Math.PI/2-0.06;   // canhão com escudo furtivo
+  tronco(8,1.4,8,0.7,esc_,14,9.2,0,g);for(let i=0;i<3;i++)for(let k=0;k<2;k++)box(1.4,0.3,1.4,pr,12+i*2,10,-1.2+k*2.4,g);  // células de míssil
+  box(13,0.3,12,M('#4a5258',0.8),-32,8.6,0,g);const an=new THREE.Mesh(new THREE.RingGeometry(3,3.6,24),M('#e8e8e8',0.6));an.rotation.x=-Math.PI/2;an.position.set(-32,8.8,0);g.add(an);
+  bandeira(cor,-38,8.5,g);return g;}
+
+// Navio C · Corveta clássica: duas chaminés, duas torres de canhão, botes, mastro treliça
+function navioC(cor){const g=new THREE.Group(),cz=M('#8b949a',0.7),br=M('#c9c2b2',0.7),esc_=M('#4a4f53',0.7),ver=M('#7a2620',0.8),pr=M('#22282d',0.5),fx=M(cor,0.6),mad=M('#8a6a45',0.8);
+  casco(74,13,4,12,ver,g,-1.5);casco(74,13,6,12,cz,g,2.5);casco(70,11.6,0.4,11,mad,g,8.5);
+  box(12,5,9,br,-2,11.5,0,g);box(7,4,8,br,-0.5,16,0,g);box(4,1.2,8.2,pr,2.6,16.6,0,g);
+  for(const x of[-12,-19]){cil(1.8,2,9,cz,x,13,0,g,12);cil(1.9,1.9,1.4,fx,x,16.8,0,g,12);cil(1.95,1.95,1,M('#222',0.6),x,17.9,0,g,12);}
+  for(const z of[-0.6,0.6]){const p=cil(0.25,0.25,22,esc_,1.5,26,z*1.6,g,5);p.rotation.x=z*0.08;}for(let i=0;i<5;i++)box(0.25,0.25,3.6,esc_,1.5,18+i*3.6,0,g);
+  box(5,0.25,0.25,esc_,1.5,33,0,g);
+  torreCanhao(br,esc_,21,8.7,g,10);torreCanhao(br,esc_,-29,8.7,g,10).rotation.y=Math.PI;
+  for(const z of[-5.6,5.6]){const b=esf(1.6,M('#e8e2d0',0.7),-8,10.6,z,g,3,0.6,1);}
+  bandeira(cor,-36,8.7,g);return g;}
+
+// Radar A · Radome: bola branca numa torre de concreto, casinha e cerca
+function radarA(cor){const g=new THREE.Group(),con=M('#9aa0a4',0.9),bra=M('#eef1f3',0.35),esc_=M('#4f565c',0.8),fx=M(cor,0.6);
+  box(34,1,34,M('#6f7a62',0.95),0,0.5,0,g);cil(5,6,22,con,0,12,0,g,8);cil(6.6,6.6,1.2,esc_,0,23.5,0,g,16);
+  esf(9,bra,0,31,0,g);box(10,5,7,M('#c9cdc8',0.8),-11,3.5,-10,g);box(10.4,0.6,7.4,fx,-11,6.2,-10,g);
+  for(let i=0;i<16;i++){const a=i/16*Math.PI*2;box(0.4,3,0.4,esc_,Math.cos(a)*16,2,Math.sin(a)*16,g);}
+  const luz=esf(0.8,M('#ff3b30',0.3),0,40.4,0,g);return g;}
+
+// Radar B · Antena treliça girando: painel retangular grande num pedestal, cabine e gerador
+function radarB(cor){const g=new THREE.Group(),con=M('#8f969b',0.85),esc_=M('#3f464c',0.7),fx=M(cor,0.6),pai=M('#d6dadc',0.5);
+  box(30,1,30,M('#6f7a62',0.95),0,0.5,0,g);box(12,6,9,M('#c2c6c0',0.8),-8,4,6,g);box(12.4,0.7,9.4,fx,-8,7.3,6,g);box(5,3.5,4,esc_,9,2.8,-8,g);
+  cil(2.5,3.6,12,con,0,7,0,g,8);const cab=new THREE.Group();cab.position.set(0,14,0);g.add(cab);box(4,3,4,esc_,0,0,0,cab);
+  const ant=new THREE.Group();ant.position.set(1.5,6,0);ant.rotation.z=-0.25;cab.add(ant);
+  for(let i=0;i<=6;i++)box(0.4,0.4,22,pai,0,-4.5+i*1.5,0,ant);for(let k=0;k<=8;k++)box(0.4,9.4,0.4,pai,0,0,-11+k*2.75,ant);
+  box(0.3,9,21.6,M('#9ea6ab',0.6),-0.4,0,0,ant);gira(cab,0.025);return g;}
+
+// Radar C · Estação SAM: prato + 2 lançadores com mísseis + sacos de areia
+function radarC(cor){const g=new THREE.Group(),con=M('#8a9196',0.85),esc_=M('#4a5157',0.75),oli=M('#5d6b4a',0.8),are=M('#b9a77e',0.95),bra=M('#e2e6e8',0.4),fx=M(cor,0.6);
+  box(40,1,40,M('#7a7a5e',0.95),0,0.5,0,g);
+  for(let i=0;i<22;i++){const a=i/22*Math.PI*2;box(3.4,1.6,1.8,are,Math.cos(a)*17,1.8,Math.sin(a)*17,g).rotation.y=-a;}
+  box(8,4,6,oli,0,3,0,g);cil(1.2,1.6,8,esc_,0,9,0,g,8);const pr=new THREE.Group();pr.position.set(0,14,0);g.add(pr);
+  const d=new THREE.Mesh(new THREE.SphereGeometry(7,18,8,0,Math.PI*2,0,Math.PI/3),dupla(bra));d.rotation.x=-2.0;pr.add(d);cil(0.3,0.3,5,esc_,0,0,2.5,pr,6).rotation.x=Math.PI/2;
+  esf(0.9,fx,0,1.5,5.4,pr);gira(pr,0.03);
+  for(const [x,z,a] of[[-10,-8,0.5],[10,-8,-0.5]]){const l=new THREE.Group();l.position.set(x,1,z);l.rotation.y=a;g.add(l);box(6,2,6,oli,0,1,0,l);
+    const tr=new THREE.Group();tr.position.y=2.5;tr.rotation.x=-0.75;l.add(tr);box(5,0.8,9,oli,0,0,0,tr);
+    for(const k of[-1.4,1.4]){cil(0.6,0.6,8,bra,k,1,0.5,tr,8).rotation.x=Math.PI/2;const p=new THREE.Mesh(new THREE.ConeGeometry(0.6,1.6,8),fx);p.rotation.x=Math.PI/2;p.position.set(k,1,5.3);tr.add(p);}}
+  box(6,3,5,oli,9,2.5,9,g);box(6.2,0.5,5.2,fx,9,4.2,9,g);return g;}
+// (19/11) cargueiro multimissão inspirado no KC-390 (Embraer): asa alta, cauda em T, 2 turbofans sob a asa, traseira levantada c/ rampa. Tamanho real (~35 m), frente = +x
+// (19/11) KC-390 de verdade (STL do Geraldo1600, Thingiverse 4807167, CC BY-SA) — kc390.js só carrega quando precisa
+let KMOD=null,KMOD_CARREGANDO=false;const KMOD_COR={};
+const KMOD_MAT=new THREE.MeshStandardMaterial({roughness:0.6,metalness:0.1,flatShading:true,side:THREE.DoubleSide});
+{const L=c=>{const k=new THREE.Color(c).convertSRGBToLinear();return `vec3(${k.r.toFixed(4)},${k.g.toFixed(4)},${k.b.toFixed(4)})`;};   // (19/11) camuflagem FAB: verde sobre azul-claro (como a foto de referência)
+ KMOD_MAT.onBeforeCompile=sh=>{sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vPo;').replace('#include <begin_vertex>','#include <begin_vertex>\nvPo=position;');
+  sh.fragmentShader=sh.fragmentShader.replace('#include <common>',`#include <common>
+varying vec3 vPo;
+float hcm(vec3 p){return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453);}
+float ncm(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+  return mix(mix(mix(hcm(i),hcm(i+vec3(1,0,0)),f.x),mix(hcm(i+vec3(0,1,0)),hcm(i+vec3(1,1,0)),f.x),f.y),
+             mix(mix(hcm(i+vec3(0,0,1)),hcm(i+vec3(1,0,1)),f.x),mix(hcm(i+vec3(0,1,1)),hcm(i+vec3(1,1,1)),f.x),f.y),f.z);}`)
+   .replace('#include <color_fragment>',`#include <color_fragment>
+{vec3 q=vPo*vec3(0.16,0.2,0.18);float m=ncm(q)*0.65+ncm(q*2.3+7.1)*0.25+ncm(q*5.1+3.3)*0.1;
+ diffuseColor.rgb=mix(${L('#86aac6')},${L('#3a7262')},smoothstep(0.45,0.48,m));}`);};}
+// (19/11) adesivo que acompanha a fuselagem: acha o ponto com raio, pega os triângulos dentro do "projetor" e cola a textura neles
+const KMOD_TEX={};
+function texAdesivo(tipo){if(KMOD_TEX[tipo])return KMOD_TEX[tipo];
+  const c=document.createElement('canvas'),g=c.getContext('2d');
+  if(tipo==='cocar'){c.width=c.height=256;const r=[118,84,52];['#1e8a3c','#f2c230','#1f4fa8'].forEach((k,i)=>{g.fillStyle=k;g.beginPath();g.arc(128,128,r[i],0,7);g.fill();});
+    g.fillStyle='#fff';g.beginPath();for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,rr=i%2?14:36;g.lineTo(128+Math.cos(a)*rr,128+Math.sin(a)*rr);}g.fill();}
+  else{c.width=512;c.height=160;const vid=g.createLinearGradient(0,0,0,160);vid.addColorStop(0,'#3a5468');vid.addColorStop(0.5,'#121e28');vid.addColorStop(1,'#0b141c');
+    const jan=tipo==='janelas'?[[20,40,150,30,140,140,30,130],[180,30,330,30,320,140,190,140],[360,30,490,40,480,130,370,140]]:[[20,20,245,20,245,150,50,135],[267,20,492,20,462,135,267,150]];   // vidros (4 cantos de cada)
+    g.fillStyle=vid;for(const q of jan){g.beginPath();g.moveTo(q[0],q[1]);for(let i=2;i<8;i+=2)g.lineTo(q[i],q[i+1]);g.closePath();g.fill();}
+    g.fillStyle='rgba(255,255,255,0.18)';for(const q of jan){g.beginPath();g.moveTo(q[0]+8,q[1]+6);g.lineTo(q[2]-20,q[3]+6);g.lineTo(q[0]+30,q[1]+40);g.closePath();g.fill();}}
+  const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;t.anisotropy=4;return KMOD_TEX[tipo]=t;}
+function adesivo(malha,de,para,larg,alt,tipo){   // de: ponto fora do avião; para: p/ onde o raio vai
+  const rc=new THREE.Raycaster(de,para.clone().sub(de).normalize(),0,60);malha.updateMatrixWorld();const h=rc.intersectObject(malha).find(x=>Math.abs(x.point.z)<3);if(!h)return null;   // só a fuselagem (o motor fica a ~5 m do centro)
+  const n=de.clone().sub(h.point).setY(0).normalize(),up=new THREE.Vector3(0,1,0),dir=n.clone().negate().cross(up).normalize();   // dir = direita de quem olha
+  const P=malha.geometry.attributes.position,I=malha.geometry.index.array,pos=[],uv=[],a=new THREE.Vector3(),fn=new THREE.Vector3(),e1=new THREE.Vector3(),e2=new THREE.Vector3(),vs=[0,0,0].map(()=>new THREE.Vector3());
+  for(let t=0;t<I.length;t+=3){for(let k=0;k<3;k++)vs[k].fromBufferAttribute(P,I[t+k]);
+    fn.crossVectors(e1.subVectors(vs[1],vs[0]),e2.subVectors(vs[2],vs[0])).normalize();if(Math.abs(fn.dot(n))<0.25)continue;
+    const L=vs.map(v=>{a.subVectors(v,h.point);return [a.dot(dir)/larg,a.dot(up)/alt,a.dot(n)];});   // triângulo grande também entra se cruzar o adesivo
+    if(Math.min(...L.map(l=>l[0]))>0.5||Math.max(...L.map(l=>l[0]))<-0.5||Math.min(...L.map(l=>l[1]))>0.5||Math.max(...L.map(l=>l[1]))<-0.5||L.some(l=>Math.abs(l[2])>3)||vs.some(v=>Math.abs(v.z)>3.2))continue;
+    const ordem=fn.dot(n)>0?[0,1,2]:[0,2,1];
+    for(const k of ordem){a.copy(vs[k]).addScaledVector(n,0.04);pos.push(a.x,a.y,a.z);uv.push(L[k][0]+0.5,L[k][1]+0.5);}}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.computeVertexNormals();
+  const tx=texAdesivo(tipo);tx.wrapS=tx.wrapT=THREE.ClampToEdgeWrapping;
+  return new THREE.Mesh(g,new THREE.MeshStandardMaterial({map:tx,transparent:true,alphaTest:0.3,roughness:0.6,polygonOffset:true,polygonOffsetFactor:-4,depthWrite:false}));}
+function kcGeo(cor){const d=window.KC390;if(!d)return null;
+  if(!KMOD){const b64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));const p=new Int16Array(b64(d.pos).buffer),ix=new Uint32Array(b64(d.idx).buffer),pt=b64(d.parte);
+    const pos=new Float32Array(p.length);for(let i=0;i<p.length;i++)pos[i]=p[i]/1000;
+    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setIndex(new THREE.BufferAttribute(ix,1));g.computeVertexNormals();KMOD={g,pt};}
+  if(!KMOD_COR[cor]){const n=KMOD.pt.length,c=new Float32Array(n*3),cz=new THREE.Color('#8e979e').convertSRGBToLinear(),tm=new THREE.Color(cor).convertSRGBToLinear(),P=KMOD.g.attributes.position;
+    for(let i=0;i<n;i++){const k=KMOD.pt[i]===2&&P.getY(i)>3.2&&P.getY(i)<7.6?tm:cz;c[i*3]=k.r;c[i*3+1]=k.g;c[i*3+2]=k.b;}   // deriva com a cor do time
+    const g=new THREE.BufferGeometry();g.setAttribute("position",KMOD.g.attributes.position);g.setAttribute("normal",KMOD.g.attributes.normal);g.setIndex(KMOD.g.index);g.setAttribute('color',new THREE.BufferAttribute(c,3));KMOD_COR[cor]=g;}
+  return KMOD_COR[cor];}
+function carregaKC(){if(KMOD_CARREGANDO||window.KC390)return;KMOD_CARREGANDO=true;const s=document.createElement('script');s.src='kc390.js';
+  s.onload=()=>{if(typeof OUT!=='undefined')for(const o of OUT.values())if(o.g.userData.simples){const j=criarCargueiro(o.g.userData.simples);j.visible=o.g.visible;j.position.copy(o.g.position);j.quaternion.copy(o.g.quaternion);cena.remove(o.g);cena.add(j);o.g=j;}};
+  document.head.appendChild(s);}
+function criarCargueiro(cor){const geo=kcGeo(cor);if(!geo){carregaKC();const g=criarCargueiroSimples(cor);g.userData.simples=cor;return g;}
+  const g=new THREE.Group();g.add(new THREE.Mesh(geo,KMOD_MAT));
+  const malha=g.children[0],V=THREE.Vector3;
+  for(const z of[-1,1]){   // adesivos colados na fuselagem (acompanham a curva)
+    const c=adesivo(malha,new V(-4,0.9,z*12),new V(-4,0.9,0),2.3,2.3,'cocar');if(c)g.add(c);
+    const j=adesivo(malha,new V(14.3,1.15,z*12),new V(14.3,1.15,0),2.6,0.75,'janelas');if(j)g.add(j);}
+  {const p=adesivo(malha,new V(30,4,0),new V(15,1.2,0),2.4,0.9,'parabrisa');if(p)g.add(p);}   // para-brisa
+  return g;}
+function criarCargueiroSimples(cor){const g=new THREE.Group(),cz=M('#8e979e',0.55),cz2=M('#737c83',0.6),esc_=M('#2f363c',0.5),vid=M('#16202a',0.15),fx=M(cor,0.6);
+  const fus=cil(2.35,2.35,21,cz,1.5,0,0,g,18);fus.rotation.z=Math.PI/2;                                   // fuselagem
+  esf(2.35,cz,12,-0.15,0,g,2.6,0.95,1);                                                                       // nariz
+  const vj=esf(2.36,vid,12.6,0.55,0,g,1.6,0.42,0.86);                                                        // para-brisa (faixa escura)
+  const tr=cil(2.35,0.75,12,cz,-14.8,1.25,0,g,18);tr.rotation.z=Math.PI/2+0.2;                               // traseira subindo (rampa)
+  box(7,0.5,3.2,cz2,-13.5,-1.2,0,g).rotation.z=0.2;                                                            // porta da rampa
+  for(const z of[-1,1])box(7,1.4,1,cz2,0.5,-1.75,z*2.2,g);                                                    // carenagens do trem
+  // asa alta com leve anedro e enflechamento
+  for(const z of[-1,1]){const a=new THREE.Group();a.position.set(1.5,2.2,z*1.4);a.rotation.x=z*0.035;g.add(a);
+    const w=box(4.6,0.45,16.5,cz,0,0,z*8.25,a);w.rotation.y=z*0.1;box(3,0.46,4,cz2,-1.2,0.02,z*16.4,a);
+    const pil=box(2.2,1.2,0.5,cz2,1.2,-0.8,z*6.4,a);
+    const mot=cil(1.05,0.95,5.2,cz2,2.4,-1.75,z*6.4,a,14);mot.rotation.z=Math.PI/2;
+    const boca=cil(0.95,0.95,0.3,esc_,5.05,-1.75,z*6.4,a,14);boca.rotation.z=Math.PI/2;
+    const bico=cil(0.7,0.55,1,esc_,-0.6,-1.75,z*6.4,a,12);bico.rotation.z=Math.PI/2;}
+  box(4.8,0.7,3,cz,1.5,2.1,0,g);                                                                               // carenagem da asa no dorso
+  // cauda em T
+  const der=box(5.6,7.4,0.5,cz,-18.4,5.2,0,g);der.rotation.z=-0.42;box(3.6,7,0.52,fx,-19.2,5.3,0,g).rotation.z=-0.42;   // deriva c/ a cor do time
+  for(const z of[-1,1]){const h=box(3.2,0.35,6.2,cz,-21.3,8.6,z*3.1,g);h.rotation.y=z*0.18;}
+  // cocar da FAB (verde, amarelo, azul, estrela branca simplificada) dos dois lados
+  for(const z of[-1,1]){const c=new THREE.Group();c.position.set(-6,0.4,z*2.37);c.rotation.y=z>0?0:Math.PI;g.add(c);
+    [['#1e8a3c',1.1],['#f2c230',0.78],['#1f4fa8',0.5],['#ffffff',0.16]].forEach(([k,r],i)=>{const d=new THREE.Mesh(new THREE.CircleGeometry(r,20),M(k,0.6));d.position.z=0.01+i*0.01;c.add(d);});}
+  box(9,0.25,0.06,fx,4,-0.6,2.36,g);box(9,0.25,0.06,fx,4,-0.6,-2.36,g);                                     // faixa do time na fuselagem
+  return g;}
+function criarNavio(cor,id=0){const g=[navioA,navioB,navioC][Math.abs(id)%3](cor);cena.add(g);return g;}
+function criarRadar(cor,id=0){const g=[radarC,radarA,radarB][Math.abs(id)%3](cor);cena.add(g);return g;}
 function anelNavio(aliado){const m=new THREE.Mesh(new THREE.RingGeometry(ALC_NAVIO-24,ALC_NAVIO,72),new THREE.MeshBasicMaterial({color:aliado?0x4aa3ff:0xff3030,transparent:true,opacity:0.55,side:THREE.DoubleSide,depthWrite:false}));
   m.rotation.x=-Math.PI/2;cena.add(m);return m;}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -873,7 +1033,11 @@ function compensacao(W,H){const el=$('#lead');LEADD=0;if(!EU.vivo){el.style.disp
   _v1.copy(_lp).project(cam);if(_v1.z>=1){el.style.display='none';return;}
   el.style.display='block';el.style.left=((_v1.x+1)/2*W)+'px';el.style.top=((1-_v1.y)/2*H)+'px';el.style.color=alvo.cor||'#fff';
   _v1.subVectors(_lp,EU.pos).normalize();const erro=Math.acos(Math.min(1,_v1.dot(fw)))*d;el.classList.toggle('ok',erro<(alvo.navio?22:9*(alvo.esc||1)));}
-const _AQ=new V3();
+const _AQ=new V3();let ROT_MAX=4500,NEB0=null;
+function tempestade(on){const u=ceu.material.uniforms;   // (19/11) missão 7: neblina pesada, céu cinza, luz baixa
+  if(on&&!NEB0){NEB0={c:cena.fog.color.getHex(),n:cena.fog.near,f:cena.fog.far,b:cena.background.getHex(),h:u.uHor.value.getHex(),z:u.uZen.value.getHex(),s:sol.intensity};
+    cena.fog.color.set('#56616b');cena.fog.near=60;cena.fog.far=1000;cena.background.set('#56616b');u.uHor.value.set('#56616b');u.uZen.value.set('#3a434b');sol.intensity=0.45;ROT_MAX=800;}
+  else if(!on&&NEB0){cena.fog.color.setHex(NEB0.c);cena.fog.near=NEB0.n;cena.fog.far=NEB0.f;cena.background.setHex(NEB0.b);u.uHor.value.setHex(NEB0.h);u.uZen.value.setHex(NEB0.z);sol.intensity=NEB0.s;NEB0=null;ROT_MAX=4500;}}
 function hud(dt){const W=innerWidth,H=innerHeight;compensacao(W,H);
   const mira=$('#mira');if(EU.vivo){_v1.copy(EU.pos).addScaledVector(frente(EU.q),LEADD||700).project(cam);mira.style.display=CABINE?'none':'block';mira.style.left=((_v1.x+1)/2*W)+'px';mira.style.top=((1-_v1.y)/2*H)+'px';}else mira.style.display='none';
   tAcerto-=dt;mira.classList.toggle('acertou',tAcerto>0);
@@ -884,7 +1048,7 @@ function hud(dt){const W=innerWidth,H=innerHeight;compensacao(W,H);
     if(!o.vivo||agoraH-o.tRec>2500){o.rot.style.display='none';o.aq.style.display='none';o.vis=false;continue;}if(d<dP&&!o.aliado){dP=d;perto=o;}
     _v1.copy(o.pos).y+=o.navio?34:9;_v1.project(cam);
     if(!o.aliado&&agoraH>(o.tVis||0)){o.tVis=agoraH+250;o.semMorro=visada(EU.pos,o.pos);}   // (18/11) atrás do morro: sem rótulo (aliado vem por datalink)
-    if(_v1.z<1&&Math.abs(_v1.x)<1.1&&Math.abs(_v1.y)<1.1&&d<4500&&(o.aliado||o.semMorro!==false)){_AQ.copy(o.pos).project(cam);const ax=(_AQ.x+1)/2*W,ay=(1-_AQ.y)/2*H,as=Math.max(15,(o.navio?70:13)*H/(2*Math.tan(cam.fov*Math.PI/360)*d));
+    if(_v1.z<1&&Math.abs(_v1.x)<1.1&&Math.abs(_v1.y)<1.1&&d<ROT_MAX&&(o.aliado||o.semMorro!==false)){_AQ.copy(o.pos).project(cam);const ax=(_AQ.x+1)/2*W,ay=(1-_AQ.y)/2*H,as=Math.max(15,(o.navio?70:o.carga?36:13)*H/(2*Math.tan(cam.fov*Math.PI/360)*d));
       o.aq.style.display='block';o.aq.style.left=ax+'px';o.aq.style.top=ay+'px';o.aq.style.width=o.aq.style.height=as+'px';o.aq.style.color=o.rot.style.color;o.aq.classList.toggle('trav',o===otv&&TRAVA.t>=1);
       o.rot.style.display='block';o.rot.style.left=ax+'px';o.rot.style.top=Math.min((1-_v1.y)/2*H,ay-as*0.72-4)+'px';
       o.rot.firstChild.textContent=o.nome+' · '+Math.round(d)+'m';o.rot.lastChild.firstChild.style.width=Math.min(100,o.vida*100/(o.vidaMax||100))+'%';o.vis=true;}else{o.rot.style.display='none';o.aq.style.display='none';o.vis=false;}}
@@ -1210,7 +1374,7 @@ const PASSOS=[
     tic:(dt)=>{if(!TREINO.mis.some(m=>m.L.ob===EU)&&!TREINO.desviou){TREINO.tMis-=dt;if(TREINO.tMis<=0){TREINO.tMis=3;const f=frente(EU.q,_v2);
         misLocal(_v1.copy(EU.pos).addScaledVector(f,-1700).setY(EU.pos.y+100),f,EU,160,330);}}
       return TREINO.desviou?'✔️ despistou!':TREINO.levou?'💥 te acertou! vem outro… solte o flare quando o alerta aparecer':'';},ok:()=>TREINO.desviou},
-  {t:'💣 Bombardeio',d:T_?'Afunde os <b>3 barcos 🚢</b> (siga a seta). O <b>anel vermelho</b> no mar mostra onde a bomba cai: ponha o anel no barco e toque <b>💣</b>. Voar mais baixo e devagar facilita.':'Afunde os <b>3 barcos 🚢</b> (siga a seta). O <b>anel vermelho</b> no mar mostra onde a bomba cai: ponha o anel no barco e aperte <b>B</b>. Voar mais baixo e devagar facilita.',
+  {t:'💣 Bombardeio',d:T_?'Afunde os <b>3 barcos 🚢</b> (siga a seta). O <b>anel vermelho</b> no mar mostra onde a bomba cai: ponha o anel no barco e toque <b>💣</b>. Voar mais baixo e devagar facilita.':'Afunde os <b>3 barcos 🚢</b> (siga a seta). O <b>anel vermelho</b> no mar mostra onde a bomba cai: ponha o anel no barco e aperte <b>Q</b> (ou B). Voar mais baixo e devagar facilita.',
     ini:()=>{BOMBAS=4;TREINO.tRec=0;poeBarcos();},tic:(dt)=>{TREINO.tRec+=dt;if(BOMBAS<4&&TREINO.tRec>5){BOMBAS++;TREINO.tRec=0;}const n=TREINO.barcos.filter(B=>!B.vivo).length;return n?`✔️ ${n}/3 afundados`:'';},
     ok:()=>TREINO.barcos.length&&TREINO.barcos.every(B=>!B.vivo)},
   {t:'🛬 Rasante na pista',d:'Volte p/ a sua base (quadrado verde no radar) e passe pelo anel <b>em cima da pista</b>, bem baixinho! (pode subir o nariz e dar a volta depois)',ini:()=>{const B=BASES[0];TREINO.alvo=poeAnel(B.x,BASE_H+45,B.z,B.dx,B.dz);},ok:()=>!TREINO.alvo},
@@ -1244,25 +1408,36 @@ $('#bTreino').addEventListener('click',async()=>{SALA='treino';SOM.ini();$('#err
 // ------------------------------------------------ (19/11) MODO HISTÓRIA "Operação Arquipélago": tela de missões, briefing, rádio e resultado
 const MISSOES=[
   {e:'🛫',t:'Primeiro voo',r:'Patrulha: 2 caças inimigos fracos.',ok:1,
-   b:'A <b>Frota Cinzenta</b> vem tomando o arquipélago, ilha por ilha. O <b>Esquadrão Garoupa</b> é a última base de pé, e você é o piloto mais novo.<br><br>Dois caças inimigos cruzaram a linha. É o seu primeiro combate de verdade.',
+   b:'A <b>Frota Cinzenta</b> vem tomando o arquipélago, ilha por ilha. O <b>Esquadrão Harpia</b> é a última base de pé, e você é o piloto mais novo.<br><br>Dois caças inimigos cruzaram a linha. É o seu primeiro combate de verdade.',
    o:['🎯 Derrube os 2 caças inimigos'],dicas:'Chegue por trás. O míssil só sai depois do quadrado ficar vermelho.'},
   {e:'🚨',t:'Interceptação',r:'Bombardeiros indo p/ a sua base. Você leva 2 alas.',ok:1,
-   b:'O radar pegou <b>dois bombardeiros</b> pesados vindo direto para a nossa base, protegidos por <b>três caças</b> de escolta.<br><br>Desta vez você não vai sozinho: <b>Garoupa 2</b> e <b>Garoupa 3</b> voam na sua asa. Se um bombardeiro chegar, a base vira cratera.',
+   b:'O radar pegou <b>dois bombardeiros</b> pesados vindo direto para a nossa base, protegidos por <b>três caças</b> de escolta.<br><br>Desta vez você não vai sozinho: <b>Harpia 2</b> e <b>Harpia 3</b> voam na sua asa. Se um bombardeiro chegar, a base vira cratera.',
    o:['💣 Derrube os 2 bombardeiros antes que cheguem','🟦 Seus 2 alas (azuis) seguem você e brigam com a escolta','🛡️ A escolta é opcional'],dicas:'Bombardeiro aguenta o dobro de tiro: guarde os mísseis pra eles.'},
-  {e:'🛡️',t:'Escolta',r:'Leve o cargueiro Pelicano até a base Sul.',ok:1,
-   b:'O cargueiro <b>Pelicano</b> leva peças de reposição para a <b>base Sul</b>, do outro lado do arquipélago. Sem essas peças, metade do esquadrão fica no chão.<br><br>A Frota Cinzenta sabe disso e vai mandar caças atrás dele, em <b>três ondas</b>.',
-   o:['📦 O Pelicano (verde) tem que chegar inteiro na base Sul','🎯 Os caças inimigos vão direto no cargueiro: intercepte antes','🟦 Garoupa 2 e 3 voam com você'],est3:'Pelicano chegar com mais de 50%',dicas:'Fique um pouco à frente do Pelicano. O rádio avisa de que lado vem cada onda.'},
-  {e:'📡',t:'Olhos cegos',r:'Destrua radares e SAMs voando baixo pelos cânions.'},
-  {e:'🏰',t:'Defender a base',r:'Ondas de ataque na sua base.'},
-  {e:'🚢',t:'Bombardeio',r:'Afunde a frota cinzenta no mar.'},
-  {e:'⛈️',t:'Tempestade',r:'Combate com pouca visibilidade, só no radar.'},
-  {e:'🦅',t:'Corvo',r:'Duelo final contra o ás inimigo, nas montanhas.'}];
+  {e:'🛡️',t:'Escolta',r:'Leve o cargueiro Carcará até a base Sul.',ok:1,
+   b:'O cargueiro <b>Carcará</b> leva peças de reposição para a <b>base Sul</b>, do outro lado do arquipélago. Sem essas peças, metade do esquadrão fica no chão.<br><br>A Frota Cinzenta sabe disso e vai mandar caças atrás dele, em <b>três ondas</b>.',
+   o:['📦 O Carcará (verde) tem que chegar inteiro na base Sul','🎯 Os caças inimigos vão direto no cargueiro: intercepte antes','🟦 Harpia 2 e 3 voam com você'],est3:'Carcará chegar com mais de 50%',dicas:'Fique um pouco à frente do Carcará. O rádio avisa de que lado vem cada onda.'},
+  {e:'📡',t:'Olhos cegos',r:'Destrua 3 radares voando baixo entre os morros.',ok:1,
+   b:'A Frota Cinzenta instalou <b>três radares</b> nas ilhas. Com eles de pé, qualquer avião nosso é visto de longe.<br><br>Quem passa <b>acima de 450 m</b> é travado e leva míssil. A única saída é voar <b>baixinho, entre os morros</b>: a montanha esconde você.',
+   o:['📡 Destrua os 3 radares (canhão ou bomba)','⛰️ Fique abaixo de 450 m perto deles','🟦 Harpia 2 voa com você'],dicas:'Você leva 4 bombas. Chegue escondido atrás de um morro e só suba no último segundo.'},
+  {e:'🏰',t:'Defender a base',r:'Três ondas de bombardeiros contra a sua base.',ok:1,
+   b:'É o ataque grande. A Frota Cinzenta vai mandar <b>três ondas</b> de bombardeiros contra a base do Esquadrão Harpia, cada uma de um lado.<br><br>Se um único bombardeiro chegar, acabou.',
+   o:['💣 Derrube todos os bombardeiros das 3 ondas','🧭 O rádio avisa de que lado vem cada onda','🟦 Harpia 2 e 3 voam com você'],dicas:'Você leva 600 balas e 4 mísseis. Volte p/ perto da base entre uma onda e outra.'},
+  {e:'🚢',t:'Bombardeio',r:'Afunde os 4 navios da frota cinzenta.',ok:1,
+   b:'Achamos a <b>frota cinzenta</b>: quatro navios no meio do arquipélago, com metralhadoras antiaéreas e dois caças de patrulha por cima.<br><br>Hoje você troca o canhão pela bomba.',
+   o:['🚢 Afunde os 4 navios','💣 Você leva 8 bombas: mire com o anel vermelho no mar','🔫 Metralhadora dos navios alcança 900 m'],dicas:'Chegue rápido, solte a bomba e saia. Duas bombas no mesmo navio afundam ele.'},
+  {e:'⛈️',t:'Tempestade',r:'Combate às cegas: só o radar ajuda.',ok:1,
+   b:'Uma <b>tempestade</b> fechou o céu do arquipélago. Quatro caças inimigos estão escondidos nela.<br><br>Você só vai enxergar alguém quando estiver quase colado. Confie no <b>radar</b> e na <b>seta do HUD</b>.',
+   o:['🎯 Derrube os 4 caças inimigos','📡 Use o radar p/ achar cada um','🟦 Harpia 2 voa com você'],dicas:'Cuidado com as montanhas: na neblina elas aparecem em cima da hora.'},
+  {e:'🦅',t:'Corvo',r:'Duelo final contra o ás inimigo.',ok:1,
+   b:'O <b>Corvo</b>, o ás da Frota Cinzenta, chamou você para um duelo. Sem alas, sem escolta: <b>só você e ele</b>.<br><br>Ele vira mais rápido que você, mira melhor e aguenta o dobro de tiro. Se ele cair, a Frota Cinzenta recua.',
+   o:['🦅 Derrube o Corvo','🚀 Você leva 3 mísseis e 600 balas'],dicas:'Não fique na frente dele. Use as montanhas p/ quebrar a trava e solte flare quando o míssil vier.'}];
 let MIS_N=0,MIS_FEITAS={},NASCE=null,tRadio=0;
 const estrelas=n=>'⭐'.repeat(n)+'<i>'+'☆'.repeat(3-n)+'</i>';
 async function carregaMissoes(){MIS_FEITAS={};
   if(CONTA){try{const d=await (await fetch('api/missoes?token='+encodeURIComponent(CONTA.token))).json();for(const k in d.feitas||{})MIS_FEITAS[+k]=d.feitas[k];}catch(e){}}
   else{try{MIS_FEITAS=JSON.parse(localStorage.getItem('jsjet-missoes')||'{}');}catch(e){}}}
-const liberada=n=>n===1||!!MIS_FEITAS[n-1];
+const MIS_TESTE=true;   // (19/11) TESTE: tudo desbloqueado (voltar p/ false depois, junto com MIS_TUDO_LIBERADO no servidor)
+const liberada=n=>MIS_TESTE||n===1||!!MIS_FEITAS[n-1];
 async function abreMissoes(){const box=$('#missoes');box.style.display='flex';$('#mBrief').style.display='none';$('#mLista').style.display='block';
   await carregaMissoes();
   $('#mGrade').innerHTML=MISSOES.map((M,i)=>{const n=i+1,lib=liberada(n),pronta=!!M.ok,est=MIS_FEITAS[n]||0;
@@ -1284,10 +1459,10 @@ function fimMissao(d){const ok=d.ok,n=d.n,box=$('#fimMis');
   if(ok&&!CONTA){MIS_FEITAS[n]=Math.max(MIS_FEITAS[n]||0,d.estrelas);try{localStorage.setItem('jsjet-missoes',JSON.stringify(MIS_FEITAS));}catch(e){}}
   if(ok)MIS_FEITAS[n]=Math.max(MIS_FEITAS[n]||0,d.estrelas);
   const prox=ok&&MISSOES[n]&&MISSOES[n].ok,mm=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
-  box.innerHTML=`<div class="card"><small class="mk">MISSÃO ${n} · ${MISSOES[n-1].t}</small><h2>${ok?'🏆 Missão cumprida!':'❌ Missão fracassada'}</h2>
+  box.innerHTML=`<div class="card"><small class="mk">MISSÃO ${n} · ${MISSOES[n-1].t}</small><h2>${ok?(n===MISSOES.length?'🏁 Campanha completa!':'🏆 Missão cumprida!'):'❌ Missão fracassada'}</h2>
     ${ok?`<div class="fe">${estrelas(d.estrelas)}</div><div class="fl">${(d.crit||[]).map(c=>`<div>${c[1]?'✅':'▫️'} ${esc(c[0])} ${c[2]?'<i>('+esc(c[2])+')</i>':''}</div>`).join('')}</div>`:`<p>${esc(d.motivo||'')}</p>`}
     ${d.fala?`<p class="ff"><b>📻 ${esc(d.fala[0])}:</b> “${esc(d.fala[1])}”</p>`:''}
-    ${prox?`<button id="fProx">▶️ MISSÃO ${n+1}: ${MISSOES[n].t}</button>`:ok&&MISSOES[n]?'<p class="md">🚧 A missão '+(n+1)+' chega em breve!</p>':''}
+    ${ok&&n===MISSOES.length?'<p class="md">🎖️ O Esquadrão Harpia venceu a Operação Arquipélago. Obrigado, piloto!</p>':''}${prox?`<button id="fProx">▶️ MISSÃO ${n+1}: ${MISSOES[n].t}</button>`:ok&&MISSOES[n]?'<p class="md">🚧 A missão '+(n+1)+' chega em breve!</p>':''}
     <button id="fDeNovo" class="${prox?'sec':''}">🔁 ${ok?'JOGAR DE NOVO':'TENTAR DE NOVO'}</button><button id="fMis" class="sec">🗺️ MISSÕES</button></div>`;
   setTimeout(()=>{box.style.display='flex';},ok?1800:2600);
   if(prox)$('#fProx').onclick=()=>{sair();iniciaMissao(n+1);};
@@ -1301,6 +1476,6 @@ function sair(){for(const b of BOMBV.values())cena.remove(b.g);BOMBV.clear();cci
   for(const o of OUT.values()){cena.remove(o.g);o.rot.remove();o.aq?.remove();}OUT.clear();for(const m of MISV.values())cena.remove(m.g);MISV.clear();
   if(JATO){cena.remove(JATO);JATO=null;}for(const k in TEC)TEC[k]=false;
   for(const id of['#mira','#seta','#trava','#alerta','#aviso','#morte','#dicaDec'])$(id).style.display='none';
-  $('#placar').innerHTML='';$('#feed').innerHTML='';$('#erro').textContent='';$('#radio').style.display='none';$('#menu').style.display='flex';}
+  $('#placar').innerHTML='';$('#feed').innerHTML='';$('#erro').textContent='';$('#radio').style.display='none';tempestade(false);$('#menu').style.display='flex';}
 $('#bVisao').addEventListener('pointerdown',e=>{e.stopPropagation();trocaVisao();});
 $('#bTrem').addEventListener('pointerdown',e=>{e.stopPropagation();e.preventDefault();trocaTrem();});

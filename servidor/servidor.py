@@ -15,7 +15,7 @@ RAIZ = Path(__file__).resolve().parent.parent / 'fonte'
 PORTA = int(os.environ.get('PORTA', 8791))
 MIN_AVIOES = int(os.environ.get('MIN_AVIOES', 4))
 CORES = ['#e8443a', '#2f7de1', '#f2b632', '#3cb371', '#b05be0', '#ff7f2a', '#1fc3c3', '#e055a0']
-NOMES_BOT = ['Bot Tainha', 'Bot Garoupa', 'Bot Anchova', 'Bot Siri', 'Bot Berbigão', 'Bot Corvina', 'Bot Linguado']
+NOMES_BOT = ['Bot Carcará', 'Bot Gavião', 'Bot Falcão', 'Bot Caburé', 'Bot Acauã', 'Bot Sovi', 'Bot Uiraçu']   # (19/11) aves de rapina brasileiras (eram peixes)
 DANO_TIRO = 7
 DANO_MISSIL = 60
 MISSEIS_MAX, RECARGA_MISSIL, ESPERA_FLARE = 2, 10.0, 6.0
@@ -352,7 +352,7 @@ async def placar(sala):
     l = [a for a in AV.values() if a.sala == sala]
     msg = {'t': 'placar', 'l': [{'id': a.id, 'nome': a.nome, 'cor': a.cor, 'bot': a.bot,
                                  'pontos': a.pontos, 'mortes': a.mortes, 'base': a.base,
-                                 'conv': not a.bot and a.conta is None, 'vm': getattr(a, 'vida_max', 100), 'time': a.time, 'esc': a.esc, 'navio': a.navio, 'av': a.av,
+                                 'conv': not a.bot and a.conta is None, 'vm': getattr(a, 'vida_max', 100), 'tipo': getattr(a, 'tipo', None), 'time': a.time, 'esc': a.esc, 'navio': a.navio, 'av': a.av,
                                  'kh': LIVE['derrubou'].get(a.dono_chave, 0) if a.dono_chave else 0} for a in l]}
     await todos(msg, sala)
 
@@ -796,7 +796,7 @@ async def voar_bot(b, dt, agora):
     des = norm(des)
     f0 = b.f
     ang = math.acos(max(-1.0, min(1.0, dot(f0, des))))
-    passo = (1.15 if furia or modo in ('missil', 'defesa') else 0.85) * dt
+    passo = (1.15 if furia or modo in ('missil', 'defesa') else 0.85) * dt * getattr(b, 'agil', 1.0)   # (19/11) Corvo vira mais
     if not modo and alvo is not None and not alvo.bot:
         passo *= 0.7 + 0.3 * min(1.0, fac(alvo))   # (18/11) contra humano fraco curva menos
     f1 = girar(f0, des, passo) if ang > passo else des
@@ -838,10 +838,12 @@ async def voar_bot(b, dt, agora):
 
 # ---------------------------------------------------------------- (19/11) MODO HISTÓRIA: "Operação Arquipélago"
 # Cada missão roda numa sala particular 'm:<id do jogador>'. Munição sem recarga, morreu = missão fracassada.
-# Estrelas: ⭐ cumpriu · ⭐ terminou com mais de metade da vida · ⭐ abaixo do tempo-alvo. Progresso salvo na conta.
-CASA = 4                    # base de origem do Esquadrão Garoupa (a mesma ilha da sala com bots)
+# Estrelas: ⭐ cumpriu · ⭐ terminou com mais de metade da vida · ⭐ 3ª depende da missão (tempo, cargueiro...). Progresso salvo na conta.
+CASA = 4                    # base de origem do Esquadrão Harpia (a mesma ilha da sala com bots)
 MISSAO = {}                 # sala -> estado da missão
 COR_CINZA, COR_BOMB = '#e8443a', '#ff9a2a'
+MIS_TUDO_LIBERADO = True    # (19/11) TESTE: todas as missões abertas (o Gomes pediu p/ testar; voltar p/ False depois)
+ALT_RADAR, ALC_RADAR = 450.0, 7000.0   # missão 4: acima de 450 m o radar te vê (até 7 km, se o morro não tapar)
 
 
 def _eixo():
@@ -853,6 +855,12 @@ def _eixo():
 def _ponto(dist, alt, lado=0.0):
     b, f = _eixo()
     return [b[0] + f[0] * dist - f[2] * lado, alt, b[2] + f[2] * dist + f[0] * lado]
+
+
+def _gira(f, graus):
+    a = math.radians(graus)
+    c, s_ = math.cos(a), math.sin(a)
+    return norm([f[0] * c - f[2] * s_, 0, f[0] * s_ + f[2] * c])
 
 
 def _cinza(sala, nome, p, f, cor=COR_CINZA, **kw):
@@ -867,22 +875,8 @@ def _cinza(sala, nome, p, f, cor=COR_CINZA, **kw):
     return b
 
 
-def _m1(M, a):
-    """Primeiro voo: 2 caças fracos, sem míssil."""
-    _, f = _eixo()
-    volta = [-f[0], 0, -f[2]]
-    for i, nome in enumerate(('Cinzento 1', 'Cinzento 2')):
-        b = _cinza(M['sala'], nome, _ponto(7200, 1000, (i - 0.5) * 500), volta,
-                   pontaria=0.055, misseis=0, balas=250)
-        M['alvos'].append(b.id)
-    M['t_alvo'] = 150
-    M['radio'] = [(0, 'Torre', 'Garoupa 1, aqui é a Torre. Dois caças da Frota Cinzenta cruzaram a linha. Vá lá e derrube os dois.'),
-                  (7, 'Torre', 'Eles aparecem no seu radar à frente. Munição contada: aqui não tem recarga.'),
-                  (20, 'Torre', 'Dica: chegue por trás. Míssil só depois do quadrado ficar vermelho.')]
-
-
 def _ala(M, a, nome, lado):
-    """(19/11) ala do Esquadrão Garoupa: voa colado em você e briga com o que aparecer."""
+    """Ala do Esquadrão Harpia: voa colado em você e briga com o que aparecer (até 4,5 km)."""
     _, f = _eixo()
     b = _cinza(M['sala'], nome, _ponto(1450, 900, lado * 220), f, cor='#2f7de1',
                pontaria=0.03, misseis=1, segue=a.id, off=[lado * 220 * -f[2] - f[0] * 150, 0, lado * 220 * f[0] - f[2] * 150])
@@ -891,48 +885,85 @@ def _ala(M, a, nome, lado):
     return b
 
 
+def _bombardeiro(M, nome, p, f, **kw):
+    b = _cinza(M['sala'], nome, p, f, cor=COR_BOMB, papel='bomb', esc=1.6, vida=200, vida_max=200,
+               misseis=0, balas=0, vel_cru=88.0, **kw)
+    M['alvos'].append(b.id)
+    return b
+
+
+def _escolta(M, lider, nome, lado, cima=0, **kw):
+    f = lider.f
+    off = [lado * 600 * -f[2] - f[0] * cima * 1.5, 150 + cima, lado * 600 * f[0] - f[2] * cima * 1.5]
+    p = [lider.p[i] + off[i] for i in range(3)]
+    b = _cinza(M['sala'], nome, p, f, pontaria=kw.pop('pontaria', 0.04), misseis=1, segue=lider.id, off=off, **kw)
+    M['extras'].append(b.id)
+    return b
+
+
+def _terra(perto, rmin, rmax, hmin=80, hmax=520):
+    """Ponto em ilha (morro baixo/médio) perto de 'perto' — onde dá p/ pôr um radar."""
+    for _ in range(400):
+        a, r = random.random() * math.tau, random.uniform(rmin, rmax)
+        x, z = perto[0] + math.cos(a) * r, perto[2] + math.sin(a) * r
+        h = relevo(x, z)
+        if hmin < h < hmax:
+            return [x, h, z]
+    return None
+
+
+# ---- missão 1: Primeiro voo
+def _m1(M, a):
+    _, f = _eixo()
+    volta = [-f[0], 0, -f[2]]
+    for i, nome in enumerate(('Cinzento 1', 'Cinzento 2')):
+        b = _cinza(M['sala'], nome, _ponto(7200, 1000, (i - 0.5) * 500), volta, pontaria=0.055, misseis=0, balas=250)
+        M['alvos'].append(b.id)
+    M['t_alvo'] = 150
+    M['radio'] = [(0, 'Torre', 'Harpia 1, aqui é a Torre. Dois caças da Frota Cinzenta cruzaram a linha. Vá lá e derrube os dois.'),
+                  (7, 'Torre', 'Eles aparecem no seu radar à frente. Munição contada: aqui não tem recarga.'),
+                  (20, 'Torre', 'Dica: chegue por trás. Míssil só depois do quadrado ficar vermelho.')]
+    M['fala'] = ('Torre', 'Céu limpo. Bom trabalho, novato. Volte p/ a base.')
+
+
+# ---- missão 2: Interceptação
 def _m2(M, a):
-    """Interceptação: 2 bombardeiros indo p/ a base, com 3 caças de escolta; você leva 2 alas."""
     _, f = _eixo()
     volta = [-f[0], 0, -f[2]]
     lider = None
     for i in range(2):
-        b = _cinza(M['sala'], f'Bombardeiro {i + 1}', _ponto(12500, 1500, (i - 0.5) * 300), volta, cor=COR_BOMB,
-                   papel='bomb', esc=1.6, vida=200, vida_max=200, misseis=0, balas=0, vel_cru=88.0)
-        M['alvos'].append(b.id)
+        b = _bombardeiro(M, f'Bombardeiro {i + 1}', _ponto(12500, 1500, (i - 0.5) * 300), volta)
         lider = lider or b
-    for i, lado in enumerate((-1, 0, 1)):   # 2 nas laterais e 1 em cima, logo atrás
-        atras = 300 if lado == 0 else 0
-        b = _cinza(M['sala'], f'Escolta {i + 1}', _ponto(12100 + atras * 2, 1700 if lado == 0 else 1650, lado * 600), volta,
-                   pontaria=0.04, misseis=1, segue=lider.id,
-                   off=[lado * 600 * -f[2] + f[0] * atras, 200 if lado == 0 else 150, lado * 600 * f[0] + f[2] * atras])
-        M['extras'].append(b.id)
-    _ala(M, a, 'Garoupa 2', -1)
-    _ala(M, a, 'Garoupa 3', 1)
+    for i, (lado, cima) in enumerate(((-1, 0), (0, 200), (1, 0))):
+        _escolta(M, lider, f'Escolta {i + 1}', lado, cima)
+    _ala(M, a, 'Harpia 2', -1)
+    _ala(M, a, 'Harpia 3', 1)
     M['t_alvo'] = 130
-    M['radio'] = [(0, 'Torre', 'Alerta, Garoupa 1! Dois bombardeiros da Frota Cinzenta vêm direto p/ a nossa base, com 3 caças de escolta.'),
-                  (5, 'Garoupa 2', 'Garoupa 2 e 3 na sua asa, líder. A gente segura a escolta!'),
+    M['radio'] = [(0, 'Torre', 'Alerta, Harpia 1! Dois bombardeiros da Frota Cinzenta vêm direto p/ a nossa base, com 3 caças de escolta.'),
+                  (5, 'Harpia 2', 'Harpia 2 e 3 na sua asa, líder. A gente segura a escolta!'),
                   (11, 'Torre', 'Derrube os 2 bombardeiros antes que cheguem. Seus alas te ajudam com os caças.'),
                   (60, 'Torre', 'Eles estão chegando! Não deixe nenhum passar!')]
+    M['fala'] = ('Corvo', '...Harpia 1, é? Vou lembrar desse nome.')
 
 
+# ---- missão 3: Escolta
 def _m3(M, a):
-    """Escolta: o cargueiro Pelicano atravessa o arquipélago até a base Sul; 3 ondas de 2 caças vão atrás dele."""
     _, f = _eixo()
-    c = _cinza(M['sala'], '📦 Pelicano', _ponto(2100, 1200), f, cor='#3cd070', papel='bomb', esc=1.8, vida=400, vida_max=400,
-               misseis=0, balas=0, vel_cru=85.0, destino=BASES[(CASA + 2) % 8 if CASA >= 4 else CASA + 2], alt=1200.0)
+    c = _cinza(M['sala'], '📦 Carcará', _ponto(2100, 1200), f, cor='#3cd070', papel='bomb', tipo='carga', esc=1.8, vida=400, vida_max=400,
+               misseis=0, balas=0, vel_cru=85.0, destino=BASES[6], alt=1200.0)
     c.time = 'azul'
     M['carga'] = c.id
     M['extras'].append(c.id)
-    _ala(M, a, 'Garoupa 2', -1)
-    _ala(M, a, 'Garoupa 3', 1)
-    M['ondas'] = [(12, -1), (40, 1), (66, -1)]   # (instante, lado de onde vêm)
-    M['n_ondas'], M['t_alvo'] = 3, 999
-    M['radio'] = [(0, 'Torre', 'Garoupa 1, o cargueiro Pelicano leva peças p/ a base Sul, do outro lado do arquipélago. Escolte até lá.'),
-                  (5, 'Pelicano', 'Pelicano no ar. Contamos com vocês, Garoupa!')]
+    _ala(M, a, 'Harpia 2', -1)
+    _ala(M, a, 'Harpia 3', 1)
+    M['ondas'] = [(12, lambda M: _onda_carga(M, -1)), (40, lambda M: _onda_carga(M, 1)), (66, lambda M: _onda_carga(M, -1))]
+    M['t_alvo'] = 999
+    M['radio'] = [(0, 'Torre', 'Harpia 1, o cargueiro Carcará leva peças p/ a base Sul, do outro lado do arquipélago. Escolte até lá.'),
+                  (5, 'Carcará', 'Carcará no ar. Contamos com vocês, Harpia!')]
+    M['fala'] = ('Carcará', 'Pousamos inteiros! Devemos uma, Harpia.')
 
 
-def _onda(M, lado):
+def _onda_carga(M, lado):
     C = AV.get(M['carga'])
     if not C or not C.vivo:
         return
@@ -943,23 +974,169 @@ def _onda(M, lado):
                    pontaria=0.045, misseis=1, caca=C.id)
         M['alvos'].append(b.id)
     M['onda'] = M.get('onda', 0) + 1
-    M['radio'].insert(0, (0, 'Torre', f'Dois caças vindo pela {"esquerda" if lado < 0 else "direita"} do Pelicano! ({M["onda"]}/3)'))
+    _diz(M, 'Torre', f'Dois caças vindo pela {"esquerda" if lado < 0 else "direita"} do Carcará! ({M["onda"]}/3)')
 
 
-MISSOES = {1: _m1, 2: _m2, 3: _m3}
+# ---- missão 4: Olhos cegos (radares em terra; acima de 450 m eles te travam e soltam míssil)
+def _m4(M, a):
+    centro = _ponto(5800, 0)
+    usados = []
+    for i in range(3):
+        p = None
+        for _ in range(30):
+            p = _terra(centro, 1200, 4200)
+            if p and all(math.dist(p, u) > 2200 for u in usados):
+                break
+        if not p:
+            p = _ponto(5800 + (i - 1) * 2500, relevo(*_ponto(5800 + (i - 1) * 2500, 0)[::2]))
+        usados.append(p)
+        b = _cinza(M['sala'], f'📡 Radar {i + 1}', p, [1, 0, 0], cor='#ff7f2a', navio=True, papel='radar', tipo='radar',
+                   vida=120, vida_max=120, misseis=99, balas=0, t_lock=0.0, t_sam=0.0)
+        b.v = [0, 0, 0]
+        M['alvos'].append(b.id)
+    a.bombas = 4
+    _ala(M, a, 'Harpia 2', -1)
+    M['t_alvo'] = 240
+    M['radio'] = [(0, 'Torre', 'Harpia 1, a Frota Cinzenta montou 3 radares nas ilhas. Enquanto eles estiverem de pé, a gente está cego.'),
+                  (7, 'Torre', f'Acima de {int(ALT_RADAR)} m eles te veem e disparam míssil. Voe baixo, entre os morros, e destrua os 3.'),
+                  (16, 'Harpia 2', 'Os radares são os pontos laranja no mapa. Canhão ou bomba derrubam!')]
+    M['fala'] = ('Torre', 'Radares no chão! Agora quem está cego são eles.')
+
+
+async def radar_passo(b, dt, agora):
+    """Radar da missão 4: trava quem passa acima de ALT_RADAR a menos de ALC_RADAR (e com visada); 2,5 s travado = míssil."""
+    if not b.vivo:
+        return
+    topo = [b.p[0], b.p[1] + 20, b.p[2]]
+    vistos = [a for a in AV.values() if a.sala == b.sala and a.vivo and a.time != b.time and not a.navio
+              and a.p[1] > ALT_RADAR and math.dist(a.p, topo) < ALC_RADAR and visada(topo, a.p)]
+    if not vistos:
+        b.t_lock = max(0.0, b.t_lock - dt)
+        return
+    alvo = min(vistos, key=lambda a: math.dist(a.p, topo))
+    b.t_lock += dt
+    M = MISSAO.get(b.sala)
+    if M and not alvo.bot and agora - M.get('t_aviso', 0) > 9:
+        M['t_aviso'] = agora
+        _diz(M, 'Torre', f'📡 {b.nome[2:]} te pegou! Desça abaixo de {int(ALT_RADAR)} m!')
+    if b.t_lock < 2.5 or agora - b.t_sam < 7 / fac(alvo):
+        return
+    b.t_sam, b.t_lock = agora, 0.0
+    m = Missil(b, alvo)
+    m.p = [b.p[0], b.p[1] + 25, b.p[2]]
+    m.f = norm([alvo.p[i] - m.p[i] + (0, 600, 0)[i] for i in range(3)])
+    MIS[m.id] = m
+    await todos({'t': 'missil', 'id': m.id, 'dono': b.id, 'alvo': alvo.id}, b.sala)
+
+
+# ---- missão 5: Defender a base (3 ondas de bombardeiros de lados diferentes)
+def _m5(M, a):
+    _ala(M, a, 'Harpia 2', -1)
+    _ala(M, a, 'Harpia 3', 1)
+    a.balas, a.misseis = 600, 4
+    M['ondas'] = [(4, lambda M: _onda_base(M, 0, 2, 2)), (50, lambda M: _onda_base(M, -55, 3, 2)), (96, lambda M: _onda_base(M, 55, 2, 3))]
+    M['n_ondas'] = 3
+    M['t_alvo'] = 220
+    M['radio'] = [(0, 'Torre', 'Harpia, é agora: a Frota Cinzenta vai atacar a base com tudo. Três ondas.'),
+                  (6, 'Torre', 'Bombardeiro que chegar em cima da base = base perdida. Os caças são problema dos seus alas.')]
+    M['fala'] = ('Torre', 'A base está de pé! Ninguém passou. Ninguém!')
+
+
+def _onda_base(M, graus, nb, ne):
+    casa, f = _eixo()
+    d = _gira(f, graus)
+    volta = [-d[0], 0, -d[2]]
+    centro = [casa[0] + d[0] * 9500, 1500, casa[2] + d[2] * 9500]
+    lider = None
+    for i in range(nb):
+        lado = (i - (nb - 1) / 2) * 320
+        b = _bombardeiro(M, f'Bombardeiro {len(M["alvos"]) + 1}', [centro[0] - d[2] * lado, 1500, centro[2] + d[0] * lado], volta)
+        lider = lider or b
+    for i in range(ne):
+        _escolta(M, lider, f'Escolta {len(M["extras"])}', (-1, 1, 0)[i % 3], 200 if i == 2 else 0)
+    M['onda'] = M.get('onda', 0) + 1
+    lado = 'de frente' if graus == 0 else 'pela esquerda' if graus < 0 else 'pela direita'
+    _diz(M, 'Torre', f'Onda {M["onda"]}/3: {nb} bombardeiros vindo {lado}!')
+
+
+# ---- missão 6: Bombardeio (afundar a frota)
+def _m6(M, a):
+    p0 = ponto_mar([0, 0, 0], 800, 2600) or [0.0, 0.0, 0.0]
+    ang = random.random() * math.tau
+    f = [math.cos(ang), 0, math.sin(ang)]
+    navios = []
+    for i in range(4):
+        p = p0 if i == 0 else (ponto_mar(p0, 250, 700) or p0)
+        b = _cinza(M['sala'], f'🚢 Cinzento {i + 1}', [p[0], 0.0, p[2]], f, cor='#8a96a8', navio=True,
+                   vida=VIDA_NAVIO, vida_max=VIDA_NAVIO, misseis=0, balas=0)
+        b.v = [f[0] * VEL_NAVIO, 0, f[2] * VEL_NAVIO]
+        M['alvos'].append(b.id)
+        navios.append(b)
+    for i, lado in enumerate((-1, 1)):   # patrulha aérea em cima da frota
+        b = _cinza(M['sala'], f'Patrulha {i + 1}', [p0[0] + lado * 900, 1100, p0[2]], f, pontaria=0.04, misseis=1,
+                   segue=navios[0].id, off=[lado * 900, 1100, 0])
+        M['extras'].append(b.id)
+    _ala(M, a, 'Harpia 2', -1)
+    a.bombas, a.misseis = 8, 2
+    M['t_alvo'] = 240
+    M['radio'] = [(0, 'Torre', 'Harpia 1, achamos a frota cinzenta: 4 navios no meio do arquipélago. Afunde todos.'),
+                  (7, 'Torre', 'Você leva 8 bombas. O anel vermelho no mar mostra onde ela cai. Cuidado com a metralhadora dos navios abaixo de 900 m.'),
+                  (15, 'Harpia 2', 'Eu cuido da patrulha aérea, líder!')]
+    M['fala'] = ('Corvo', 'Minha frota... Você vai pagar por isso, Harpia.')
+
+
+# ---- missão 7: Tempestade (neblina pesada: só o radar ajuda)
+def _m7(M, a):
+    _, f = _eixo()
+    volta = [-f[0], 0, -f[2]]
+    for i in range(4):
+        b = _cinza(M['sala'], f'Cinzento {i + 1}', _ponto(6500 + (i % 2) * 600, 900 + i * 90, (i - 1.5) * 700), volta,
+                   pontaria=0.045, misseis=1)
+        M['alvos'].append(b.id)
+    _ala(M, a, 'Harpia 2', 1)
+    M['clima'] = 'tempestade'
+    M['t_alvo'] = 200
+    M['radio'] = [(0, 'Torre', 'Harpia 1, tempestade feia sobre o arquipélago. Quatro caças inimigos estão usando ela p/ se esconder.'),
+                  (8, 'Torre', 'Você não vai ver nada a olho. Confie no radar e na seta do HUD.'),
+                  (40, 'Harpia 2', 'Não enxergo nem minha asa! Fica no radar, líder.')]
+    M['fala'] = ('Torre', 'Saiu da tempestade inteiro? Você é dos bons, Harpia.')
+
+
+# ---- missão 8: Corvo (duelo contra o ás)
+def _m8(M, a):
+    _, f = _eixo()
+    volta = [-f[0], 0, -f[2]]
+    b = _cinza(M['sala'], '🦅 Corvo', _ponto(6800, 1100), volta, cor='#b05be0', pontaria=0.013, misseis=3,
+               vida=220, vida_max=220, agil=1.4, vel_cru=128.0, balas=900)
+    M['alvos'].append(b.id)
+    M['corvo'] = b.id
+    a.balas, a.misseis = 600, 3
+    M['t_alvo'] = 180
+    M['radio'] = [(0, 'Torre', 'Harpia 1... é ele. O Corvo, o ás da Frota Cinzenta, quer duelo. Só você e ele, nas montanhas.'),
+                  (6, 'Corvo', 'Então você é o novato que derrubou meus bombardeiros. Vamos ver do que é feito.'),
+                  (35, 'Corvo', 'Lento demais, Harpia!'),
+                  (75, 'Corvo', 'Ainda está vivo? Interessante...')]
+    M['fala'] = ('Torre', 'O CORVO CAIU! A Frota Cinzenta está recuando. O arquipélago é nosso, Harpia 1!')
+
+
+MISSOES = {1: _m1, 2: _m2, 3: _m3, 4: _m4, 5: _m5, 6: _m6, 7: _m7, 8: _m8}
+
+
+def _diz(M, quem, txt):
+    M['radio'].insert(0, (0, quem, txt))
 
 
 def missao_iniciar(a, n):
     M = {'sala': a.sala, 'n': n, 'dono': a.id, 'nasceu': False, 't0': 0.0, 'fim': False,
-         'alvos': [], 'extras': [], 'radio': [], 'mortos': 0, 'obj': '', 't_alvo': 120}
+         'alvos': [], 'extras': [], 'radio': [], 'ondas': [], 'mortos': 0, 'obj': '', 't_alvo': 120, 'fala': None}
     MISSAO[a.sala] = M
     a.time = 'azul'
     a.balas, a.misseis, a.bombas = 400, 2, 0
     MISSOES[n](M, a)
     b, f = _eixo()
-    p = _ponto(1600, 900)
+    p = _ponto(1600, 900 if n != 4 else 380)
     print(f'missão {n} começou p/ {a.nome}', flush=True)
-    return {'missao': n, 'nasce': [p, math.atan2(-f[2], f[0])], 'time': 'azul'}
+    return {'missao': n, 'nasce': [p, math.atan2(-f[2], f[0])], 'time': 'azul', 'clima': M.get('clima')}
 
 
 def missao_limpar(sala):
@@ -972,45 +1149,68 @@ def missao_limpar(sala):
 
 
 def _checa(M, a, agora):
-    """-> (ok, motivo) quando acaba; atualiza o objetivo na tela."""
+    """-> (ok, motivo, objetivo na tela). ok None = continua."""
+    t = agora - M['t0']
+    while M['ondas'] and t >= M['ondas'][0][0]:
+        M['ondas'].pop(0)[1](M)
+    n = M['n']
     alvos = [AV.get(i) for i in M['alvos']]
-    mortos = sum(1 for b in alvos if not b or not b.vivo)
-    if M['n'] == 3:
-        t = agora - M['t0']
-        while M['ondas'] and t >= M['ondas'][0][0]:
-            _onda(M, M['ondas'].pop(0)[1])
+    vivos = [b for b in alvos if b and b.vivo]
+    mortos = len(alvos) - len(vivos)
+    falta = len(vivos)
+    if n == 3:
         C = AV.get(M['carga'])
         if not C or not C.vivo:
-            return False, '💥 O Pelicano foi derrubado.', '📦 Pelicano abatido'
+            return False, '💥 O Carcará foi derrubado.', '📦 Carcará abatido'
         d = math.hypot(C.destino[0] - C.p[0], C.destino[2] - C.p[2])
         pct = round(100 * C.vida / 400)
         if pct < 50 and not M.get('aviso50'):
             M['aviso50'] = True
-            M['radio'].insert(0, (0, 'Pelicano', 'Estamos sendo atingidos! Tirem eles daqui!'))
-        if mortos > M['mortos']:
-            M['mortos'] = mortos
-            M['radio'].insert(0, (0, 'Torre', random.choice(('Abatido! Boa, Garoupa.', 'Um a menos!', 'Na mosca!'))))
-        obj = f'📦 Pelicano: {pct}% · chega em {max(0, int((d - 350) / 85))} s · onda {M.get("onda", 0)}/3'
+            _diz(M, 'Carcará', 'Estamos sendo atingidos! Tirem eles daqui!')
+        _comenta(M, mortos, 0)
+        obj = f'📦 Carcará: {pct}% · chega em {max(0, int((d - 350) / 85))} s · onda {M.get("onda", 0)}/3'
         if getattr(C, 'chegou', False):
-            M['estrela3'] = ('Pelicano com mais de 50%', pct >= 50, f'{pct}%')
+            M['estrela3'] = ('Carcará com mais de 50%', pct >= 50, f'{pct}%')
             return True, None, obj
         return None, None, obj
-    if M['n'] == 1:
-        obj = f'🎯 Caças inimigos derrubados: {mortos}/{len(alvos)}'
-    else:
-        vivos = [b for b in alvos if b and b.vivo]
+    if n in (2, 5):   # bombardeiros: se um chega, perdeu
+        if any(getattr(b, 'chegou', False) for b in vivos):
+            return False, '💥 Um bombardeiro chegou e bombardeou a base!', M['obj']
         casa = BASES[CASA]
         perto = min((math.hypot(b.p[0] - casa[0], b.p[2] - casa[2]) for b in vivos), default=0)
-        obj = f'💣 Bombardeiros derrubados: {mortos}/{len(alvos)}' + (f' · chegam em {max(0, int((perto - 350) / 88))} s' if vivos else '')
-        if any(getattr(b, 'chegou', False) for b in vivos):
-            return False, '💥 Um bombardeiro chegou e bombardeou a base!', obj
-    if mortos > M['mortos']:
-        M['mortos'] = mortos
-        if mortos < len(alvos):
-            M['radio'].insert(0, (0, 'Torre', random.choice(('Um a menos! Continue.', 'Abatido! Boa, Garoupa 1.', 'Na mosca! Falta' + ('m ' if len(alvos) - mortos > 1 else ' ') + str(len(alvos) - mortos) + '.'))))
-    if mortos == len(alvos):
+        chega = f' · chegam em {max(0, int((perto - 350) / 88))} s' if vivos else ''
+        onda = f'🏰 Onda {M.get("onda", 0)}/3 · ' if n == 5 else ''
+        obj = f'{onda}💣 Bombardeiros derrubados: {mortos}/{len(alvos)}{chega}'
+        if n == 5 and (M['ondas'] or M.get('onda', 0) < 3):
+            _comenta(M, mortos, 0)
+            return None, None, obj
+    elif n == 4:
+        obj = f'📡 Radares destruídos: {mortos}/{len(alvos)} · fique abaixo de {int(ALT_RADAR)} m'
+    elif n == 6:
+        obj = f'🚢 Navios afundados: {mortos}/{len(alvos)} · 💣 {a.bombas} bombas'
+        if a.bombas == 0 and falta and not any(x['dono'] is a for x in BOMBAS.values()):
+            return False, '💣 Acabaram as bombas e ainda tem navio boiando.', obj
+    elif n == 8:
+        C = AV.get(M['corvo'])
+        pct = round(100 * C.vida / 220) if C and C.vivo else 0
+        if 0 < pct < 50 and not M.get('aviso50'):
+            M['aviso50'] = True
+            _diz(M, 'Corvo', 'Nada mal, novato... mas eu ainda não terminei!')
+        obj = f'🦅 Corvo: {pct}%'
+        return (True, None, obj) if not falta else (None, None, obj)
+    else:
+        obj = f'🎯 Caças inimigos derrubados: {mortos}/{len(alvos)}'
+    _comenta(M, mortos, falta)
+    if not falta:
         return True, None, obj
     return None, None, obj
+
+
+def _comenta(M, mortos, falta):
+    if mortos > M['mortos']:
+        M['mortos'] = mortos
+        if falta or M['n'] in (3, 5):
+            _diz(M, 'Torre', random.choice(('Um a menos! Continue.', 'Abatido! Boa, Harpia.', 'Na mosca!' + (f' Falta{"m" if falta > 1 else ""} {falta}.' if falta else ''))))
 
 
 async def missoes_passo(agora):
@@ -1019,10 +1219,10 @@ async def missoes_passo(agora):
         if not a or M['fim'] or not M['nasceu']:
             continue
         t = agora - M['t0']
+        ok, motivo, obj = _checa(M, a, agora)
         while M['radio'] and t >= M['radio'][0][0]:
             _, quem, txt = M['radio'].pop(0)
             await mandar(a, {'t': 'radio', 'quem': quem, 'txt': txt})
-        ok, motivo, obj = _checa(M, a, agora)
         if obj != M['obj']:
             M['obj'] = obj
             await mandar(a, {'t': 'obj', 'txt': obj})
@@ -1037,16 +1237,9 @@ async def missoes_passo(agora):
             est = 1 + (a.vida >= 50) + bool(e3[1])
             crit = [('Cumpriu', True, ''), ('Vida acima de 50%', a.vida >= 50, f'{round(a.vida)}%'), e3]
             contas.missao_feita(a.conta, M['n'], est, round(t, 1))
-        fala = None
-        if ok and M['n'] == 1:
-            fala = ('Torre', 'Céu limpo. Bom trabalho, novato. Volte p/ a base.')
-        elif ok and M['n'] == 2:
-            fala = ('Corvo', '...Garoupa 1, é? Vou lembrar desse nome.')
-        elif ok and M['n'] == 3:
-            fala = ('Pelicano', 'Pousamos inteiros! Devemos uma, Garoupa.')
         print(f'missão {M["n"]} de {a.nome}: {"ok" if ok else "falhou"} {est}★ {t:.0f}s', flush=True)
         await mandar(a, {'t': 'fim', 'ok': ok, 'n': M['n'], 'estrelas': est, 'tempo': round(t), 't_alvo': M['t_alvo'],
-                         'vida': a.vida, 'motivo': motivo, 'fala': fala, 'crit': crit})
+                         'vida': a.vida, 'motivo': motivo, 'fala': M['fala'] if ok else None, 'crit': crit})
 
 
 async def voar_bombardeiro(b, dt):
@@ -1258,6 +1451,11 @@ async def live_navios(chave, nome, time_, n=2):
 
 
 async def navegar(b, dt, agora):
+    if getattr(b, 'papel', None) == 'radar':   # (19/11) missão 4: radar em terra
+        await radar_passo(b, dt, agora)
+        return
+    if not b.vivo and e_missao(b.sala):        # (19/11) missão: navio afundado fica no fundo
+        return
     if not b.vivo:
         await live_renascer(b, agora)
         return
@@ -1447,7 +1645,7 @@ async def ws_jogo(req):
                     nome = f'Convidado {random.randint(100, 999)}'
                 if sala == 'missao':   # (19/11) modo história: sala particular 'm:<id>'
                     n = d.get('missao') if isinstance(d.get('missao'), int) else 0
-                    if n not in MISSOES or (conta and n > 1 and (n - 1) not in contas.missoes_de(conta[0])):
+                    if n not in MISSOES or (not MIS_TUDO_LIBERADO and conta and n > 1 and (n - 1) not in contas.missoes_de(conta[0])):
                         await ws.send_str(json.dumps({'t': 'expulso', 'msg': 'Essa missão ainda está bloqueada.'}))
                         break
                     a = Aviao(nome, ws=ws, sala='m:?')

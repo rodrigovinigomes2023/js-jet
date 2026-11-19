@@ -1,0 +1,48 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>js-jet · modelos</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#9cc9ec;font-family:system-ui,sans-serif;color:#fff}
+#ui{position:fixed;left:10px;top:10px;display:flex;flex-wrap:wrap;gap:6px;max-width:calc(100% - 20px)}
+#ui button{font:700 15px system-ui;padding:9px 12px;border-radius:10px;border:2px solid #7fd3ff66;background:#0b1a2acc;color:#fff;cursor:pointer}
+#ui button.on{background:linear-gradient(180deg,#ffd23a,#ff9a2a);color:#3a1d00;border-color:transparent}
+#dica{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);background:#0b1a2acc;padding:6px 12px;border-radius:8px;font-size:13px;text-align:center}
+canvas{display:block;touch-action:none}</style></head><body>
+<div id="ui"></div><div id="dica">🖱️ arraste p/ girar · roda/pinça p/ zoom · botão direito/2 dedos p/ mover · <a id="auto" style="color:#9fd4ff;cursor:pointer;text-decoration:underline">⏯️ girar sozinho</a></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+// (19/11) visualizador dos modelos do jogo (copiados do jogo.js por script — mesmo código)
+const mats={},geos={};
+function M(cor,r=0.8){return mats[cor+'/'+r]||(mats[cor+'/'+r]=new THREE.MeshStandardMaterial({color:new THREE.Color(cor).convertSRGBToLinear(),roughness:r}));}
+function G(k,f){return geos[k]||(geos[k]=f());}
+function box(w,h,d,mat,x,y,z,pai){const m=new THREE.Mesh(G('b'+w+','+h+','+d,()=>new THREE.BoxGeometry(w,h,d)),mat);m.position.set(x,y,z);pai.add(m);return m;}
+function cil(rt,rb,h,mat,x,y,z,pai,seg=10){const m=new THREE.Mesh(G('c'+rt+','+rb+','+h+','+seg,()=>new THREE.CylinderGeometry(rt,rb,h,seg)),mat);m.position.set(x,y,z);pai.add(m);return m;}
+function criarNavio(cor){const g=new THREE.Group(),mC=M('#5f6a72',0.7),mE=M('#8a949b',0.6),mR=M('#9e2b25',0.8),mF=M(cor,0.6);
+  box(70,6,16,mR,0,1,0,g);box(70,5,16,mC,0,6.5,0,g);box(18,9,11,mE,-12,13,0,g);box(8,4,8,mF,-12,19.5,0,g);cil(1.6,1.6,8,mC,6,13,0,g);
+  const t=new THREE.Group();t.position.set(20,10,0);g.add(t);cil(3,3.5,3,mE,0,0,0,t);box(9,1,1,mC,4,2.2,1.2,t);box(9,1,1,mC,4,2.2,-1.2,t);t.rotation.z=0.6;
+  return g;}
+function criarRadar(cor){const g=new THREE.Group(),mB=M('#6d7378',0.8),mP=M('#d8dde2',0.5),mC=M(cor,0.6);   // (19/11) missão 4: radar em terra
+  const base=new THREE.Mesh(new THREE.BoxGeometry(26,10,26),mB);base.position.y=5;g.add(base);
+  const torre=new THREE.Mesh(new THREE.CylinderGeometry(2.5,4,26,8),mB);torre.position.y=23;g.add(torre);
+  const prato=new THREE.Group();prato.position.y=38;const d=new THREE.Mesh(new THREE.SphereGeometry(14,16,8,0,Math.PI*2,0,Math.PI/3),mP);d.rotation.x=-Math.PI/2.2;prato.add(d);
+  const l=new THREE.Mesh(new THREE.SphereGeometry(2.2,8,6),mC);l.position.set(0,2,6);prato.add(l);g.add(prato);
+  d.onBeforeRender=()=>{prato.rotation.y+=0.02;};return g;}   // (19/11) faltava pôr na cena: só aparecia na queda
+
+const R=new THREE.WebGLRenderer({antialias:true});R.outputEncoding=THREE.sRGBEncoding;R.toneMapping=THREE.ACESFilmicToneMapping;R.setPixelRatio(Math.min(2,devicePixelRatio));document.body.appendChild(R.domElement);
+const cena=new THREE.Scene();cena.background=new THREE.Color(0x9cc9ec);
+cena.add(new THREE.HemisphereLight(0xdcefff,0x2a4a3a,0.9));const sol=new THREE.DirectionalLight(0xfff1d6,1.25);sol.position.set(-0.5,1,0.35);cena.add(sol);
+const agua=new THREE.Mesh(new THREE.CircleGeometry(400,64),new THREE.MeshStandardMaterial({color:new THREE.Color('#2f7fae').convertSRGBToLinear(),roughness:0.35,transparent:true,opacity:0.85}));agua.rotation.x=-Math.PI/2;cena.add(agua);
+const cam=new THREE.PerspectiveCamera(45,1,0.5,5000);cam.position.set(90,45,90);
+const ctl=new THREE.OrbitControls(cam,R.domElement);ctl.target.set(0,8,0);ctl.enableDamping=true;ctl.autoRotate=true;ctl.autoRotateSpeed=1.2;ctl.maxDistance=600;ctl.minDistance=12;
+const MODELOS=[
+  {n:'🚢 Navio inimigo (missão 6)',f:()=>criarNavio('#8a96a8'),agua:1},
+  {n:'🚢 Navio da live · time vermelho',f:()=>criarNavio('#e8443a'),agua:1},
+  {n:'🚢 Navio da live · time azul',f:()=>criarNavio('#2f7de1'),agua:1},
+  {n:'📡 Radar (missão 4)',f:()=>criarRadar('#ff7f2a'),agua:0}];
+let atual=null;
+function mostra(i){if(atual)cena.remove(atual);atual=MODELOS[i].f();cena.add(atual);agua.visible=!!MODELOS[i].agua;
+  [...document.querySelectorAll('#ui button')].forEach((b,k)=>b.classList.toggle('on',k===i));}
+MODELOS.forEach((m,i)=>{const b=document.createElement('button');b.textContent=m.n;b.onclick=()=>mostra(i);document.getElementById('ui').appendChild(b);});
+document.getElementById('auto').onclick=()=>{ctl.autoRotate=!ctl.autoRotate;};
+function tam(){R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();}addEventListener('resize',tam);tam();
+mostra(0);(function loop(){requestAnimationFrame(loop);ctl.update();R.render(cena,cam);})();
+</script></body></html>
