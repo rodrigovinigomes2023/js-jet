@@ -739,14 +739,18 @@ function nascer(){KC=null;MEU_DESTROCO=null;document.body.classList.remove('mort
 
 // ------------------------------------------------ rede
 function envia(m){if(ws&&ws.readyState===1)ws.send(JSON.stringify(m));}
-function conectar(){const url=window.JJ_SERVIDOR?'wss://'+JJ_SERVIDOR+'/ws':(location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws';
+/* (19/11) tela grande de "conectando" do clique até o bemvindo (servidor grátis pode estar acordando) */
+let _conT=null;function conTela(on){const c=$('#conectando');if(!c)return;clearInterval(_conT);if(!on){c.style.display='none';return;}
+  const t0=Date.now();c.style.display='flex';const seg=$('#conSeg'),dica=$('#conDica');seg.textContent='0 s';dica.textContent='';
+  _conT=setInterval(()=>{const n=Math.round((Date.now()-t0)/1000);seg.textContent=n+' s';if(n>=4&&window.JJ_SERVIDOR)dica.textContent='☕ O servidor gratuito estava dormindo e está acordando. Pode levar até 1 minuto, não precisa clicar de novo.';},500);}
+function conectar(){conTela(true);const url=window.JJ_SERVIDOR?'wss://'+JJ_SERVIDOR+'/ws':(location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws';
   ws=new WebSocket(url);
   ws.onopen=()=>{conectado=true;envia({t:'entrar',nome:EU.nome,sala:SALA,token:CONTA?CONTA.token:null,missao:SALA==='missao'?MIS_N:undefined});};
-  ws.onclose=()=>{const era=conectado;conectado=false;if(jogando){jogando=false;document.body.classList.remove('jogando');$('#menu').style.display='flex';
+  ws.onclose=()=>{conTela(false);const era=conectado;conectado=false;if(jogando){jogando=false;document.body.classList.remove('jogando');$('#menu').style.display='flex';
       $('#erro').textContent=EXPULSO||(era?'⚠️ Conexão perdida. Escolha a sala para voltar.':window.JJ_SERVIDOR?'⏳ O servidor está acordando (até 1 min). Tente de novo já já.':'⚠️ Não consegui falar com o servidor.');EXPULSO='';}};
   ws.onmessage=e=>{let d;try{d=JSON.parse(e.data);}catch{return;}
     if(d.t==='expulso'){EXPULSO='⚠️ '+d.msg;}
-    if(d.t==='bemvindo'){EU.id=d.id;EU.cor=d.cor;if(d.nome)EU.nome=d.nome;SALA=d.sala||'bots';MINHA_BASE=d.base??null;if(d.zona)ZONA=d.zona;if(d.rsam)R_SAM=d.rsam;LIMITE=SALA==='pvp'||SALA==='missao'?20900:SALA==='bots'?7600:5200;MEU_TIME=d.time||(SALA==='live'?'azul':null);NASCE=d.nasce||null;tempestade(d.clima==='tempestade');if(SALA==='missao'){$('#placar').innerHTML='';radio('Torre','Harpia 1, decolagem autorizada. Aguarde instruções.');}VS_ANT=null;placarVs(SALA==='live'?[0,0]:null);mostrarBases();
+    if(d.t==='bemvindo'){conTela(false);EU.id=d.id;EU.cor=d.cor;if(d.nome)EU.nome=d.nome;SALA=d.sala||'bots';MINHA_BASE=d.base??null;if(d.zona)ZONA=d.zona;if(d.rsam)R_SAM=d.rsam;LIMITE=SALA==='pvp'||SALA==='missao'?20900:SALA==='bots'?7600:5200;MEU_TIME=d.time||(SALA==='live'?'azul':null);NASCE=d.nasce||null;tempestade(d.clima==='tempestade');if(SALA==='missao'){$('#placar').innerHTML='';radio('Torre','Harpia 1, decolagem autorizada. Aguarde instruções.');}VS_ANT=null;placarVs(SALA==='live'?[0,0]:null);mostrarBases();
       if(JATO)cena.remove(JATO);JATO=criarJato(d.cor);nascer();}
     else if(d.t==='placar')recebePlacar(d.l);
     else if(d.t==='snap')recebeSnap(d.j);

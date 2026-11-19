@@ -39,6 +39,10 @@
   #bVida i{background:linear-gradient(90deg,#3ad07a,#9be15d)}
   #bTurboB i{background:linear-gradient(90deg,#ff9a2a,#ffd23a)}
   #info{display:flex;justify-content:space-between;font-weight:700}
+  #conectando{position:fixed;inset:0;z-index:60;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(5,12,24,.88);color:#fff;text-align:center;padding:16px;font-family:inherit}
+  #conectando .gira{width:64px;height:64px;border:6px solid rgba(255,255,255,.2);border-top-color:#ffc94a;border-radius:50%;animation:gira 1s linear infinite}
+  #conectando h2{margin:0;font-size:clamp(24px,6vw,38px);letter-spacing:1px}#conSeg{font-size:20px;color:#ffc94a;font-weight:700}#conDica{max-width:420px;font-size:15px;opacity:.9;min-height:20px}
+  @keyframes gira{to{transform:rotate(360deg)}}
   #servEst{font-size:13px;opacity:.85;margin-top:6px;min-height:18px}body.publico #salaLive{display:none}
   #pLive .liveTit{font-size:22px;font-weight:800;margin:6px 0}#pLive .liveTxt{opacity:.85;font-size:14px;margin-bottom:10px}#liveEst{min-height:20px;font-size:14px;margin-top:8px}
   #menu button.live{background:linear-gradient(180deg,#ff2d6f,#7a2cff);color:#fff}
@@ -233,6 +237,7 @@
 
 <div id="girar">📱↻<br>Vire o celular deitado para voar melhor</div>
 
+<div id="conectando"><div class="gira"></div><h2>📡 CONECTANDO AO SERVIDOR…</h2><div id="conSeg">0 s</div><div id="conDica"></div></div>
 <div id="menu">
   <div class="card">
     <h1>✈️ JS-JET</h1>
