@@ -12,7 +12,7 @@ from aiohttp import web, WSMsgType
 import contas   # (10/11) login e ranking
 
 RAIZ = Path(__file__).resolve().parent.parent / 'fonte'
-PORTA = int(os.environ.get('PORTA', 8791))
+PORTA = int(os.environ.get('PORTA') or os.environ.get('PORT') or 8791)   # PORT = nuvem (Render)
 MIN_AVIOES = int(os.environ.get('MIN_AVIOES', 4))
 CORES = ['#e8443a', '#2f7de1', '#f2b632', '#3cb371', '#b05be0', '#ff7f2a', '#1fc3c3', '#e055a0']
 NOMES_BOT = ['Bot Carcará', 'Bot Gavião', 'Bot Falcão', 'Bot Caburé', 'Bot Acauã', 'Bot Sovi', 'Bot Uiraçu']   # (19/11) aves de rapina brasileiras (eram peixes)
@@ -31,7 +31,8 @@ AV = {}            # id -> Aviao
 _prox = [1]
 
 # (10/11) salas: 'bots' (como antes, completa com bots) e 'pvp' (sem bots, com bases)
-SALAS = ('bots', 'pvp', 'live')   # (10/11) live = sala do TikTok: chat vira avião
+PUBLICO = bool(os.environ.get('PUBLICO'))   # (19/11) versão na nuvem (portfólio): sem a sala da live/TikTok
+SALAS = ('bots', 'pvp') if PUBLICO else ('bots', 'pvp', 'live')   # (10/11) live = sala do TikTok: chat vira avião
 # Bases da sala pvp: 4 no máximo, num anel fora da zona de combate (círculo no meio do mapa).
 # Cada um nasce na pista da sua base; chegar perto de base alheia = míssil terra-ar (SAM).
 BASE_R, ZONA, R_SAM = 18600, 15200, 3000   # (10/11) arena 4x maior (era zona 3800, bases a 7200)
@@ -1600,6 +1601,8 @@ async def live_evento(d):
 
 
 def _rede_de_casa(req):
+    if PUBLICO:
+        return False
     try:
         ip = ipaddress.ip_address(req.remote or '')
         return ip.is_loopback or ip.is_private
@@ -1833,6 +1836,10 @@ FALHAS = {}   # ip -> instantes de tentativas erradas (trava chute de senha)
 
 
 def _ip(req):
+    if PUBLICO:   # (19/11) na nuvem tem proxy na frente: o IP de verdade vem no X-Forwarded-For
+        xff = req.headers.get('X-Forwarded-For', '').split(',')[0].strip()
+        if xff:
+            return xff
     return req.remote or '?'
 
 
@@ -1887,8 +1894,10 @@ def main():
     app.router.add_get('/api/eu', api_eu)
     app.router.add_get('/api/rank', api_rank)
     app.router.add_get('/api/missoes', api_missoes)
-    app.router.add_post('/api/live', api_live)
-    app.router.add_route('*', '/api/live/ponte', api_ponte)
+    if not PUBLICO:   # (19/11) live/TikTok só em casa (na nuvem o proxy faz tudo parecer "rede de casa")
+        app.router.add_post('/api/live', api_live)
+        app.router.add_route('*', '/api/live/ponte', api_ponte)
+    app.router.add_get('/api/ping', lambda r: web.json_response({'ok': True}))
     app.router.add_get('/', arquivo)
     app.router.add_get('/{arq}', arquivo)
     app.on_startup.append(iniciar)

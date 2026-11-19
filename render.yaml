@@ -1,0 +1,14 @@
+# (19/11) servidor do jogo no Render (plano grátis). Blueprint: Render → New → Blueprint → este repositório.
+services:
+  - type: web
+    name: js-jet
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python servidor/servidor.py
+    healthCheckPath: /api/ping
+    envVars:
+      - key: PUBLICO
+        value: "1"
+      - key: PYTHON_VERSION
+        value: "3.10.12"

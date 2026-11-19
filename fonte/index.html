@@ -39,6 +39,7 @@
   #bVida i{background:linear-gradient(90deg,#3ad07a,#9be15d)}
   #bTurboB i{background:linear-gradient(90deg,#ff9a2a,#ffd23a)}
   #info{display:flex;justify-content:space-between;font-weight:700}
+  #servEst{font-size:13px;opacity:.85;margin-top:6px;min-height:18px}body.publico #salaLive{display:none}
   #pLive .liveTit{font-size:22px;font-weight:800;margin:6px 0}#pLive .liveTxt{opacity:.85;font-size:14px;margin-bottom:10px}#liveEst{min-height:20px;font-size:14px;margin-top:8px}
   #menu button.live{background:linear-gradient(180deg,#ff2d6f,#7a2cff);color:#fff}
   #liveA{left:50%;top:22%;transform:translateX(-50%);width:min(92vw,560px);text-align:center;pointer-events:none}
@@ -262,6 +263,7 @@
     </div>
     <button id="bRank" class="sec">🏆 RANKING</button>
     <div id="erro"></div>
+    <div id="servEst"></div>
     <div class="dica">
       📱 <b>Celular:</b> arraste no lado esquerdo para pilotar · 🎯 atira · 🚀 míssil (trave a mira 1 s) · ✨ flare · 🔥 turbo<br>
       ⚔️ <b>Deathmatch:</b> você decola da sua base; chegar perto da base dos outros = míssil terra-ar 🛡️<br>
@@ -292,6 +294,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="config.js"></script>
 <script src="terreno.js"></script>
 <script src="jogo.js"></script>
 <script src="heli.js"></script>

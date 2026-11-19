@@ -739,11 +739,11 @@ function nascer(){KC=null;MEU_DESTROCO=null;document.body.classList.remove('mort
 
 // ------------------------------------------------ rede
 function envia(m){if(ws&&ws.readyState===1)ws.send(JSON.stringify(m));}
-function conectar(){const url=(location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws';
+function conectar(){const url=window.JJ_SERVIDOR?'wss://'+JJ_SERVIDOR+'/ws':(location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws';
   ws=new WebSocket(url);
   ws.onopen=()=>{conectado=true;envia({t:'entrar',nome:EU.nome,sala:SALA,token:CONTA?CONTA.token:null,missao:SALA==='missao'?MIS_N:undefined});};
   ws.onclose=()=>{const era=conectado;conectado=false;if(jogando){jogando=false;document.body.classList.remove('jogando');$('#menu').style.display='flex';
-      $('#erro').textContent=EXPULSO||(era?'⚠️ Conexão perdida. Escolha a sala para voltar.':'⚠️ Não consegui falar com o servidor.');EXPULSO='';}};
+      $('#erro').textContent=EXPULSO||(era?'⚠️ Conexão perdida. Escolha a sala para voltar.':window.JJ_SERVIDOR?'⏳ O servidor está acordando (até 1 min). Tente de novo já já.':'⚠️ Não consegui falar com o servidor.');EXPULSO='';}};
   ws.onmessage=e=>{let d;try{d=JSON.parse(e.data);}catch{return;}
     if(d.t==='expulso'){EXPULSO='⚠️ '+d.msg;}
     if(d.t==='bemvindo'){EU.id=d.id;EU.cor=d.cor;if(d.nome)EU.nome=d.nome;SALA=d.sala||'bots';MINHA_BASE=d.base??null;if(d.zona)ZONA=d.zona;if(d.rsam)R_SAM=d.rsam;LIMITE=SALA==='pvp'||SALA==='missao'?20900:SALA==='bots'?7600:5200;MEU_TIME=d.time||(SALA==='live'?'azul':null);NASCE=d.nasce||null;tempestade(d.clima==='tempestade');if(SALA==='missao'){$('#placar').innerHTML='';radio('Torre','Harpia 1, decolagem autorizada. Aguarde instruções.');}VS_ANT=null;placarVs(SALA==='live'?[0,0]:null);mostrarBases();
@@ -1301,6 +1301,12 @@ $('#bCam').addEventListener('click',async()=>{
     if(CAM_I>=cams.length){paraCam();CAM_I=-1;liveAlerta({k:'info',txt:'📷 câmera desligada'});return;}
     const nome=await abreCam(cams[CAM_I].deviceId);liveAlerta({k:'info',txt:`📷 ${nome||'câmera '+(CAM_I+1)} (${CAM_I+1}/${cams.length})`});}
   catch(e){paraCam();CAM_I=-1;liveAlerta({k:'info',txt:'📷 não deu p/ abrir a câmera: '+(e.name==='NotAllowedError'?'permissão negada':e.message)});}});
+/* (19/11) versão publicada: sem sala da live; servidor grátis dorme sem jogadores -> acorda ao abrir a página */
+if(window.JJ_PUBLICO)document.body.classList.add('publico');
+if(window.JJ_SERVIDOR){const st=$('#servEst');let t0=Date.now(),ok=false;
+  const ping=async()=>{try{const r=await fetch('api/ping',{cache:'no-store'});if(r.ok){ok=true;st.textContent='🟢 servidor online';setTimeout(()=>{if(ok)st.textContent='';},4000);return;}}catch(e){}
+    st.textContent='⏳ acordando o servidor… '+Math.round((Date.now()-t0)/1000)+' s (até ~1 min). Helicóptero e tutorial já funcionam!';setTimeout(ping,3000);};
+  st.textContent='⏳ conectando ao servidor…';ping();}
 /* (19/11) sala da live: primeiro o @ de quem transmite; o servidor liga a ponte do TikTok p/ esse @ */
 $('#salaLive').addEventListener('click',()=>{$('#pSalas').style.display='none';$('#pLive').style.display='';$('#liveEst').textContent='';
   let u='';try{u=localStorage.getItem('jsjet-live')||'';}catch(e){}$('#liveUser').value=u;$('#liveUser').focus();});
