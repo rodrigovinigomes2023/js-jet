@@ -3,7 +3,7 @@
 Jogo de combate aéreo 3D que roda no **navegador do celular ou do PC**, sem instalar nada.
 Feito do zero com **three.js** no cliente e um **servidor Python (aiohttp + WebSocket)** que faz o papel de juiz da partida.
 
-🎮 **Jogar:** _(link do Vercel aqui)_
+🎮 **Jogar:** https://js-jet-alpha.vercel.app
 
 ## 🕹️ Modos
 - ⚔️ **Deathmatch** — multiplayer em tempo real; cada jogador decola da sua base, protegida por defesa antiaérea (SAM).
