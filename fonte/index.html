@@ -131,6 +131,20 @@
   #menu .link{display:block;margin-top:12px;font-size:14px;color:#9fd4ff;text-decoration:underline;cursor:pointer}
   #ola{font-size:17px;font-weight:700;background:#0b1a2a;border-radius:12px;padding:10px;border:2px solid #7fd3ff33}
   #ola a{font-size:13px;font-weight:400;color:#9fd4ff;text-decoration:underline;cursor:pointer;margin-left:6px}
+  #menu button.heli{background:linear-gradient(180deg,#9aa86a,#4d5a3c);color:#fff}
+  #heliMsg{left:50%;top:58px;transform:translateX(-50%);max-width:min(560px,92vw);background:#0b1a2ae6;border-left:4px solid #9aa86a;border-radius:8px;padding:8px 12px;font-size:15px;z-index:4;text-align:center}
+  #heliZoom{display:none;position:fixed;right:10px;top:38%;z-index:30;flex-direction:column;gap:8px}
+  body.heli #heliZoom{display:flex}
+  #heliMapa{position:fixed;inset:0;display:flex;align-items:safe center;justify-content:center;background:#0d1420e6;z-index:9;padding:14px;overflow-y:auto}
+  #heliMapa .card{width:min(980px,100%);color:#fff}
+  #heliMapa h2{margin:0 0 10px;font-size:26px;text-align:center}#heliMapa h2 small{display:block;font-size:14px;font-weight:400;opacity:.85;margin-top:4px}
+  .hmCorpo{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+  #hmCv{width:min(560px,100%,72vh);aspect-ratio:1;border-radius:12px;border:2px solid #7fd3ff55;transform:none}
+  #hmObj{flex:1;min-width:240px;text-align:left;font-size:16px;line-height:1.7}#hmObj h3{margin:8px 0 2px;font-size:15px;color:#ffd23a;letter-spacing:1px}
+  #hmObj .ok{opacity:.6}#hmObj .leg{font-size:13px;opacity:.85}
+  #hmOk{margin-top:12px;width:100%;font-size:20px;font-weight:800;padding:12px;border:0;border-radius:12px;cursor:pointer;background:linear-gradient(180deg,#ffd23a,#ff9a2a);color:#3a1d00}
+  #heliZoom button{width:52px;height:46px;border-radius:12px;border:1px solid #fff6;background:#0008;color:#fff;font-size:17px;touch-action:none}
+  body.heli #mira,body.heli #leme,body.heli #bTrem,body.heli #bBomba,body.heli #bVisao,body.heli #dicaDec,body.heli #hudCab{display:none!important}
   #menu button.mis{background:linear-gradient(180deg,#3fd0a0,#16806a);color:#fff}
   #missoes,#fimMis{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 30%,#1c3d63,#0d1420 70%);z-index:7;padding:16px;overflow-y:auto;align-items:safe center}
   #fimMis{background:#0d1420cc;z-index:8}
@@ -231,6 +245,7 @@
       <div id="ola"></div>
       <label><input type="checkbox" id="inverter"> Inverter subir/descer</label>
       <button id="bMissoes" class="mis">🎖️ MISSÕES · modo história</button>
+      <button id="bHeli" class="heli">🚁 HELICÓPTERO · ataque isométrico</button>
       <button id="decolar">🤖 SALA COM BOTS</button>
       <button id="salaPvp" class="pvp">⚔️ SALA SEM BOTS · bases</button>
       <button id="salaLive" class="live">📺 SALA DA LIVE · o chat vira avião</button>
@@ -254,6 +269,9 @@
 </div>
 <div id="fimMis" style="display:none"></div>
 <div class="hud" id="radio" style="display:none"></div>
+<div class="hud" id="heliMsg" style="display:none"></div>
+<div id="heliZoom"><button id="bZoomMais">🔍＋</button><button id="bZoomMenos">🔍－</button><button id="bMapa">🗺️</button><button id="bCamPadrao">🎥</button></div>
+<div id="heliMapa" style="display:none"><div class="card"><h2 id="hmTit"></h2><div class="hmCorpo"><canvas id="hmCv" width="560" height="560"></canvas><div id="hmObj"></div></div><button id="hmOk">DECOLAR</button></div></div>
 
 <div id="rank" style="display:none">
   <div class="card">
@@ -267,5 +285,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="terreno.js"></script>
 <script src="jogo.js"></script>
+<script src="heli.js"></script>
 </body>
 </html>

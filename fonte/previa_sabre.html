@@ -1,0 +1,172 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>js-jet · prévia AH-2 Sabre</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#9cc9ec;font-family:system-ui,sans-serif;color:#fff}
+#ui{position:fixed;left:10px;top:10px;display:flex;flex-direction:column;gap:6px;max-width:calc(100% - 20px)}
+.lin{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.lin b{font-size:13px;background:#0b1a2acc;padding:6px 8px;border-radius:8px;min-width:70px}
+#ui button{font:700 14px system-ui;padding:8px 11px;border-radius:10px;border:2px solid #7fd3ff66;background:#0b1a2acc;color:#fff;cursor:pointer}
+#ui button.on{background:linear-gradient(180deg,#ffd23a,#ff9a2a);color:#3a1d00;border-color:transparent}
+#nome{position:fixed;left:12px;bottom:52px;pointer-events:none;background:#0b1a2acc;padding:10px 14px;border-radius:10px;max-width:330px;font-size:13px;line-height:1.4}#nome b{font-size:16px;display:block;margin-bottom:3px}
+#dica{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);background:#0b1a2acc;padding:6px 12px;border-radius:8px;font-size:13px;text-align:center;width:max-content;max-width:92vw}
+canvas{display:block;touch-action:none}</style></head><body>
+<div id="ui"><div class="lin" id="lM"><b>🚁 Modelo</b></div><div class="lin" id="lP"><b>🎨 Pintura</b></div><div class="lin" id="lX"><b>⚙️ Extras</b></div></div>
+<div id="nome"></div>
+<div id="dica">🖱️ arraste p/ girar · roda/pinça = zoom · botão direito/2 dedos = mover</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="mi35.js"></script>
+<script>
+// (19/11) PRÉVIA do AH-2 Sabre (Mi-35M da FAB, 2010–2022) p/ o modo helicóptero. Frente = +x, ~18,5 m, rotor de 17 m.
+const mats={},geos={};
+function M(cor,r=0.8){return mats[cor+'/'+r]||(mats[cor+'/'+r]=new THREE.MeshStandardMaterial({color:new THREE.Color(cor).convertSRGBToLinear(),roughness:r}));}
+function G(k,f){return geos[k]||(geos[k]=f());}
+function box(w,h,d,mat,x,y,z,pai){const m=new THREE.Mesh(G('b'+w+','+h+','+d,()=>new THREE.BoxGeometry(w,h,d)),mat);m.position.set(x,y,z);pai.add(m);return m;}
+function esf(r,mat,x,y,z,pai,sx=1,sy=1,sz=1){const m=new THREE.Mesh(G('s'+r,()=>new THREE.SphereGeometry(r,14,10)),mat);m.position.set(x,y,z);m.scale.set(sx,sy,sz);pai.add(m);return m;}
+function cil(rt,rb,h,mat,x,y,z,pai,seg=10){const m=new THREE.Mesh(G('c'+rt+','+rb+','+h+','+seg,()=>new THREE.CylinderGeometry(rt,rb,h,seg)),mat);m.position.set(x,y,z);pai.add(m);return m;}
+
+// camuflagem: ruído 3D na posição do objeto mistura 3 cores (mesma ideia do KC-390)
+const CAMO_INV={value:new THREE.Matrix4()};   // inversa da matriz do helicóptero, atualizada a cada quadro
+function matCamo(c1,c2,c3,esc=0.3){const m=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.75});
+  m.onBeforeCompile=s=>{s.uniforms.cA={value:new THREE.Color(c1).convertSRGBToLinear()};s.uniforms.cB={value:new THREE.Color(c2).convertSRGBToLinear()};s.uniforms.cC={value:new THREE.Color(c3).convertSRGBToLinear()};s.uniforms.cG={value:new THREE.Color('#8f979a').convertSRGBToLinear()};
+    s.uniforms.uInv=CAMO_INV;s.vertexShader=s.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vOP;uniform mat4 uInv;').replace('#include <begin_vertex>','#include <begin_vertex>\nvOP=(uInv*modelMatrix*vec4(position,1.0)).xyz;');
+    s.fragmentShader=s.fragmentShader.replace('#include <common>',`#include <common>
+varying vec3 vOP;uniform vec3 cA,cB,cC,cG;
+float h3(vec3 p){return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453);}
+float n3(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+ return mix(mix(mix(h3(i),h3(i+vec3(1,0,0)),f.x),mix(h3(i+vec3(0,1,0)),h3(i+vec3(1,1,0)),f.x),f.y),mix(mix(h3(i+vec3(0,0,1)),h3(i+vec3(1,0,1)),f.x),mix(h3(i+vec3(0,1,1)),h3(i+vec3(1,1,1)),f.x),f.y),f.z);}`)
+     .replace('vec4 diffuseColor = vec4( diffuse, opacity );',`vec3 q=vOP*${esc.toFixed(3)};float a=n3(q)+0.5*n3(q*2.1+7.3),b=n3(q+vec3(31.,7.,13.))+0.5*n3(q*2.3+3.1);
+ vec3 cc=cA;if(a>0.8)cc=cB;if(b>0.86)cc=cC;if(vOP.y<1.15&&vOP.x>-3.5)cc=cG;vec4 diffuseColor=vec4(cc,opacity);`);};
+  return m;}
+
+// ---------- AH-2 Sabre
+function criarSabre(pint){const g=new THREE.Group(),cor=pint.camo?matCamo(...pint.camo):M(pint.cor,0.75),bar=M('#c9ccc4',0.6),pre=M('#24282b',0.6),
+    vid=new THREE.MeshStandardMaterial({color:0x5d7a8c,roughness:0.05,metalness:0.5,transparent:true,opacity:0.8}),mol=M('#2e3430',0.6),borr=M('#151515',0.9);
+  // fuselagem: perfil lateral extrudado com borda arredondada (cabine dos 2 tripulantes em degrau + compartimento de tropa)
+  const s=new THREE.Shape();s.moveTo(7.5,1.2);s.quadraticCurveTo(7.4,0.8,6.9,0.75);s.lineTo(-3,0.75);s.quadraticCurveTo(-4.6,0.95,-5.6,2.3);s.lineTo(-5.6,3.15);
+  s.lineTo(-3,3.4);s.lineTo(3.2,3.4);s.lineTo(3.55,2.3);s.lineTo(5.45,2.25);s.lineTo(5.7,1.6);s.lineTo(7.2,1.55);s.quadraticCurveTo(7.55,1.45,7.5,1.2);
+  const ge=new THREE.ExtrudeGeometry(s,{depth:1.6,bevelEnabled:true,bevelThickness:0.28,bevelSize:0.22,bevelSegments:3,curveSegments:8});ge.translate(0,0,-0.8);
+  const fus=new THREE.Mesh(ge,cor);g.add(fus);
+  // cabines em bolha: atirador na frente/baixo, piloto atrás/em cima
+  esf(1,vid,6.45,1.62,0,g,1.25,0.82,0.78);esf(1,vid,4.5,2.32,0,g,1.2,0.9,0.82);
+  for(const [x,y,h] of[[5.75,1.95,1.1],[7.05,1.75,0.7],[3.75,2.75,1.2],[5.2,2.6,0.9]])box(0.09,h,1.7,mol,x,y,0,g);
+  box(2.4,0.08,0.09,mol,6.45,2.42,0,g);box(2.3,0.08,0.09,mol,4.5,3.2,0,g);
+  // canhão duplo 23 mm em torre sob o nariz + tubo de pitot
+  const tor=new THREE.Group();tor.position.set(6.7,0.55,0);g.add(tor);esf(0.42,pre,0,0,0,tor);for(const z of[-0.13,0.13]){const c=cil(0.07,0.07,1.6,pre,0.95,0,z,tor,6);c.rotation.z=Math.PI/2;}
+  g.userData.torre=tor;const pit=cil(0.035,0.035,1.6,bar,8.2,1.25,-0.35,g,5);pit.rotation.z=Math.PI/2;esf(0.2,pre,7.35,0.75,-0.55,g);   // pitot + sensor
+  // compartimento de tropa: janelas e porta dupla (cima abre p/ cima, baixo vira escada) dos dois lados
+  const portas=[];
+  for(const z of[-1,1]){const zz=z*1.09;for(const x of[-2.2,-1.3,-0.4])box(0.42,0.42,0.04,vid,x,2.35,zz,g);
+    box(1.55,2.05,0.03,M('#0e1114',0.9),1.75,1.8,zz,g);   // vão da porta (escuro)
+    const pc=new THREE.Group();pc.position.set(1.75,2.8,zz+z*0.03);g.add(pc);const a=box(1.5,1.0,0.06,cor,0,-0.5,0,pc);box(0.6,0.4,0.03,vid,0,-0.45,z*0.04,pc);
+    const pb=new THREE.Group();pb.position.set(1.75,0.8,zz+z*0.03);g.add(pb);box(1.5,1.0,0.06,cor,0,0.5,0,pb);for(let i=0;i<3;i++)box(1.2,0.05,0.08,pre,0,0.25+i*0.28,z*0.05,pb);
+    portas.push({pc,pb,z});}
+  // motores em cima: naceles com filtros de areia na frente, escapes virados p/ fora
+  box(5,0.9,2.0,cor,0.1,3.75,0,g);
+  for(const z of[-1,1]){const n=cil(0.68,0.66,4.6,cor,0.4,4.0,z*0.75,g,14);n.rotation.z=Math.PI/2;esf(0.85,M('#3d4734',0.6),3.0,4.05,z*0.82,g,1.05,1,1);   // filtros de areia (domos)
+    cil(0.42,0.42,0.12,pre,-1.6,4.0,z*1.38,g,14).rotation.x=Math.PI/2;}   // escape redondo na lateral
+  box(2.4,0.75,1.6,cor,-0.3,4.55,0,g);cil(0.22,0.26,0.8,pre,-0.1,5.15,0,g,8);
+  // rotor principal de 5 pás
+  const rotor=new THREE.Group();rotor.position.set(-0.1,5.55,0);g.add(rotor);esf(0.45,pre,0,0,0,rotor);
+  const pa=new THREE.MeshStandardMaterial({color:0x1d2124,roughness:0.6});
+  for(let i=0;i<5;i++){const b=new THREE.Mesh(G('pa5',()=>new THREE.BoxGeometry(8.4,0.09,0.55)),pa);b.position.x=4.4;b.rotation.z=-0.02;const h=new THREE.Group();h.rotation.y=i*Math.PI*2/5;h.add(b);rotor.add(h);}
+  const disco=new THREE.Mesh(new THREE.CircleGeometry(8.6,40),new THREE.MeshBasicMaterial({color:0x222222,transparent:true,opacity:0.1,depthWrite:false,side:THREE.DoubleSide}));disco.rotation.x=-Math.PI/2;disco.visible=false;rotor.add(disco);
+  // asas curtas com anedro: casulos de foguete e, na ponta, trilhos de míssil anticarro
+  for(const z of[-1,1]){const w=new THREE.Group();w.position.set(-0.6,2.55,z*1.05);w.rotation.x=z*0.22;g.add(w);
+    box(2.1,0.18,3.7,cor,0,0,z*1.85,w);box(1.6,1.0,0.1,cor,0,-0.25,z*3.7,w);
+    for(const k of[1.15,2.55]){box(1.0,0.45,0.12,pre,0.1,-0.32,z*k,w);const p=cil(0.36,0.36,2.3,mol,0.2,-0.85,z*k,w,14);p.rotation.z=Math.PI/2;
+      const fr=new THREE.Mesh(G('frB8',()=>new THREE.CircleGeometry(0.34,14)),M('#15181a',0.9));fr.position.set(1.36,-0.85,z*k);fr.rotation.y=Math.PI/2;w.add(fr);}   // casulo de 20 foguetes
+    for(const y of[-0.55,0.2])for(const dz of[0,0.24]){const t=cil(0.1,0.1,1.9,M('#6d7564',0.7),0.25,y,z*(3.85+dz),w,6);t.rotation.z=Math.PI/2;}}
+  // cone de cauda, estabilizador, deriva inclinada e rotor de cauda de 3 pás do lado esquerdo
+  const cone=cil(0.36,0.78,6.4,cor,-8.2,3.05,0,g,12);cone.rotation.z=Math.PI/2+0.06;
+  box(1.2,0.12,3.8,cor,-9.8,2.95,0,g);const fin=box(1.9,3.4,0.26,cor,-11.4,4.6,0,g);fin.rotation.z=-0.45;
+  const cauda=new THREE.Group();cauda.position.set(-12.0,5.6,-0.4);g.add(cauda);esf(0.18,pre,0,0,0,cauda);
+  for(let i=0;i<3;i++){const b=new THREE.Mesh(G('pc3',()=>new THREE.BoxGeometry(0.22,1.9,0.06)),pa);b.position.y=0.95;const h=new THREE.Group();h.rotation.z=i*Math.PI*2/3;h.add(b);cauda.add(h);}
+  // trem fixo (triciclo) + calço de cauda
+  for(const z of[-0.3,0.3])cil(0.3,0.3,0.22,borr,6.1,0.32,z,g,12).rotation.x=Math.PI/2;box(0.15,0.5,0.15,pre,6.1,0.6,0,g);
+  for(const z of[-1,1]){const st=box(0.18,1.6,0.18,pre,-0.9,1.0,z*1.55,g);st.rotation.x=z*0.55;const st2=box(0.14,1.2,0.14,pre,-0.9,0.9,z*1.6,g);st2.rotation.x=-z*0.3;cil(0.48,0.48,0.34,borr,-0.9,0.48,z*1.95,g,14).rotation.x=Math.PI/2;}
+  box(0.12,0.9,0.12,pre,-10.6,2.3,0,g);
+  // FAB: cocar no cone de cauda e bandeira na deriva
+  for(const z of[-1,1]){const c=new THREE.Group();c.position.set(-3.7,2.4,z*1.13);c.rotation.y=z>0?0:Math.PI;g.add(c);
+    [['#1e8a3c',0.55],['#f2c230',0.39],['#1f4fa8',0.25],['#ffffff',0.08]].forEach(([k,r],i)=>{const d=new THREE.Mesh(new THREE.CircleGeometry(r,20),M(k,0.6));d.position.z=0.01+i*0.005;c.add(d);});
+    const f=new THREE.Group();f.position.set(-11.5,4.7,z*0.14);f.rotation.z=-0.45;g.add(f);box(0.45,1.2,0.02,M('#1e8a3c',0.6),-0.22,0,0,f);box(0.45,1.2,0.02,M('#f2c230',0.6),0.23,0,0,f);}
+  g.userData={rotor,cauda,disco,portas,torre:tor};return g;}
+
+// ---------- (19/11) AH-2 Sabre a partir do modelo 3D baixado (Mi-35M de 42manako, CC-BY-4.0), pintado de FAB
+let MI=null;
+function miGeo(){if(MI)return MI;const d=window.MI35,b64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+  const p=new Int16Array(b64(d.pos).buffer),nn=new Int8Array(b64(d.nor).buffer),ix=d.i32?new Uint32Array(b64(d.idx).buffer):new Uint16Array(b64(d.idx).buffer),pt=b64(d.parte);
+  const pos=new Float32Array(p.length),nor=new Float32Array(nn.length);for(let i=0;i<p.length;i++){pos[i]=p[i]/1000;nor[i]=nn[i]/127;}
+  const pa=new THREE.BufferAttribute(pos,3),na=new THREE.BufferAttribute(nor,3),L=[[],[],[],[],[],[],[]];for(let t=0;t<ix.length;t+=3)L[pt[ix[t]]].push(ix[t],ix[t+1],ix[t+2]);
+  MI=L.map(l=>{const g=new THREE.BufferGeometry();g.setAttribute('position',pa);g.setAttribute('normal',na);g.setIndex(l);return g;});return MI;}
+function criarSabre3D(pint){const g=new THREE.Group(),G_=miGeo(),d=window.MI35,cor=pint.camo?matCamo(...pint.camo):M(pint.cor,0.75);
+  const vid=new THREE.MeshStandardMaterial({color:0x5d7a8c,roughness:0.05,metalness:0.5,transparent:true,opacity:0.65,side:THREE.DoubleSide});
+  const mt=[cor,vid,M('#3a4136',0.6),M('#22262a',0.9)];for(let i=0;i<4;i++){const m=new THREE.Mesh(G_[i],mt[i]);if(i===0)m.name='fus';g.add(m);}g.add(new THREE.Mesh(G_[6],M('#141414',0.9)));
+  const pa=new THREE.MeshStandardMaterial({color:0x2a2e30,roughness:0.6,side:THREE.DoubleSide});
+  const rotor=new THREE.Group();rotor.position.fromArray(d.rotor);g.add(rotor);const mr=new THREE.Mesh(G_[4],pa);mr.position.fromArray(d.rotor).negate();rotor.add(mr);
+  const cauda=new THREE.Group();cauda.position.fromArray(d.cauda);g.add(cauda);const mc=new THREE.Mesh(G_[5],pa);mc.position.fromArray(d.cauda).negate();cauda.add(mc);
+  const disco=new THREE.Mesh(new THREE.CircleGeometry(8.6,40),new THREE.MeshBasicMaterial({color:0x222222,transparent:true,opacity:0.1,depthWrite:false,side:THREE.DoubleSide}));disco.rotation.x=-Math.PI/2;disco.visible=false;rotor.add(disco);
+  // marcas da FAB coladas na superfície (raio de fora p/ dentro acha o casco e a normal)
+  const fus=g.children[0],rc=new THREE.Raycaster(),cola=(x,y,z,obj)=>{rc.set(new THREE.Vector3(x,y,z*6),new THREE.Vector3(0,0,-Math.sign(z)));const h=rc.intersectObject(fus)[0];if(!h)return;
+    obj.position.copy(h.point).addScaledVector(h.face.normal,0.03);obj.lookAt(_o.copy(h.point).add(h.face.normal));g.add(obj);};
+  for(const z of[-1,1]){const c=new THREE.Group();[['#1e8a3c',0.6],['#f2c230',0.43],['#1f4fa8',0.27],['#ffffff',0.09]].forEach(([k,r],i)=>{const dd=new THREE.Mesh(new THREE.CircleGeometry(r,24),M(k,0.6));dd.position.z=i*0.006;c.add(dd);});cola(-4.6,2.6,z,c);
+    const f=new THREE.Group();box(0.5,0.9,0.01,M('#1e8a3c',0.6),-0.25,0,0,f);box(0.5,0.9,0.01,M('#f2c230',0.6),0.25,0,0,f);cola(-12.2,4.2,z,f);}
+  g.userData={rotor,cauda,disco,portas:[],eixoCauda:'z'};return g;}
+const _o=new THREE.Vector3();
+
+// ---------- modelo atual do jogo (p/ comparar)
+function criarAtual(cor='#4d5a3c'){const g=new THREE.Group(),ve=M(cor,0.7),ve2=M('#3c4730',0.7),esc_=M('#22282b',0.6),vid=M('#1a2733',0.15),pre=M('#2b2f33',0.5);
+  const fus=new THREE.Mesh(new THREE.CylinderGeometry(1.15,1.35,9,12),ve);fus.rotation.z=Math.PI/2;fus.scale.set(1,1,0.8);fus.position.set(1.5,1.6,0);g.add(fus);
+  esf(1.15,ve,6.2,1.4,0,g,1.6,0.9,0.8);const cab=new THREE.Mesh(new THREE.CylinderGeometry(0.85,1.05,5,10),vid);cab.rotation.z=Math.PI/2;cab.scale.set(1,1,0.8);cab.position.set(3.6,2.6,0);g.add(cab);
+  box(0.25,1.1,1.5,ve,2.4,2.8,0,g);box(0.25,1.1,1.5,ve,4.7,2.8,0,g);const cone=new THREE.Mesh(new THREE.CylinderGeometry(0.35,1.05,8.5,10),ve);cone.rotation.z=Math.PI/2;cone.position.set(-6.8,1.9,0);g.add(cone);
+  box(1.4,3.6,0.25,ve2,-11,3.4,0,g).rotation.z=-0.3;box(2.6,0.15,3.4,ve2,-10.4,1.9,0,g);box(3.2,1.3,3.6,ve,0.2,2.9,0,g);for(const z of[-1,1]){cil(0.55,0.6,2.4,pre,0.6,2.9,z*1.6,g,10).rotation.z=Math.PI/2;}
+  for(const z of[-1,1]){box(1.6,0.2,2.6,ve2,1.2,1.4,z*2.1,g);for(const k of[-1,1]){const c=cil(0.32,0.32,2.2,ve2,1.1,0.9,z*(2.1+k*0.75),g,8);c.rotation.z=Math.PI/2;}}
+  for(const z of[-1,1])cil(0.35,0.35,0.3,esc_,3.2,0.35,z*1.1,g,10).rotation.x=Math.PI/2;cil(0.25,0.25,0.25,esc_,-8.6,0.9,0,g,8).rotation.x=Math.PI/2;
+  cil(0.25,0.25,1.1,pre,0.4,4.1,0,g,8);const rotor=new THREE.Group();rotor.position.set(0.4,4.7,0);g.add(rotor);esf(0.4,pre,0,0,0,rotor);
+  const pa=new THREE.MeshStandardMaterial({color:0x1d2124,roughness:0.6});for(let i=0;i<4;i++){const b=new THREE.Mesh(new THREE.BoxGeometry(7.2,0.08,0.45),pa);b.position.x=3.6;const h=new THREE.Group();h.rotation.y=i*Math.PI/2;h.add(b);rotor.add(h);}
+  const cauda=new THREE.Group();cauda.position.set(-11.3,3.6,0.35);g.add(cauda);for(let i=0;i<2;i++){const b=new THREE.Mesh(new THREE.BoxGeometry(0.15,2.6,0.2),pa);b.rotation.x=i*Math.PI/2;cauda.add(b);}
+  g.scale.setScalar(1.5);g.userData={rotor,cauda,portas:[]};return g;}
+
+// soldados desembarcando (aparecem c/ a porta aberta)
+function criarTropa(){const g=new THREE.Group(),f=M('#4f5a3a',0.9),pele=M('#c99a72',0.8),cap=M('#3c4430',0.7);
+  [[2.0,3.0],[0.8,3.6],[2.9,4.2],[1.4,4.9],[-0.2,4.4]].forEach(([x,z],i)=>{for(const s of[-1,1]){const p=new THREE.Group();p.position.set(x+(i%2)*0.3,0,s*z);p.rotation.y=s*0.4;g.add(p);
+    cil(0.22,0.25,0.9,f,0,0.45,0,p,8);cil(0.26,0.22,0.65,f,0,1.25,0,p,8);esf(0.17,pele,0,1.75,0,p);esf(0.2,cap,0,1.85,0,p,1,0.6,1);box(0.8,0.08,0.08,M('#222',0.6),0.3,1.25,0.15,p);}});
+  g.visible=false;return g;}
+
+// ---------- cena
+const R=new THREE.WebGLRenderer({antialias:true});R.setPixelRatio(Math.min(devicePixelRatio,2));R.setSize(innerWidth,innerHeight);R.outputEncoding=THREE.sRGBEncoding;R.shadowMap.enabled=true;document.body.appendChild(R.domElement);
+const cena=new THREE.Scene();cena.background=new THREE.Color(0x9cc9ec);cena.fog=new THREE.Fog(0x9cc9ec,300,900);
+const cam=new THREE.PerspectiveCamera(40,innerWidth/innerHeight,0.3,3000);cam.position.set(22,12,26);
+const ctl=new THREE.OrbitControls(cam,R.domElement);ctl.target.set(-1,2.5,0);ctl.enableDamping=true;
+cena.add(new THREE.HemisphereLight(0xdfefff,0x5a6a48,0.75));const sol=new THREE.DirectionalLight(0xfff2dc,1.1);sol.position.set(30,50,20);sol.castShadow=true;sol.shadow.mapSize.set(2048,2048);
+Object.assign(sol.shadow.camera,{left:-25,right:25,top:25,bottom:-25});cena.add(sol);
+const chao=new THREE.Mesh(new THREE.PlaneGeometry(400,400),M('#7f8f62',1));chao.rotation.x=-Math.PI/2;chao.receiveShadow=true;cena.add(chao);
+const pista=new THREE.Mesh(new THREE.CircleGeometry(16,40),M('#8a8d88',0.95));pista.rotation.x=-Math.PI/2;pista.position.y=0.02;pista.receiveShadow=true;cena.add(pista);
+const H=new THREE.Mesh(new THREE.RingGeometry(11,12,40),M('#f2f2f2',0.7));H.rotation.x=-Math.PI/2;H.position.y=0.03;cena.add(H);
+const tropa=criarTropa();cena.add(tropa);
+
+const PINT=[
+  {id:'fab',nome:'Camuflagem FAB',camo:['#56653f','#8b7b56','#353d2e'],txt:'Verde, marrom e verde-escuro em manchas, no estilo da camuflagem de selva.'},
+  {id:'cinza',nome:'Cinza tático',camo:['#6c757a','#535b60','#868d91'],txt:'Dois tons de cinza, mais "moderno".'},
+  {id:'oliva',nome:'Verde-oliva',cor:'#4d5a3c',txt:'Liso, igual ao helicóptero atual do jogo.'}];
+const MOD=[
+  {id:'sabre3d',nome:'🇧🇷 Sabre (modelo 3D)',f:criarSabre3D,txt:'Modelo 3D baixado (Mi-35M de 42manako, CC-BY-4.0), sem as marcas russas: pintado com a camuflagem escolhida, cocar da FAB e bandeira na deriva. ~37 mil triângulos.'},
+  {id:'sabre',nome:'Sabre (feito à mão)',f:criarSabre,txt:'Mi-35M da FAB (2010–2022). Atirador na frente, piloto atrás e em cima, <b style="display:inline;font-size:13px">compartimento p/ 8 soldados</b>. Canhão duplo de 23 mm na torre do nariz, 2 casulos de foguete e trilhos de míssil anticarro em cada asa. Rotor de 5 pás, cauda de 3 pás do lado esquerdo.'},
+  {id:'atual',nome:'Atual do jogo',f:criarAtual,txt:'O helicóptero de hoje no modo heli (estilo Apache).'}];
+let mod=MOD[0],pint=PINT[0],heli=null,porta=false,gira=true;
+function monta(){if(heli)cena.remove(heli);heli=mod.id==='atual'?criarAtual(pint.cor||pint.camo[0]):mod.f(pint);heli.traverse(m=>{if(m.isMesh){m.castShadow=true;}});cena.add(heli);
+  aplicaPorta();$n.innerHTML=`<b>${mod.nome}</b>${mod.txt}<br><br>🎨 <b style="display:inline;font-size:13px">${pint.nome}</b>: ${pint.txt}`;}
+function aplicaPorta(){for(const P of heli.userData.portas||[]){P.pc.rotation.x=porta?-P.z*1.6:0;P.pb.rotation.x=porta?P.z*1.25:0;}tropa.visible=porta&&mod.id!=='atual';}
+const $n=document.getElementById('nome');
+function linha(id,itens,f,ativo){const l=document.getElementById(id);for(const it of itens){const b=document.createElement('button');b.textContent=it.nome;if(it===ativo)b.classList.add('on');
+  b.onclick=()=>{[...l.querySelectorAll('button')].forEach(x=>x.classList.remove('on'));b.classList.add('on');f(it);};l.appendChild(b);}}
+linha('lM',MOD,m=>{mod=m;monta();},mod);linha('lP',PINT,p=>{pint=p;monta();},pint);
+const X=[{nome:'🚪 Porta aberta + tropa'},{nome:'⏯️ Rotor'},{nome:'🔭 Distância de jogo'}];
+{const l=document.getElementById('lX');X.forEach((it,i)=>{const b=document.createElement('button');b.textContent=it.nome;if(i===1)b.classList.add('on');l.appendChild(b);
+  b.onclick=()=>{if(i===0){porta=!porta;b.classList.toggle('on',porta);aplicaPorta();}else if(i===1){gira=!gira;b.classList.toggle('on',gira);}
+    else{cam.position.set(-95,165,95).add(ctl.target);}};});}
+monta();
+addEventListener('resize',()=>{R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();});
+let t0=performance.now();(function loop(){requestAnimationFrame(loop);const t=performance.now(),dt=Math.min(0.05,(t-t0)/1000);t0=t;const u=heli.userData;
+  if(u.rotor){u.rotor.rotation.y+=gira?dt*14:0;u.cauda.rotation[mod.id==='sabre'?'z':'z']+=gira?dt*30:0;if(u.disco)u.disco.visible=gira;}
+  heli.updateMatrixWorld();CAMO_INV.value.copy(heli.matrixWorld).invert();ctl.update();R.render(cena,cam);})();
+window.PV={cena,cam,ctl,set:(m,p,po)=>{mod=MOD.find(x=>x.id===m)||mod;pint=PINT.find(x=>x.id===p)||pint;porta=!!po;monta();}};
+</script></body></html>

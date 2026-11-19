@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0d1420">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>JS-JET</title>
+<link rel="icon" href="data:,">
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+  html,body{margin:0;height:100%;overflow:hidden;background:#0d1420;color:#fff;font-family:system-ui,"Segoe UI",Roboto,Arial,sans-serif;touch-action:none}
+  canvas#tela{display:block;position:fixed;inset:0;width:100%;height:100%}
+  .hud{position:fixed;pointer-events:none;text-shadow:0 1px 3px #000a}
+  #mira{width:34px;height:34px;margin:-17px 0 0 -17px;border:2px solid #fffc;border-radius:50%;left:50%;top:50%}
+  #mira::after{content:"";position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px;background:#fff;border-radius:50%}
+  #lead{width:18px;height:18px;margin:-9px 0 0 -9px;border:2px solid currentColor;transform:rotate(45deg);display:none;box-shadow:0 0 0 1px #000a;transition:transform .1s}
+  #lead::after{content:'';position:absolute;left:5px;top:5px;width:4px;height:4px;background:currentColor;border-radius:1px}
+  #lead.ok{color:#5dff8a!important;transform:rotate(45deg) scale(1.35);border-width:3px}
+  #mira.acertou{border-color:#ff4b3a;transform:scale(1.25)}
+  #radar{left:max(10px,env(safe-area-inset-left));top:10px;width:118px;height:118px;border-radius:50%;background:#0b1a2acc;border:2px solid #7fd3ff66}
+  #placar{right:max(10px,env(safe-area-inset-right));top:10px;font-size:13px;background:#0b1a2acc;border-radius:10px;padding:6px 10px;min-width:130px}
+  #placar div{display:flex;justify-content:space-between;gap:10px;line-height:1.5}
+  #placar .eu{font-weight:800}
+  body.toque #placar{font-size:11px;padding:4px 8px}body.toque #placar div{line-height:1.3}body.toque #placar div:nth-child(n+4):not(.eu){display:none}   /* celular: placar curto p/ caber o leme */
+  #bVisao{position:fixed;left:max(47px,calc(env(safe-area-inset-left) + 37px));top:136px;width:44px;height:44px;border-radius:50%;background:#0b1a2acc;border:2px solid #7fd3ff66;display:none;align-items:center;justify-content:center;font-size:22px;cursor:pointer;z-index:2}
+  body.jogando #bVisao{display:flex}
+  #bTrem{position:fixed;right:max(222px,calc(env(safe-area-inset-right) + 200px));bottom:234px;width:52px;height:34px;border-radius:17px;background:#0b1a2acc;border:2px solid #7fd3ff66;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;user-select:none;touch-action:none;z-index:3}
+  #bTrem.on{border-color:#3cd070;color:#3cd070}   /* (10/11) trem: só no celular (teclado = G), à direita perto do leme */
+  body.jogando #bTrem{display:flex}#bTrem.on{border-color:#3cd070;color:#3cd070}
+  body.cabine #barras,body.cabine #mira{display:none!important}
+  #feed{left:50%;top:10px;transform:translateX(-50%);font-size:14px;text-align:center}
+  #feed div{background:#0b1a2acc;border-radius:8px;padding:3px 10px;margin-bottom:4px;animation:some 4s forwards}
+  @keyframes some{0%,80%{opacity:1}100%{opacity:0}}
+  #barras{left:50%;bottom:12px;transform:translateX(-50%);width:min(320px,46vw);font-size:12px}
+  .barra{height:9px;background:#0008;border-radius:5px;overflow:hidden;margin-top:4px}
+  .barra i{display:block;height:100%;width:100%;border-radius:5px;transition:width .15s}
+  #bVida i{background:linear-gradient(90deg,#3ad07a,#9be15d)}
+  #bTurboB i{background:linear-gradient(90deg,#ff9a2a,#ffd23a)}
+  #info{display:flex;justify-content:space-between;font-weight:700}
+  #menu button.live{background:linear-gradient(180deg,#ff2d6f,#7a2cff);color:#fff}
+  #liveA{left:50%;top:22%;transform:translateX(-50%);width:min(92vw,560px);text-align:center;pointer-events:none}
+  #liveA .la{background:#0b1a2add;border:2px solid #7fd3ff55;border-radius:12px;padding:6px 12px;margin-bottom:6px;font-size:16px;font-weight:800;animation:some 3.5s forwards}
+  #liveA .la[class*=presente],#liveA .la.onda{font-size:19px;color:#ffd23a;border-color:#ffd23a;background:linear-gradient(90deg,#3a1d00dd,#7a2cffdd);animation:some 6s forwards}
+  #liveA .la.seguir{color:#ffd23a}#liveA .la.time{color:#9fd4ff}
+  body.toque #liveA{left:max(10px,env(safe-area-inset-left));top:200px;transform:none;width:min(44vw,330px);text-align:left}   /* celular: canto esquerdo, embaixo do radar */
+  body.toque #liveA .la{font-size:11px;padding:3px 7px;border-radius:8px;border-width:1px;margin-bottom:4px}body.toque #liveA .la[class*=presente],body.toque #liveA .la.onda{font-size:12px}
+  body.toque #morte small{font-size:12px}
+  #vs{left:50%;top:8px;transform:translateX(-50%);display:none;align-items:center;gap:8px;background:#0b1a2ae6;border:2px solid #ffd23a;border-radius:14px;padding:4px 12px;font-size:16px;white-space:nowrap}
+  #vs .n{font-size:26px;min-width:28px;text-align:center;display:inline-block}#vs #vsEu{color:#4aa3ff}#vs #vsChat{color:#ff4a4a}#vs .x{opacity:.6;font-weight:800}
+  #vs .eu{color:#9fd4ff}#vs .ch{color:#ff9a9a}
+  #vs .pulo{animation:pulo .7s}@keyframes pulo{0%{transform:scale(1)}30%{transform:scale(1.9)}100%{transform:scale(1)}}
+  body.toque #vs{font-size:12px;padding:2px 10px;gap:6px}body.toque #vs .n{font-size:20px}
+  body.sala-live #feed{top:52px}
+  #bCam{position:fixed;left:max(97px,calc(env(safe-area-inset-left) + 87px));top:136px;width:44px;height:44px;border-radius:50%;background:#0b1a2acc;border:2px solid #7fd3ff66;display:none;align-items:center;justify-content:center;font-size:20px;cursor:pointer;z-index:2}
+  body.jogando.sala-live #bCam{display:flex}#bCam.on{border-color:#ff2d6f;background:#ff2d6f55}
+  #selfie{position:fixed;left:max(10px,env(safe-area-inset-left));bottom:10px;width:132px;height:99px;object-fit:cover;transform:scaleX(-1);border-radius:14px;border:3px solid #ff2d6f;display:none;z-index:1;pointer-events:none;background:#000;box-shadow:0 4px 14px #0008}
+  body.toque #selfie{width:112px;height:84px}
+  .av{width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:5px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;border:2px solid #fff8;flex:none}
+  .av.g{width:64px;height:64px;font-size:30px;border-width:3px;margin:0}
+  .rot .rav{position:absolute;right:100%;top:-3px}.rot .rav .av{width:22px;height:22px;margin-right:3px}
+  .rot .bal{position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:#fff;color:#111;font-size:12px;font-weight:700;padding:3px 8px;border-radius:10px;max-width:200px;white-space:normal;width:max-content;text-shadow:none;display:none}
+  .rot .bal::after{content:'';position:absolute;left:50%;top:100%;border:6px solid transparent;border-top-color:#fff;transform:translateX(-50%)}
+  #liveA .la{display:flex;align-items:center;gap:2px}#liveA .la.fala{font-size:14px;font-weight:600;border-color:#ffffff33}
+  body:not(.toque) #liveA .la{justify-content:center}
+  body.toque #liveA .la.fala{font-size:11px}
+  body.sala-live #morte{top:auto;bottom:8%;transform:translateX(-50%)}
+  body.morto #barras,body.morto #mira,body.morto #liveA .la.fala{display:none}   /* morto: tela limpa p/ o close em quem te derrubou */
+  .kc{display:flex;align-items:center;gap:12px;background:#0b1a2ae6;border:2px solid #ff2d6f;border-radius:16px;padding:10px 16px;text-align:left}
+  .kcN{font-size:26px;line-height:1.1}.kcT{font-size:16px}.kcC{font-size:14px;color:#ffd23a}
+  body.toque .kc{padding:6px 10px}body.toque .av.g{width:48px;height:48px;font-size:22px}body.toque .kcN{font-size:20px}body.toque .kcT{font-size:13px}body.toque .kcC{font-size:12px}
+  #aviso{left:50%;top:32%;transform:translateX(-50%);font-size:20px;font-weight:800;color:#ffd23a;text-align:center;display:none}
+  #dor{inset:0;box-shadow:inset 0 0 120px 40px #ff1e1e;opacity:0;transition:opacity .25s}
+  .rot{position:fixed;transform:translate(-50%,-100%);font-size:12px;font-weight:700;white-space:nowrap;pointer-events:none;text-align:center;text-shadow:0 1px 3px #000}
+  .rot b{display:block;height:3px;background:#0008;margin-top:2px;border-radius:2px;overflow:hidden}
+  .rot b i{display:block;height:100%;background:#ff5a4a}
+  .aq{position:fixed;pointer-events:none;display:none;transform:translate(-50%,-50%) rotate(45deg);filter:drop-shadow(0 0 1px #000);--l:30%;--w:1.5px;background-repeat:no-repeat;
+    background-image:linear-gradient(currentColor,currentColor),linear-gradient(currentColor,currentColor),linear-gradient(currentColor,currentColor),linear-gradient(currentColor,currentColor),linear-gradient(currentColor,currentColor),linear-gradient(currentColor,currentColor),linear-gradient(currentColor,currentColor),linear-gradient(currentColor,currentColor);
+    background-position:left top,left top,right top,right top,left bottom,left bottom,right bottom,right bottom;
+    background-size:var(--l) var(--w),var(--w) var(--l),var(--l) var(--w),var(--w) var(--l),var(--l) var(--w),var(--w) var(--l),var(--l) var(--w),var(--w) var(--l)}
+  .aq.trav{transform:translate(-50%,-50%);--w:2px;animation:aqPisca .3s steps(1) infinite}
+  @keyframes aqPisca{0%{color:#ff3b30}50%{color:#ffd23a}}
+  #trava{left:0;top:0;width:58px;height:58px;border:3px solid #ffd23a;border-radius:6px;display:none;transition:transform .08s}
+  #trava.ok{border-color:#ff3b30;box-shadow:0 0 12px #ff3b30}
+  #alerta{left:50%;top:22%;transform:translateX(-50%);font-size:24px;font-weight:900;color:#fff;background:#d01c1ccc;padding:6px 16px;border-radius:10px;display:none;animation:pisca .3s infinite alternate}
+  @keyframes pisca{from{opacity:1}to{opacity:.45}}
+  #tMis{font-weight:700;text-align:center;margin-top:3px;font-size:12px}
+  #bMissil{right:max(30px,env(safe-area-inset-right));bottom:136px;width:70px;height:70px;font-size:20px}
+  #bMissil.pronto{background:#ff3b3066;border-color:#ff3b30;box-shadow:0 0 14px #ff3b30}
+  #bFlare{right:max(136px,calc(env(safe-area-inset-right) + 114px));bottom:100px;width:58px;height:58px;font-size:22px}
+  #bFreio{right:max(140px,calc(env(safe-area-inset-right) + 118px));bottom:172px;width:50px;height:50px;font-size:20px}
+  #leme{position:fixed;right:max(22px,env(safe-area-inset-right));bottom:228px;width:190px;height:46px;border-radius:24px;background:#ffffff1c;border:2px solid #fff5;display:flex;align-items:center;justify-content:space-between;padding:0 14px;box-sizing:border-box;color:#fff9;font-size:12px;font-weight:800;touch-action:none}
+  #lemeK{position:absolute;left:50%;top:50%;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;background:#ffffff55;border:2px solid #fff;pointer-events:none}
+  #leme.on{border-color:#ffd23a}
+  #treino{display:none;left:50%;top:10px;transform:translateX(-50%);width:min(440px,calc(100% - 300px));background:#0b1a2ae6;border:2px solid #ffd23a88;border-radius:12px;padding:8px 14px;text-align:center;pointer-events:auto}
+  body.treinando #treino{display:block}
+  #treino small{float:right;color:#ffd23a;font-weight:800}#treino b{display:block;font-size:17px;color:#ffd23a}#treino span{display:block;font-size:14px;line-height:1.35;margin-top:3px}#treino span b{display:inline;font-size:inherit;color:#fff}
+  #treino a{display:block;margin-top:4px;font-size:12px;color:#7fd3ff;text-decoration:underline;cursor:pointer}
+  #treino i{display:block;font-style:normal;color:#3cd070;font-weight:800;font-size:13px;min-height:2px}
+  #treino div{display:flex;gap:8px;margin-top:8px}#treino button{flex:1;font-size:15px;font-weight:800;padding:10px;border:0;border-radius:10px;background:linear-gradient(180deg,#ffd23a,#ff9a2a);color:#3a1d00}#treino button.sec{background:#ffffff1a;color:#fff;border:2px solid #7fd3ff66}
+  #treino.ok{animation:tOk .5s}@keyframes tOk{from{transform:translateX(-50%) scale(1.12);border-color:#3cd070}to{transform:translateX(-50%) scale(1)}}
+  @media (max-height:520px){#treino{padding:5px 10px}#treino b{font-size:14px}#treino span{font-size:12px}}
+  #bBomba{right:max(214px,calc(env(safe-area-inset-right) + 192px));bottom:88px;width:56px;height:56px;font-size:17px}
+  .bt.vazio{opacity:.35}
+  #seta{width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-bottom:22px solid #ff5a4a;display:none;filter:drop-shadow(0 0 3px #000)}
+  /* controles de toque */
+  #toque{display:none}
+  body.toque #toque{display:block}
+  #zonaJoy{position:fixed;left:0;top:0;bottom:0;width:50%}
+  #joy{position:fixed;width:130px;height:130px;margin:-65px 0 0 -65px;border-radius:50%;border:2px solid #fff5;background:#fff1;display:none;pointer-events:none}
+  #joyK{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px;border-radius:50%;background:#fff6}
+  .bt{position:fixed;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;background:#ffffff22;border:2px solid #fff6}
+  .bt.on{background:#ffffff55}
+  #bFogo{right:max(22px,env(safe-area-inset-right));bottom:26px;width:96px;height:96px;background:#ff4b3a44;border-color:#ff8a7a}
+  #bTurbo{right:max(136px,calc(env(safe-area-inset-right) + 114px));bottom:22px;width:66px;height:66px;font-size:22px}
+  /* menu */
+  #menu{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 30%,#1c3d63,#0d1420 70%);z-index:5;padding:16px}
+  #menu .card{width:min(380px,100%);text-align:center}
+  #menu{overflow-y:auto;align-items:safe center}
+  @media (max-height:520px){#menu h1{font-size:30px;margin:0}#menu p{margin:0 0 8px}#menu .dica{display:none}#menu button{margin-top:9px;padding:10px}#menu input[type=text],#menu input[type=password]{padding:8px 12px;font-size:17px}#menu input[type=password]{margin-top:7px}}
+  #menu h1{font-size:46px;margin:0 0 4px;letter-spacing:2px}
+  #menu p{opacity:.8;margin:0 0 18px}
+  #menu input[type=text]{width:100%;font-size:20px;padding:12px 14px;border-radius:12px;border:2px solid #7fd3ff66;background:#0b1a2a;color:#fff;text-align:center;user-select:text;-webkit-user-select:text}
+  #menu button{margin-top:14px;width:100%;font-size:22px;font-weight:800;padding:14px;border:0;border-radius:12px;background:linear-gradient(180deg,#ffd23a,#ff9a2a);color:#3a1d00;cursor:pointer}
+  #menu button.pvp{background:linear-gradient(180deg,#ff6a4a,#c0392b);color:#fff}
+  #dicaDec{left:50%;top:26%;transform:translateX(-50%);font-size:17px;font-weight:700;background:#0b1a2acc;padding:6px 14px;border-radius:10px;display:none;text-align:center}
+  #menu input[type=password]{width:100%;font-size:20px;padding:12px 14px;border-radius:12px;border:2px solid #7fd3ff66;background:#0b1a2a;color:#fff;text-align:center;user-select:text;-webkit-user-select:text;margin-top:10px}
+  #menu .duo{display:flex;gap:10px}#menu .duo button{flex:1;font-size:18px}
+  #menu button.sec,#rank button.sec{background:#ffffff1a;color:#fff;border:2px solid #7fd3ff66}
+  #menu .link{display:block;margin-top:12px;font-size:14px;color:#9fd4ff;text-decoration:underline;cursor:pointer}
+  #ola{font-size:17px;font-weight:700;background:#0b1a2a;border-radius:12px;padding:10px;border:2px solid #7fd3ff33}
+  #ola a{font-size:13px;font-weight:400;color:#9fd4ff;text-decoration:underline;cursor:pointer;margin-left:6px}
+  #menu button.heli{background:linear-gradient(180deg,#9aa86a,#4d5a3c);color:#fff}
+  #heliMsg{left:50%;top:58px;transform:translateX(-50%);max-width:min(560px,92vw);background:#0b1a2ae6;border-left:4px solid #9aa86a;border-radius:8px;padding:8px 12px;font-size:15px;z-index:4;text-align:center}
+  body.heli #mira,body.heli #leme,body.heli #bTrem,body.heli #bBomba,body.heli #bVisao,body.heli #dicaDec,body.heli #hudCab{display:none!important}
+  #menu button.mis{background:linear-gradient(180deg,#3fd0a0,#16806a);color:#fff}
+  #missoes,#fimMis{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 30%,#1c3d63,#0d1420 70%);z-index:7;padding:16px;overflow-y:auto;align-items:safe center}
+  #fimMis{background:#0d1420cc;z-index:8}
+  #missoes .card,#fimMis .card{width:min(680px,100%);text-align:center}
+  #missoes h2,#fimMis h2{margin:2px 0 12px;font-size:30px}
+  .mk{display:block;font-size:12px;letter-spacing:3px;opacity:.6;font-weight:700}
+  #mGrade{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .mc{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;padding:12px 8px 10px;border-radius:12px;border:2px solid #3fd0a066;background:#0b1a2a;color:#fff;cursor:pointer;font:inherit;min-height:128px}
+  .mc:hover:not([disabled]){border-color:#3fd0a0;background:#11283a}
+  .mc .mn{position:absolute;left:8px;top:6px;font-size:12px;opacity:.5;font-weight:800}
+  .mc .me{font-size:30px}.mc b{font-size:15px}.mc small{font-size:11px;opacity:.7;line-height:1.3}
+  .mc .ms{font-size:13px;margin-top:auto}.ms i,.fe i{font-style:normal;opacity:.35}
+  .mc.trancada{opacity:.45;border-color:#ffffff22;cursor:default}
+  .mc.feita{border-color:#ffd23a88}
+  #missoes button.sec,#fimMis button.sec{background:#ffffff1a;color:#fff;border:2px solid #7fd3ff66}
+  #missoes #mFechar,#mBrief button,#fimMis button{margin-top:12px;width:100%;font-size:20px;font-weight:800;padding:12px;border:0;border-radius:12px;cursor:pointer;background:linear-gradient(180deg,#ffd23a,#ff9a2a);color:#3a1d00}
+  #mBrief{text-align:left}#mBrief h2{text-align:left}#mBrief p{line-height:1.5;opacity:.9}
+  .mo{background:#0b1a2a;border:1px solid #7fd3ff33;border-radius:10px;padding:10px 12px;margin-top:10px;font-size:14px;line-height:1.6}.mo>b{display:block;font-size:12px;letter-spacing:2px;opacity:.6}
+  .md{font-size:14px;opacity:.8}
+  .fe{font-size:40px;margin:4px 0 10px}.fl{text-align:left;display:inline-block;font-size:15px;line-height:1.8}.fl i{opacity:.6;font-style:normal}
+  .ff{font-style:italic;opacity:.9}
+  #radio{left:50%;top:58px;transform:translateX(-50%);max-width:min(560px,92vw);background:#0b1a2ae6;border-left:4px solid #3fd0a0;border-radius:8px;padding:8px 12px;font-size:15px;line-height:1.4;z-index:4}
+  #radio b{color:#3fd0a0;margin-right:4px}#radio.corvo{border-left-color:#ff3b30}#radio.corvo b{color:#ff5a4a}
+  #placar .obj span{white-space:normal}
+  #rank{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 30%,#1c3d63,#0d1420 70%);z-index:7;padding:16px}
+  #rank .card{width:min(620px,100%);max-height:100%;overflow:auto;text-align:center}
+  #rank h2{margin:0 0 10px;font-size:30px}
+  #rank .abas{display:flex;gap:8px;margin-bottom:10px}#rank .abas button{flex:1;font-size:16px;font-weight:800;padding:10px;border-radius:10px;border:2px solid #7fd3ff44;background:#0b1a2a;color:#fff;cursor:pointer}
+  #rank .abas button.on{background:linear-gradient(180deg,#ffd23a,#ff9a2a);color:#3a1d00;border-color:transparent}
+  #rank table{width:100%;border-collapse:collapse;font-size:15px}#rank th{font-size:12px;opacity:.7;font-weight:600;padding:4px}
+  #rank td{padding:7px 4px;border-top:1px solid #ffffff14}#rank td.n{text-align:left;font-weight:700}#rank tr.eu td{background:#ffd23a22}
+  #rank .vazio{opacity:.7;padding:20px}
+  #rank #bFecharRank{margin-top:14px;width:100%;font-size:20px;font-weight:800;padding:12px;border-radius:12px;cursor:pointer}
+  #menu label{display:block;margin-top:12px;font-size:14px;opacity:.85}
+  #menu .dica{font-size:13px;opacity:.65;margin-top:16px;line-height:1.5}
+  #erro{color:#ff8a7a;margin-top:10px;font-size:14px;min-height:1em}
+  #morte{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);text-align:center;font-size:26px;font-weight:800;display:none;text-shadow:0 2px 6px #000}
+  #morte small{display:block;font-size:16px;font-weight:600;opacity:.85;margin-top:6px}
+  #girar{position:fixed;inset:0;background:#0d1420ee;display:none;align-items:center;justify-content:center;text-align:center;font-size:20px;z-index:6;padding:24px}
+  @media (orientation:portrait){body.toque.jogando #girar{display:flex}}
+</style>
+</head>
+<body>
+<canvas id="tela"></canvas>
+
+<div class="hud" id="dor"></div>
+<div class="hud" id="mira"></div>
+<div class="hud" id="lead"></div>
+<div class="hud" id="seta"></div>
+<div class="hud" id="trava"></div>
+<div class="hud" id="alerta">⚠️ MÍSSIL! solte ✨ flares</div>
+<canvas class="hud" id="radar" width="236" height="236"></canvas>
+<div class="hud" id="placar"></div>
+<div id="bVisao" title="Trocar visão (V)">👁️</div>
+<div id="bCam" title="Câmera frontal">📷</div>
+<video id="selfie" playsinline muted autoplay></video>
+<div class="hud" id="feed"></div>
+<div class="hud" id="liveA"></div>
+<div class="hud" id="vs"><span class="lado eu">🎮 <b id="vsNome">EU</b></span><b id="vsEu" class="n">0</b><span class="x">✕</span><b id="vsChat" class="n">0</b><span class="lado ch"><b>CHAT</b> 💬</span></div>
+<div class="hud" id="aviso">⚠️ Volte para a área de combate!</div>
+<div class="hud" id="dicaDec">🛫 Decolando… <b>puxe o manche</b> (S / ↓ ou arraste p/ baixo) a partir de 230 km/h · 🔥 turbo acelera</div>
+<div class="hud" id="barras">
+  <div id="info"><span id="tVel">0 km/h</span><span id="tAlt">0 m</span></div>
+  <div class="barra" id="bVida"><i></i></div>
+  <div class="barra" id="bTurboB"><i></i></div>
+  <div id="tMis"></div>
+</div>
+<div id="rotulos"></div>
+<div id="morte"></div>
+
+<div id="treino" class="hud"></div>
+<div id="toque">
+  <div id="zonaJoy"></div>
+  <div id="joy"><div id="joyK"></div></div>
+  <div class="bt" id="bTurbo">🔥</div>
+  <div class="bt" id="bFogo">🎯</div>
+  <div class="bt" id="bMissil">🚀2</div>
+  <div class="bt" id="bFlare">✨</div>
+  <div class="bt" id="bFreio">🪂</div>
+  <div class="bt" id="bBomba">💣4</div>
+  <div id="bTrem" title="Trem de pouso (G)">🛞▲</div>
+  <div id="leme"><span>◀</span><span>LEME</span><span>▶</span><div id="lemeK"></div></div>
+</div>
+
+<div id="girar">📱↻<br>Vire o celular deitado para voar melhor</div>
+
+<div id="menu">
+  <div class="card">
+    <h1>✈️ JS-JET</h1>
+    <p>Combate aéreo multiplayer</p>
+    <div id="pLogin">
+      <input type="text" id="nome" maxlength="16" placeholder="Nome de piloto" autocomplete="username">
+      <input type="password" id="senha" maxlength="100" placeholder="Senha" autocomplete="current-password">
+      <div class="duo"><button id="bEntrar">ENTRAR</button><button id="bCriar" class="sec">CRIAR CONTA</button></div>
+      <a id="bConvidado" class="link">jogar como convidado (fica fora do ranking)</a>
+    </div>
+    <div id="pSalas" style="display:none">
+      <div id="ola"></div>
+      <label><input type="checkbox" id="inverter"> Inverter subir/descer</label>
+      <button id="bMissoes" class="mis">🎖️ MISSÕES · modo história</button>
+      <button id="bHeli" class="heli">🚁 HELICÓPTERO · ataque isométrico</button>
+      <button id="decolar">🤖 SALA COM BOTS</button>
+      <button id="salaPvp" class="pvp">⚔️ SALA SEM BOTS · bases</button>
+      <button id="salaLive" class="live">📺 SALA DA LIVE · o chat vira avião</button>
+      <button id="bTreino" class="sec">🎓 TUTORIAL DE VOO</button>
+    </div>
+    <button id="bRank" class="sec">🏆 RANKING</button>
+    <div id="erro"></div>
+    <div class="dica">
+      📱 <b>Celular:</b> arraste no lado esquerdo para pilotar · 🎯 atira · 🚀 míssil (trave a mira 1 s) · ✨ flare · 🔥 turbo<br>
+      ⚔️ <b>Sala sem bots:</b> você decola da sua base; chegar perto da base dos outros = míssil terra-ar 🛡️<br>
+      ⌨️ <b>Teclado:</b> W/S acelera/desacelera · ↑ ↓ desce/sobe · ← → gira · A/D leme · E freio · G trem de pouso · Espaço atira · F míssil · Q bomba · X flare · Shift turbo · V cabine · Esc sai
+    </div>
+  </div>
+</div>
+
+<div id="missoes" style="display:none">
+  <div class="card">
+    <div id="mLista"><small class="mk">OPERAÇÃO ARQUIPÉLAGO</small><h2>🎖️ Missões</h2><div id="mGrade"></div><button id="mFechar" class="sec">VOLTAR</button></div>
+    <div id="mBrief" style="display:none"></div>
+  </div>
+</div>
+<div id="fimMis" style="display:none"></div>
+<div class="hud" id="radio" style="display:none"></div>
+<div class="hud" id="heliMsg" style="display:none"></div>
+
+<div id="rank" style="display:none">
+  <div class="card">
+    <h2>🏆 Ranking</h2>
+    <div class="abas"><button data-s="pvp" class="on">⚔️ Sem bots</button><button data-s="bots">🤖 Com bots</button></div>
+    <div id="tRank"></div>
+    <button id="bFecharRank" class="sec">VOLTAR</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="terreno.js"></script>
+<script src="jogo.js"></script>
+<script src="heli.js"></script>
+</body>
+</html>

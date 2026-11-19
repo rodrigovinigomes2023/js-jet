@@ -500,15 +500,20 @@ const SOMBRA=(()=>{const c=cv(128,128),g=c.getContext('2d');g.translate(64,64);g
   poli([[28,-5],[14,-22],[8,-22],[10,-5]]);poli([[28,5],[14,22],[8,22],[10,5]]);
   const t=new THREE.CanvasTexture(c),geo=new THREE.PlaneGeometry(1,1);geo.rotateX(-Math.PI/2);
   return{t,geo,pool:[],SD:sol.position.clone().normalize(),n:new V3(),f:new V3(),qy:new THREE.Quaternion(),Y:new V3(0,1,0)};})();
-function sombraEm(i,pos,q,esc){const S=SOMBRA;let m=S.pool[i];
+/* (19/11) silhueta do helicóptero (modo heli): fuselagem, cone de cauda, asinhas e o disco do rotor meio transparente */
+function texSombraHeli(){if(SOMBRA.tH)return SOMBRA.tH;const c=cv(128,128),g=c.getContext('2d');g.translate(72,64);g.filter='blur(1.5px)';g.fillStyle='#000';
+  g.globalAlpha=0.35;g.beginPath();g.arc(2,0,44,0,Math.PI*2);g.fill();g.globalAlpha=1;
+  g.beginPath();g.ellipse(14,0,30,8,0,0,Math.PI*2);g.fill();g.fillRect(-68,-3,56,6);g.fillRect(-70,-12,10,24);g.fillRect(0,-20,10,40);
+  return SOMBRA.tH=new THREE.CanvasTexture(c);}
+function sombraEm(i,pos,q,esc,tex){const S=SOMBRA;let m=S.pool[i];
   if(!m){m=new THREE.Mesh(S.geo,new THREE.MeshBasicMaterial({map:S.t,color:0x000000,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-8}));m.renderOrder=2;S.pool.push(m);cena.add(m);}
   let x=pos.x,z=pos.z,h=relevo(x,z);for(let k=0;k<2;k++){const t=(pos.y-h)/S.SD.y;x=pos.x-S.SD.x*t;z=pos.z-S.SD.z*t;h=relevo(x,z);}
   const alt=pos.y-h;if(alt>450||alt<-3){m.visible=false;return;}
-  m.visible=true;m.position.set(x,h+0.9,z);   // pista fica em BASE_H+0.5
+  m.visible=true;m.material.map=tex||S.t;m.position.set(x,h+0.9,z);   // pista fica em BASE_H+0.5
   S.n.set(relevo(x-4,z)-relevo(x+4,z),8,relevo(x,z-4)-relevo(x,z+4)).normalize();const f=frente(q,S.f);
   S.qy.setFromAxisAngle(S.Y,Math.atan2(-f.z,f.x));m.quaternion.setFromUnitVectors(S.Y,S.n).multiply(S.qy);
   const e=20*(esc||1)*(1+alt/700);m.scale.set(e,1,e);m.material.opacity=0.5*(1-alt/450);}
-function sombras(){let i=0;if(JATO&&JATO.visible&&EU.vivo)sombraEm(i++,EU.pos,EU.q,1);
+function sombras(){let i=0;if(JATO&&JATO.visible&&EU.vivo)SALA==='heli'?sombraEm(i++,EU.pos,EU.q,1.6,texSombraHeli()):sombraEm(i++,EU.pos,EU.q,1);
   for(const o of OUT.values())if(o.vivo&&!o.navio&&o.q&&o.pos.distanceToSquared(cam.position)<2500*2500)sombraEm(i++,o.pos,o.q,o.esc);
   for(;i<SOMBRA.pool.length;i++)SOMBRA.pool[i].visible=false;}
 const OUT=new Map();   // id -> {g,pos,vel,q,alvoP,alvoQ,tRec,vida,vivo,nome,cor,bot,rot}
@@ -649,7 +654,7 @@ function balas(dt){for(const b of BALAS){if(!b.ativa)continue;b.t+=dt;b.ant.copy
   if(b.t>VIDA_BALA){b.ativa=false;b.m.visible=false;continue;}
   if(b.p.y<relevo(b.p.x,b.p.z)){b.ativa=false;b.m.visible=false;if(b.minha&&b.p.distanceTo(EU.pos)<900)fx(b.p,0xffffff,6,0.4,2,false);continue;}
   if(!b.minha)continue;
-  for(const [id,o] of OUT){if(!o.vivo||o.aliado)continue;if(distSeg(o.navio?_v4.copy(o.pos).setY(o.pos.y+8):o.pos,b.ant,b.p)<(o.navio?24:10*(o.esc||1))){b.ativa=false;b.m.visible=false;if(id<0)treinoAcerto(id,o);else envia({t:'acerto',alvo:id});
+  for(const [id,o] of OUT){if(!o.vivo||o.aliado)continue;if(distSeg(o.navio?_v4.copy(o.pos).setY(o.pos.y+8):o.pos,b.ant,b.p)<(o.navio?24:10*(o.esc||1))){b.ativa=false;b.m.visible=false;if(id<0)(SALA==='heli'?heliAcerto:treinoAcerto)(id,o);else envia({t:'acerto',alvo:id});
     fx(b.p,0xffd070,7,0.25,2);SOM.acerto();tAcerto=0.15;break;}}}}
 function distSeg(c,a,b){_v1.subVectors(b,a);const l2=_v1.lengthSq()||1;let t=_v2.subVectors(c,a).dot(_v1)/l2;t=Math.max(0,Math.min(1,t));return _v2.copy(a).addScaledVector(_v1,t).distanceTo(c);}
 const arr=(v,d)=>{const k=10**d;return[Math.round(v.x*k)/k,Math.round(v.y*k)/k,Math.round(v.z*k)/k];};
@@ -1231,7 +1236,7 @@ function hudCabine(){const W=innerWidth,H=innerHeight;if(hc.width!==W||hc.height
 // ------------------------------------------------ laço principal
 let tAnt=performance.now();
 function quadro(){requestAnimationFrame(quadro);const agora=performance.now(),dt=Math.min(0.05,(agora-tAnt)/1000);tAnt=agora;
-  if(jogando&&JATO){if(EU.vivo)voar(dt);else if(SALA!=='missao'&&agora-EU.mortoEm>(KC?4600:3200)&&(conectado||SALA==='treino'))nascer();
+  if(jogando&&JATO){if(SALA==='heli')heliPasso(dt);else if(EU.vivo)voar(dt);else if(SALA!=='missao'&&agora-EU.mortoEm>(KC?4600:3200)&&(conectado||SALA==='treino'))nascer();
     if(SALA==='treino')treino(dt);
     tEnvio-=dt;if(tEnvio<=0&&EU.vivo){tEnvio=0.05;envia({t:'e',p:arr(EU.pos,1),q:[EU.q.x,EU.q.y,EU.q.z,EU.q.w].map(x=>Math.round(x*1e4)/1e4),v:arr(frente(EU.q,_v3).multiplyScalar(EU.vel),1),tr:EU.tremAlvo});}
     else if(tEnvio<=0){tEnvio=1;envia({t:'p'});}}
@@ -1239,12 +1244,12 @@ function quadro(){requestAnimationFrame(quadro);const agora=performance.now(),dt
   for(const o of OUT.values()){o.trem=(o.trem||0)+Math.sign((o.tremAlvo||0)-(o.trem||0))*Math.min(Math.abs((o.tremAlvo||0)-(o.trem||0)),0.4*dt);poeTrem(o.g,Math.round(o.trem*50)/50);}
   if(jogando)atualizaILS();else ILS.aneis.forEach(m=>m.visible=false);
   outros(dt);sombras();sprayOutros(dt);passoEspuma(dt);balas(dt);misseis(dt);bombas(dt);efeitos(dt);efeitosQueda(dt);if(jogando)mostraCcip();else ccip.visible=false;
-  if(jogando&&JATO){camera(dt);hud(dt);}else{camAng+=dt*0.05;cam.up.set(0,1,0);cam.position.set(Math.cos(camAng)*2600,700,Math.sin(camAng)*2600);cam.lookAt(0,250,0);cam.updateMatrixWorld();}   // (18/11) câmera girando no menu (estava comentada por engano)
+  if(jogando&&JATO){(SALA==='heli'?heliCamera:camera)(dt);hud(dt);}else{camAng+=dt*0.05;cam.up.set(0,1,0);cam.position.set(Math.cos(camAng)*2600,700,Math.sin(camAng)*2600);cam.lookAt(0,250,0);cam.updateMatrixWorld();}   // (18/11) câmera girando no menu (estava comentada por engano)
   if(Q.has('foto')&&GRIPEN){if(!window.__fJ){window.__fJ=criarJato('#3cd070');window.__fJ.position.set(0,3000,0);}   // ?foto: Gripen parado p/ conferir o modelo
     const f=window.__foto||[-20,6,14];cam.position.set(f[0],3000+f[1],f[2]);cam.up.set(0,1,0);cam.lookAt(0,3000,0);}
   if(window.__camFixa){const f=window.__camFixa;cam.position.set(...f[0]);cam.up.set(0,1,0);cam.lookAt(...f[1]);}   // (11/11) só p/ fotos de teste
   cam.updateMatrixWorld();if(marT)marT.value=agora/1000;
-  const dentro=CABINE&&EU.vivo&&jogando&&JATO;document.body.classList.toggle('cabine',!!dentro);if(JATO)for(const m of JATO.userData.cab)m.visible=!dentro;
+  const dentro=CABINE&&EU.vivo&&jogando&&JATO&&SALA!=="heli";document.body.classList.toggle("cabine",!!dentro);if(JATO&&JATO.userData.cab)for(const m of JATO.userData.cab)m.visible=!dentro;
   R.autoClear=true;R.render(cena,cam);
   if(dentro){cabine(ULT_I);R.autoClear=false;R.clearDepth();R.render(cenaCab,camCab);R.autoClear=true;}
   hudCabine();}
@@ -1335,7 +1340,7 @@ function misseisTreino(dt){for(const m of [...TREINO.mis]){const L=m.L;L.t+=dt;L
     L.p.addScaledVector(L.f,L.v*dt);m.alvoP.copy(L.p);m.vel.copy(L.f).multiplyScalar(L.v);m.tRec=performance.now();
     let fim=L.t>9||L.p.y<relevo(L.p.x,L.p.z);
     if(ob&&op&&L.p.distanceTo(op)<22){fim=true;explosao(L.p,true);
-      if(ob===EU){EU.vida=Math.max(15,EU.vida-35);$('#dor').style.opacity=0.8;setTimeout(()=>$('#dor').style.opacity=0,180);SOM.dor();TREINO.levou=true;}else mataDrone(ob,true);}
+      if(ob===EU){if(SALA==='heli')heliDano(35);else{EU.vida=Math.max(15,EU.vida-35);$('#dor').style.opacity=0.8;setTimeout(()=>$('#dor').style.opacity=0,180);SOM.dor();TREINO.levou=true;}}else (SALA==='heli'?heliMissilAcertou:mataDrone)(ob,true);}
     else if(fim)fx(L.p,0xffb040,14,0.6,2.5);
     if(fim){cena.remove(m.g);MISV.delete(m.id);TREINO.mis.splice(TREINO.mis.indexOf(m),1);}}}
 function poeBarcos(){let c=pontoFrente(2600);for(let k=0;k<6&&relevo(c.x,c.z)>0;k++)c=pontoFrente(2600+k*500,(k%2?1:-1)*700);
@@ -1470,7 +1475,7 @@ $('#bMissoes').addEventListener('click',abreMissoes);$('#mFechar').addEventListe
 window.JJ={EU,OUT,TRAVA,abreMissoes,PLACAR:()=>PLACAR,TREINO,ccip,BOMBV,BASES,envia,lead:()=>LEADD?_lp:null,BALAS,queda,morrer,JATO:()=>JATO,efeitosPasso:(n,dt)=>{for(let i=0;i<n;i++)efeitosQueda(dt);},nFX:()=>FX.length,efeitos:()=>({destrocos:DESTROCOS.map(D=>Math.round(D.pos.y)),pilotos:PILOTOS.length,para:PILOTOS.filter(P=>P.aberto).length,fumos:FUMOS.length,trilhaVis:[...TRILHAS.values()].some(T=>T.k>0.05)})};   // p/ testes headless
 
 // (09/11) Esc sai da partida e volta ao menu
-function sair(){for(const b of BOMBV.values())cena.remove(b.g);BOMBV.clear();ccip.visible=false;jogando=false;document.body.classList.remove('jogando','treinando');limpaAneis();
+function sair(){if(typeof heliSair==='function')heliSair();for(const b of BOMBV.values())cena.remove(b.g);BOMBV.clear();ccip.visible=false;jogando=false;document.body.classList.remove('jogando','treinando');limpaAneis();
   if(ws){ws.onclose=null;try{ws.close();}catch(e){}ws=null;}conectado=false;EU.vivo=false;SOM.motor(0,false,false);
   for(const o of OUT.values()){cena.remove(o.g);o.rot.remove();o.aq?.remove();}OUT.clear();for(const m of MISV.values())cena.remove(m.g);MISV.clear();
   if(JATO){cena.remove(JATO);JATO=null;}for(const k in TEC)TEC[k]=false;
