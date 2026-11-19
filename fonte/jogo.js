@@ -771,7 +771,7 @@ function recebePlacar(l){PLACAR=l;const ids=new Set(l.map(x=>x.id));corBandeiras
     if(!o){o={g:x.navio?criarNavio(x.cor):criarJato(x.cor),navio:!!x.navio,pos:new V3(),vel:new V3(),q:new QT(),alvoP:new V3(),alvoQ:new QT(),tRec:0,vida:100,vivo:false,novo:true};
       o.rot=document.createElement('div');o.rot.className='rot';o.rot.innerHTML='<span></span><b><i></i></b>';$('#rotulos').appendChild(o.rot);o.g.visible=false;OUT.set(x.id,o);}
     if(o.cor&&o.cor!==x.cor&&!o.navio){const j=criarJato(x.cor);j.visible=o.g.visible;cena.remove(o.g);o.g=j;}   // (10/11) live: seguiu = vira dourado
-    o.nome=(x.time&&x.time===MEU_TIME?'🟦 ':'')+x.nome;o.cor=x.cor;o.bot=x.bot;o.aliado=!!(x.time&&x.time===MEU_TIME);o.esc=x.esc||1;o.vidaMax=o.esc>1?(SALA==='missao'?200:400):100;o.g.scale.setScalar(o.navio?1:1.25*o.esc);if(o.navio&&!o.anel){o.anel=anelNavio(x.time===MEU_TIME);}
+    o.nome=(x.time&&x.time===MEU_TIME?'🟦 ':'')+x.nome;o.cor=x.cor;o.bot=x.bot;o.aliado=!!(x.time&&x.time===MEU_TIME);o.esc=x.esc||1;o.vidaMax=x.vm&&x.vm!==100?x.vm:o.esc>1?400:100;o.g.scale.setScalar(o.navio?1:1.25*o.esc);if(o.navio&&!o.anel){o.anel=anelNavio(x.time===MEU_TIME);}
     o.rot.firstChild.textContent=o.nome;o.rot.style.color=x.cor;o.kh=x.kh||0;
     if(SALA==='live'&&o.bot&&x.time!==MEU_TIME&&o.avK!==(x.av||x.nome)){o.avK=x.av||x.nome;o.av=x.av;o.rav?.remove();o.rav=document.createElement('span');o.rav.className='rav';o.rav.innerHTML=avHTML(x.av,x.nome);o.rot.insertBefore(o.rav,o.rot.lastChild);}}
   for(const [id,o] of OUT)if(!ids.has(id)){cena.remove(o.g);if(o.anel)cena.remove(o.anel);o.rot.remove();o.aq?.remove();OUT.delete(id);}
@@ -1246,10 +1246,12 @@ const MISSOES=[
   {e:'🛫',t:'Primeiro voo',r:'Patrulha: 2 caças inimigos fracos.',ok:1,
    b:'A <b>Frota Cinzenta</b> vem tomando o arquipélago, ilha por ilha. O <b>Esquadrão Garoupa</b> é a última base de pé, e você é o piloto mais novo.<br><br>Dois caças inimigos cruzaram a linha. É o seu primeiro combate de verdade.',
    o:['🎯 Derrube os 2 caças inimigos'],dicas:'Chegue por trás. O míssil só sai depois do quadrado ficar vermelho.'},
-  {e:'🚨',t:'Interceptação',r:'Bombardeiros indo p/ a sua base.',ok:1,
-   b:'O radar pegou <b>três bombardeiros</b> pesados vindo direto para a nossa base, com dois caças de escolta.<br><br>Se um deles chegar, a base vira cratera.',
-   o:['💣 Derrube os 3 bombardeiros antes que cheguem','🛡️ A escolta é opcional (mas vai atrás de você)'],dicas:'Bombardeiro aguenta mais tiro: use os mísseis neles.'},
-  {e:'🛡️',t:'Escolta',r:'Proteja um avião de carga até outra ilha.'},
+  {e:'🚨',t:'Interceptação',r:'Bombardeiros indo p/ a sua base. Você leva 2 alas.',ok:1,
+   b:'O radar pegou <b>dois bombardeiros</b> pesados vindo direto para a nossa base, protegidos por <b>três caças</b> de escolta.<br><br>Desta vez você não vai sozinho: <b>Garoupa 2</b> e <b>Garoupa 3</b> voam na sua asa. Se um bombardeiro chegar, a base vira cratera.',
+   o:['💣 Derrube os 2 bombardeiros antes que cheguem','🟦 Seus 2 alas (azuis) seguem você e brigam com a escolta','🛡️ A escolta é opcional'],dicas:'Bombardeiro aguenta o dobro de tiro: guarde os mísseis pra eles.'},
+  {e:'🛡️',t:'Escolta',r:'Leve o cargueiro Pelicano até a base Sul.',ok:1,
+   b:'O cargueiro <b>Pelicano</b> leva peças de reposição para a <b>base Sul</b>, do outro lado do arquipélago. Sem essas peças, metade do esquadrão fica no chão.<br><br>A Frota Cinzenta sabe disso e vai mandar caças atrás dele, em <b>três ondas</b>.',
+   o:['📦 O Pelicano (verde) tem que chegar inteiro na base Sul','🎯 Os caças inimigos vão direto no cargueiro: intercepte antes','🟦 Garoupa 2 e 3 voam com você'],est3:'Pelicano chegar com mais de 50%',dicas:'Fique um pouco à frente do Pelicano. O rádio avisa de que lado vem cada onda.'},
   {e:'📡',t:'Olhos cegos',r:'Destrua radares e SAMs voando baixo pelos cânions.'},
   {e:'🏰',t:'Defender a base',r:'Ondas de ataque na sua base.'},
   {e:'🚢',t:'Bombardeio',r:'Afunde a frota cinzenta no mar.'},
@@ -1272,7 +1274,7 @@ function briefing(n){const M=MISSOES[n-1];$('#mLista').style.display='none';cons
   B.innerHTML=`<small class="mk">MISSÃO ${n} DE ${MISSOES.length}</small><h2>${M.e} ${M.t}</h2><p>${M.b}</p>
     <div class="mo"><b>Objetivos</b>${M.o.map(x=>'<div>'+x+'</div>').join('')}</div>
     <div class="mo"><b>Regras</b><div>🔫 Munição contada, <b>sem recarga</b></div><div>💀 Abatido = missão fracassada</div>
-    <div>⭐ Cumprir · ⭐ terminar com mais de 50% de vida · ⭐ ser rápido</div></div>
+    <div>⭐ Cumprir · ⭐ terminar com mais de 50% de vida · ⭐ ${M.est3||'ser rápido'}</div></div>
     <p class="md">💡 ${M.dicas}</p><button id="mVai">🛫 DECOLAR</button><button id="mVolta" class="sec">VOLTAR</button>`;
   $('#mVai').onclick=()=>iniciaMissao(n);$('#mVolta').onclick=abreMissoes;}
 function iniciaMissao(n){MIS_N=n;$('#missoes').style.display='none';$('#fimMis').style.display='none';$('#decolar').dataset.sala='missao';$('#decolar').click();}
@@ -1283,7 +1285,7 @@ function fimMissao(d){const ok=d.ok,n=d.n,box=$('#fimMis');
   if(ok)MIS_FEITAS[n]=Math.max(MIS_FEITAS[n]||0,d.estrelas);
   const prox=ok&&MISSOES[n]&&MISSOES[n].ok,mm=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
   box.innerHTML=`<div class="card"><small class="mk">MISSÃO ${n} · ${MISSOES[n-1].t}</small><h2>${ok?'🏆 Missão cumprida!':'❌ Missão fracassada'}</h2>
-    ${ok?`<div class="fe">${estrelas(d.estrelas)}</div><div class="fl"><div>✅ Cumpriu</div><div>${d.vida>=50?'✅':'▫️'} Vida acima de 50% <i>(${Math.round(d.vida)}%)</i></div><div>${d.tempo<=d.t_alvo?'✅':'▫️'} Tempo até ${mm(d.t_alvo)} <i>(${mm(d.tempo)})</i></div></div>`:`<p>${esc(d.motivo||'')}</p>`}
+    ${ok?`<div class="fe">${estrelas(d.estrelas)}</div><div class="fl">${(d.crit||[]).map(c=>`<div>${c[1]?'✅':'▫️'} ${esc(c[0])} ${c[2]?'<i>('+esc(c[2])+')</i>':''}</div>`).join('')}</div>`:`<p>${esc(d.motivo||'')}</p>`}
     ${d.fala?`<p class="ff"><b>📻 ${esc(d.fala[0])}:</b> “${esc(d.fala[1])}”</p>`:''}
     ${prox?`<button id="fProx">▶️ MISSÃO ${n+1}: ${MISSOES[n].t}</button>`:ok&&MISSOES[n]?'<p class="md">🚧 A missão '+(n+1)+' chega em breve!</p>':''}
     <button id="fDeNovo" class="${prox?'sec':''}">🔁 ${ok?'JOGAR DE NOVO':'TENTAR DE NOVO'}</button><button id="fMis" class="sec">🗺️ MISSÕES</button></div>`;
