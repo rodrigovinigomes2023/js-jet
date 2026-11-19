@@ -721,9 +721,10 @@ function morrer(porQuem,caiu,arma){if(!EU.vivo)return;EU.vivo=false;EU.solo=fals
     m.innerHTML=`<div class="kc">${avHTML(porQuem.av,porQuem.nome,'g')}<div><div class="kcN" style="color:${porQuem.cor}">${esc(porQuem.nome)}</div>`+
       `<div class="kcT">${o.navio?'🚢 te afundou na metralhadora!':arma==='missil'?'🚀 te pegou de míssil!':'🔥 te derrubou!'} 💀</div>`+
       `<div class="kcC">🎯 ${KH_ULT||1}× em você nesta live</div></div></div>`+liveTop();return;}
-  m.innerHTML=(caiu?'💥 Você caiu!':arma==='sam'?'🛡️ Abatido pela defesa antiaérea!':'💥 Abatido por <span style="color:'+(porQuem?.cor||'#fff')+'">'+esc(porQuem?.nome||'?')+'</span>')+'<small>'+(SALA==='pvp'?'voltando para a pista…':'renascendo…')+'</small>'+liveTop();}
+  m.innerHTML=(caiu?'💥 Você caiu!':arma==='sam'?'🛡️ Abatido pela defesa antiaérea!':'💥 Abatido por <span style="color:'+(porQuem?.cor||'#fff')+'">'+esc(porQuem?.nome||'?')+'</span>')+'<small>'+(SALA==='missao'?'missão fracassada':SALA==='pvp'?'voltando para a pista…':'renascendo…')+'</small>'+liveTop();}
 function nascer(){KC=null;MEU_DESTROCO=null;document.body.classList.remove('morto');EU.vel=140;EU.solo=false;EU.stall=0;EU.acel=1;EU.tParado=0;EU.reab=false;EU.trem=EU.tremAlvo=0;EU.arf=0;
-  if(SALA==='treino'&&TREINO.passo>=2){const B=BASES[0];   // tutorial: depois da decolagem, volta já no ar, perto da base
+  if(SALA==='missao'&&NASCE){EU.pos.fromArray(NASCE[0]);EU.q.setFromAxisAngle(_v1.set(0,1,0),NASCE[1]);EU.vel=200;}   // (19/11) missão: começa no ar, saindo da base
+  else if(SALA==='treino'&&TREINO.passo>=2){const B=BASES[0];   // tutorial: depois da decolagem, volta já no ar, perto da base
     EU.pos.set(B.x+B.dx*1800,900,B.z+B.dz*1800);EU.q.setFromAxisAngle(_v1.set(0,1,0),B.yaw);}
   else if((SALA==='pvp'||SALA==='treino'||SALA==='bots')&&MINHA_BASE!==null){const B=BASES[MINHA_BASE];   // (10/11) salas com base: sempre na cabeceira da pista da minha base
     EU.pos.set(B.x-B.dx*(PISTA/2-50),BASE_H+1.9,B.z-B.dz*(PISTA/2-50));EU.q.setFromAxisAngle(_v1.set(0,1,0),B.yaw);EU.vel=0;EU.solo=true;EU.yawSolo=B.yaw;EU.trem=EU.tremAlvo=1;$('#dicaDec').style.display=SALA==='treino'?'none':'block';}
@@ -736,12 +737,12 @@ function nascer(){KC=null;MEU_DESTROCO=null;document.body.classList.remove('mort
 function envia(m){if(ws&&ws.readyState===1)ws.send(JSON.stringify(m));}
 function conectar(){const url=(location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws';
   ws=new WebSocket(url);
-  ws.onopen=()=>{conectado=true;envia({t:'entrar',nome:EU.nome,sala:SALA,token:CONTA?CONTA.token:null});};
+  ws.onopen=()=>{conectado=true;envia({t:'entrar',nome:EU.nome,sala:SALA,token:CONTA?CONTA.token:null,missao:SALA==='missao'?MIS_N:undefined});};
   ws.onclose=()=>{const era=conectado;conectado=false;if(jogando){jogando=false;document.body.classList.remove('jogando');$('#menu').style.display='flex';
       $('#erro').textContent=EXPULSO||(era?'⚠️ Conexão perdida. Escolha a sala para voltar.':'⚠️ Não consegui falar com o servidor.');EXPULSO='';}};
   ws.onmessage=e=>{let d;try{d=JSON.parse(e.data);}catch{return;}
     if(d.t==='expulso'){EXPULSO='⚠️ '+d.msg;}
-    if(d.t==='bemvindo'){EU.id=d.id;EU.cor=d.cor;if(d.nome)EU.nome=d.nome;SALA=d.sala||'bots';MINHA_BASE=d.base??null;if(d.zona)ZONA=d.zona;if(d.rsam)R_SAM=d.rsam;LIMITE=SALA==='pvp'?20900:SALA==='bots'?7600:5200;MEU_TIME=SALA==='live'?'azul':null;VS_ANT=null;placarVs(SALA==='live'?[0,0]:null);mostrarBases();
+    if(d.t==='bemvindo'){EU.id=d.id;EU.cor=d.cor;if(d.nome)EU.nome=d.nome;SALA=d.sala||'bots';MINHA_BASE=d.base??null;if(d.zona)ZONA=d.zona;if(d.rsam)R_SAM=d.rsam;LIMITE=SALA==='pvp'||SALA==='missao'?20900:SALA==='bots'?7600:5200;MEU_TIME=d.time||(SALA==='live'?'azul':null);NASCE=d.nasce||null;if(SALA==='missao'){$('#placar').innerHTML='';radio('Torre','Garoupa 1, decolagem autorizada. Aguarde instruções.');}VS_ANT=null;placarVs(SALA==='live'?[0,0]:null);mostrarBases();
       if(JATO)cena.remove(JATO);JATO=criarJato(d.cor);nascer();}
     else if(d.t==='placar')recebePlacar(d.l);
     else if(d.t==='snap')recebeSnap(d.j);
@@ -758,6 +759,9 @@ function conectar(){const url=(location.protocol==='https:'?'wss://':'ws://')+lo
     else if(d.t==='bomba'){_v1.fromArray(d.p);_v2.fromArray(d.v);soltaBomba(d.id,_v1,_v2,d.dono===EU.id);}
     else if(d.t==='sams')recebeSams(d.l);
     else if(d.t==='live')liveAlerta(d);
+    else if(d.t==='radio')radio(d.quem,d.txt);
+    else if(d.t==='obj')$('#placar').innerHTML='<div class="eu obj"><span>'+esc(d.txt)+'</span></div>';
+    else if(d.t==='fim')fimMissao(d);
     else if(d.t==='fala')liveFala(d);
     else if(d.t==='liverank'){LIVE_RANK=d;placarVs(d.vs);}
     else if(d.t==='flareok'){flarePronto=performance.now()+d.espera*1000;}
@@ -767,12 +771,12 @@ function recebePlacar(l){PLACAR=l;const ids=new Set(l.map(x=>x.id));corBandeiras
     if(!o){o={g:x.navio?criarNavio(x.cor):criarJato(x.cor),navio:!!x.navio,pos:new V3(),vel:new V3(),q:new QT(),alvoP:new V3(),alvoQ:new QT(),tRec:0,vida:100,vivo:false,novo:true};
       o.rot=document.createElement('div');o.rot.className='rot';o.rot.innerHTML='<span></span><b><i></i></b>';$('#rotulos').appendChild(o.rot);o.g.visible=false;OUT.set(x.id,o);}
     if(o.cor&&o.cor!==x.cor&&!o.navio){const j=criarJato(x.cor);j.visible=o.g.visible;cena.remove(o.g);o.g=j;}   // (10/11) live: seguiu = vira dourado
-    o.nome=(x.time&&x.time===MEU_TIME?'🟦 ':'')+x.nome;o.cor=x.cor;o.bot=x.bot;o.aliado=!!(x.time&&x.time===MEU_TIME);o.esc=x.esc||1;o.vidaMax=o.esc>1?400:100;o.g.scale.setScalar(o.navio?1:1.25*o.esc);if(o.navio&&!o.anel){o.anel=anelNavio(x.time===MEU_TIME);}
+    o.nome=(x.time&&x.time===MEU_TIME?'🟦 ':'')+x.nome;o.cor=x.cor;o.bot=x.bot;o.aliado=!!(x.time&&x.time===MEU_TIME);o.esc=x.esc||1;o.vidaMax=o.esc>1?(SALA==='missao'?200:400):100;o.g.scale.setScalar(o.navio?1:1.25*o.esc);if(o.navio&&!o.anel){o.anel=anelNavio(x.time===MEU_TIME);}
     o.rot.firstChild.textContent=o.nome;o.rot.style.color=x.cor;o.kh=x.kh||0;
     if(SALA==='live'&&o.bot&&x.time!==MEU_TIME&&o.avK!==(x.av||x.nome)){o.avK=x.av||x.nome;o.av=x.av;o.rav?.remove();o.rav=document.createElement('span');o.rav.className='rav';o.rav.innerHTML=avHTML(x.av,x.nome);o.rot.insertBefore(o.rav,o.rot.lastChild);}}
   for(const [id,o] of OUT)if(!ids.has(id)){cena.remove(o.g);if(o.anel)cena.remove(o.anel);o.rot.remove();o.aq?.remove();OUT.delete(id);}
   const ord=[...l].filter(x=>SALA!=='live'||!x.bot||x.pontos>0||x.id===EU.id).sort((a,b)=>b.pontos-a.pontos||a.mortes-b.mortes);
-  $('#placar').innerHTML=ord.map(x=>`<div class="${x.id===EU.id?'eu':''}"><span style="color:${x.cor}">${SALA==='live'&&x.bot?(x.time===MEU_TIME?'🟦':'🟥'):x.bot?'🤖':'✈️'} ${esc(x.nome)}</span><span>${x.pontos} 🏆</span></div>`).join('');}
+  if(SALA!=='missao')$('#placar').innerHTML=ord.map(x=>`<div class="${x.id===EU.id?'eu':''}"><span style="color:${x.cor}">${SALA==='live'&&x.bot?(x.time===MEU_TIME?'🟦':'🟥'):x.bot?'🤖':'✈️'} ${esc(x.nome)}</span><span>${x.pontos} 🏆</span></div>`).join('');}
 function recebeSnap(j){const agora=performance.now();
   for(const a of j){const [id,px,py,pz,qx,qy,qz,qw,vx,vy,vz,vida,vivo,trem]=a;
     if(id===EU.id){if(vida<EU.vida&&EU.vivo){$('#dor').style.opacity=0.8;setTimeout(()=>$('#dor').style.opacity=0,180);SOM.dor();}EU.vida=EU.vivo?vida:EU.vida;continue;}
@@ -1064,7 +1068,7 @@ function hudCabine(){const W=innerWidth,H=innerHeight;if(hc.width!==W||hc.height
 // ------------------------------------------------ laço principal
 let tAnt=performance.now();
 function quadro(){requestAnimationFrame(quadro);const agora=performance.now(),dt=Math.min(0.05,(agora-tAnt)/1000);tAnt=agora;
-  if(jogando&&JATO){if(EU.vivo)voar(dt);else if(agora-EU.mortoEm>(KC?4600:3200)&&(conectado||SALA==='treino'))nascer();
+  if(jogando&&JATO){if(EU.vivo)voar(dt);else if(SALA!=='missao'&&agora-EU.mortoEm>(KC?4600:3200)&&(conectado||SALA==='treino'))nascer();
     if(SALA==='treino')treino(dt);
     tEnvio-=dt;if(tEnvio<=0&&EU.vivo){tEnvio=0.05;envia({t:'e',p:arr(EU.pos,1),q:[EU.q.x,EU.q.y,EU.q.z,EU.q.w].map(x=>Math.round(x*1e4)/1e4),v:arr(frente(EU.q,_v3).multiplyScalar(EU.vel),1),tr:EU.tremAlvo});}
     else if(tEnvio<=0){tEnvio=1;envia({t:'p'});}}
@@ -1237,7 +1241,57 @@ $('#bTreino').addEventListener('click',async()=>{SALA='treino';SOM.ini();$('#err
   EU.id=-1;EU.cor='#3cd070';EU.nome=CONTA?CONTA.nome:'Piloto';MINHA_BASE=0;ZONA=15200;LIMITE=20900;mostrarBases();corBandeiras([{base:0,cor:'#3cd070'}]);
   $('#placar').innerHTML='<div class="eu"><span>🎓 Tutorial de voo</span></div>';
   limpaAneis();TREINO.passo=0;mostraPasso();if(JATO)cena.remove(JATO);JATO=criarJato(EU.cor);nascer();$('#dicaDec').style.display='none';});
-window.JJ={EU,OUT,TRAVA,PLACAR:()=>PLACAR,TREINO,ccip,BOMBV,BASES,envia,lead:()=>LEADD?_lp:null,BALAS,queda,morrer,JATO:()=>JATO,efeitosPasso:(n,dt)=>{for(let i=0;i<n;i++)efeitosQueda(dt);},nFX:()=>FX.length,efeitos:()=>({destrocos:DESTROCOS.map(D=>Math.round(D.pos.y)),pilotos:PILOTOS.length,para:PILOTOS.filter(P=>P.aberto).length,fumos:FUMOS.length,trilhaVis:[...TRILHAS.values()].some(T=>T.k>0.05)})};   // p/ testes headless
+// ------------------------------------------------ (19/11) MODO HISTÓRIA "Operação Arquipélago": tela de missões, briefing, rádio e resultado
+const MISSOES=[
+  {e:'🛫',t:'Primeiro voo',r:'Patrulha: 2 caças inimigos fracos.',ok:1,
+   b:'A <b>Frota Cinzenta</b> vem tomando o arquipélago, ilha por ilha. O <b>Esquadrão Garoupa</b> é a última base de pé, e você é o piloto mais novo.<br><br>Dois caças inimigos cruzaram a linha. É o seu primeiro combate de verdade.',
+   o:['🎯 Derrube os 2 caças inimigos'],dicas:'Chegue por trás. O míssil só sai depois do quadrado ficar vermelho.'},
+  {e:'🚨',t:'Interceptação',r:'Bombardeiros indo p/ a sua base.',ok:1,
+   b:'O radar pegou <b>três bombardeiros</b> pesados vindo direto para a nossa base, com dois caças de escolta.<br><br>Se um deles chegar, a base vira cratera.',
+   o:['💣 Derrube os 3 bombardeiros antes que cheguem','🛡️ A escolta é opcional (mas vai atrás de você)'],dicas:'Bombardeiro aguenta mais tiro: use os mísseis neles.'},
+  {e:'🛡️',t:'Escolta',r:'Proteja um avião de carga até outra ilha.'},
+  {e:'📡',t:'Olhos cegos',r:'Destrua radares e SAMs voando baixo pelos cânions.'},
+  {e:'🏰',t:'Defender a base',r:'Ondas de ataque na sua base.'},
+  {e:'🚢',t:'Bombardeio',r:'Afunde a frota cinzenta no mar.'},
+  {e:'⛈️',t:'Tempestade',r:'Combate com pouca visibilidade, só no radar.'},
+  {e:'🦅',t:'Corvo',r:'Duelo final contra o ás inimigo, nas montanhas.'}];
+let MIS_N=0,MIS_FEITAS={},NASCE=null,tRadio=0;
+const estrelas=n=>'⭐'.repeat(n)+'<i>'+'☆'.repeat(3-n)+'</i>';
+async function carregaMissoes(){MIS_FEITAS={};
+  if(CONTA){try{const d=await (await fetch('api/missoes?token='+encodeURIComponent(CONTA.token))).json();for(const k in d.feitas||{})MIS_FEITAS[+k]=d.feitas[k];}catch(e){}}
+  else{try{MIS_FEITAS=JSON.parse(localStorage.getItem('jsjet-missoes')||'{}');}catch(e){}}}
+const liberada=n=>n===1||!!MIS_FEITAS[n-1];
+async function abreMissoes(){const box=$('#missoes');box.style.display='flex';$('#mBrief').style.display='none';$('#mLista').style.display='block';
+  await carregaMissoes();
+  $('#mGrade').innerHTML=MISSOES.map((M,i)=>{const n=i+1,lib=liberada(n),pronta=!!M.ok,est=MIS_FEITAS[n]||0;
+    return `<button class="mc${lib&&pronta?'':' trancada'}${est?' feita':''}" data-n="${n}" ${lib&&pronta?'':'disabled'}>
+      <span class="mn">${n}</span><span class="me">${lib?M.e:'🔒'}</span><b>${lib?M.t:'Bloqueada'}</b>
+      <small>${lib?(pronta?M.r:'🚧 em breve'):'Passe da missão '+(n-1)+' p/ liberar'}</small>${lib&&pronta?'<span class="ms">'+estrelas(est)+'</span>':''}</button>`;}).join('');
+  for(const b of document.querySelectorAll('#mGrade .mc:not([disabled])'))b.onclick=()=>briefing(+b.dataset.n);}
+function briefing(n){const M=MISSOES[n-1];$('#mLista').style.display='none';const B=$('#mBrief');B.style.display='block';
+  B.innerHTML=`<small class="mk">MISSÃO ${n} DE ${MISSOES.length}</small><h2>${M.e} ${M.t}</h2><p>${M.b}</p>
+    <div class="mo"><b>Objetivos</b>${M.o.map(x=>'<div>'+x+'</div>').join('')}</div>
+    <div class="mo"><b>Regras</b><div>🔫 Munição contada, <b>sem recarga</b></div><div>💀 Abatido = missão fracassada</div>
+    <div>⭐ Cumprir · ⭐ terminar com mais de 50% de vida · ⭐ ser rápido</div></div>
+    <p class="md">💡 ${M.dicas}</p><button id="mVai">🛫 DECOLAR</button><button id="mVolta" class="sec">VOLTAR</button>`;
+  $('#mVai').onclick=()=>iniciaMissao(n);$('#mVolta').onclick=abreMissoes;}
+function iniciaMissao(n){MIS_N=n;$('#missoes').style.display='none';$('#fimMis').style.display='none';$('#decolar').dataset.sala='missao';$('#decolar').click();}
+function radio(quem,txt){const r=$('#radio');r.innerHTML=`<b>📻 ${esc(quem)}</b> ${esc(txt)}`;r.className='hud'+(quem==='Corvo'?' corvo':'');r.style.display='block';
+  clearTimeout(tRadio);tRadio=setTimeout(()=>r.style.display='none',Math.max(5000,txt.length*90));try{SOM.ok();}catch(e){}}
+function fimMissao(d){const ok=d.ok,n=d.n,box=$('#fimMis');
+  if(ok&&!CONTA){MIS_FEITAS[n]=Math.max(MIS_FEITAS[n]||0,d.estrelas);try{localStorage.setItem('jsjet-missoes',JSON.stringify(MIS_FEITAS));}catch(e){}}
+  if(ok)MIS_FEITAS[n]=Math.max(MIS_FEITAS[n]||0,d.estrelas);
+  const prox=ok&&MISSOES[n]&&MISSOES[n].ok,mm=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+  box.innerHTML=`<div class="card"><small class="mk">MISSÃO ${n} · ${MISSOES[n-1].t}</small><h2>${ok?'🏆 Missão cumprida!':'❌ Missão fracassada'}</h2>
+    ${ok?`<div class="fe">${estrelas(d.estrelas)}</div><div class="fl"><div>✅ Cumpriu</div><div>${d.vida>=50?'✅':'▫️'} Vida acima de 50% <i>(${Math.round(d.vida)}%)</i></div><div>${d.tempo<=d.t_alvo?'✅':'▫️'} Tempo até ${mm(d.t_alvo)} <i>(${mm(d.tempo)})</i></div></div>`:`<p>${esc(d.motivo||'')}</p>`}
+    ${d.fala?`<p class="ff"><b>📻 ${esc(d.fala[0])}:</b> “${esc(d.fala[1])}”</p>`:''}
+    ${prox?`<button id="fProx">▶️ MISSÃO ${n+1}: ${MISSOES[n].t}</button>`:ok&&MISSOES[n]?'<p class="md">🚧 A missão '+(n+1)+' chega em breve!</p>':''}
+    <button id="fDeNovo" class="${prox?'sec':''}">🔁 ${ok?'JOGAR DE NOVO':'TENTAR DE NOVO'}</button><button id="fMis" class="sec">🗺️ MISSÕES</button></div>`;
+  setTimeout(()=>{box.style.display='flex';},ok?1800:2600);
+  if(prox)$('#fProx').onclick=()=>{sair();iniciaMissao(n+1);};
+  $('#fDeNovo').onclick=()=>{sair();iniciaMissao(n);};$('#fMis').onclick=()=>{sair();$('#fimMis').style.display='none';abreMissoes();};}
+$('#bMissoes').addEventListener('click',abreMissoes);$('#mFechar').addEventListener('click',()=>{$('#missoes').style.display='none';});
+window.JJ={EU,OUT,TRAVA,abreMissoes,PLACAR:()=>PLACAR,TREINO,ccip,BOMBV,BASES,envia,lead:()=>LEADD?_lp:null,BALAS,queda,morrer,JATO:()=>JATO,efeitosPasso:(n,dt)=>{for(let i=0;i<n;i++)efeitosQueda(dt);},nFX:()=>FX.length,efeitos:()=>({destrocos:DESTROCOS.map(D=>Math.round(D.pos.y)),pilotos:PILOTOS.length,para:PILOTOS.filter(P=>P.aberto).length,fumos:FUMOS.length,trilhaVis:[...TRILHAS.values()].some(T=>T.k>0.05)})};   // p/ testes headless
 
 // (09/11) Esc sai da partida e volta ao menu
 function sair(){for(const b of BOMBV.values())cena.remove(b.g);BOMBV.clear();ccip.visible=false;jogando=false;document.body.classList.remove('jogando','treinando');limpaAneis();
@@ -1245,6 +1299,6 @@ function sair(){for(const b of BOMBV.values())cena.remove(b.g);BOMBV.clear();cci
   for(const o of OUT.values()){cena.remove(o.g);o.rot.remove();o.aq?.remove();}OUT.clear();for(const m of MISV.values())cena.remove(m.g);MISV.clear();
   if(JATO){cena.remove(JATO);JATO=null;}for(const k in TEC)TEC[k]=false;
   for(const id of['#mira','#seta','#trava','#alerta','#aviso','#morte','#dicaDec'])$(id).style.display='none';
-  $('#placar').innerHTML='';$('#feed').innerHTML='';$('#erro').textContent='';$('#menu').style.display='flex';}
+  $('#placar').innerHTML='';$('#feed').innerHTML='';$('#erro').textContent='';$('#radio').style.display='none';$('#menu').style.display='flex';}
 $('#bVisao').addEventListener('pointerdown',e=>{e.stopPropagation();trocaVisao();});
 $('#bTrem').addEventListener('pointerdown',e=>{e.stopPropagation();e.preventDefault();trocaTrem();});

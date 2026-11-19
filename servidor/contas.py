@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS sessoes(token TEXT PRIMARY KEY, conta INTEGER NOT NUL
 CREATE TABLE IF NOT EXISTS stats(conta INTEGER NOT NULL, sala TEXT NOT NULL, abates INTEGER DEFAULT 0,
   abates_missil INTEGER DEFAULT 0, mortes INTEGER DEFAULT 0, partidas INTEGER DEFAULT 0,
   tempo REAL DEFAULT 0, melhor_seq INTEGER DEFAULT 0, PRIMARY KEY(conta, sala));
+CREATE TABLE IF NOT EXISTS missoes(conta INTEGER NOT NULL, n INTEGER NOT NULL, estrelas INTEGER NOT NULL,
+  tempo REAL NOT NULL, PRIMARY KEY(conta, n));
 ''')
 VALIDADE = 180 * 86400
 NOME_OK = re.compile(r'^[0-9A-Za-zÀ-ÿ _\-]{3,16}$')
@@ -77,7 +79,7 @@ def _garante(conta, sala):
 
 
 def somar(conta, sala, **campos):
-    if not conta:
+    if not conta or sala.startswith('m:'):   # (19/11) missões não entram no ranking
         return
     _garante(conta, sala)
     sets = ', '.join(f'{k}={k}+?' for k in campos)
@@ -85,7 +87,7 @@ def somar(conta, sala, **campos):
 
 
 def recorde_seq(conta, sala, seq):
-    if conta:
+    if conta and not sala.startswith('m:'):
         _garante(conta, sala)
         DB.execute('UPDATE stats SET melhor_seq=MAX(melhor_seq,?) WHERE conta=? AND sala=?', (seq, conta, sala))
 
@@ -95,3 +97,16 @@ def ranking(sala, n=30):
         FROM stats s JOIN contas c ON c.id=s.conta WHERE s.sala=? AND (s.abates>0 OR s.mortes>0)
         ORDER BY s.abates DESC, (s.abates*1.0/MAX(s.mortes,1)) DESC, s.mortes ASC LIMIT ?''', (sala, n)).fetchall()
     return [dict(r) for r in rows]
+
+
+# (19/11) modo história: melhor resultado de cada missão (estrelas e tempo)
+def missoes_de(conta):
+    """-> {n: estrelas} das missões cumpridas."""
+    return {r['n']: r['estrelas'] for r in DB.execute('SELECT n, estrelas FROM missoes WHERE conta=?', (conta,))}
+
+
+def missao_feita(conta, n, estrelas, tempo):
+    if not conta:
+        return
+    DB.execute('''INSERT INTO missoes VALUES(?,?,?,?) ON CONFLICT(conta, n) DO UPDATE SET
+        estrelas=MAX(estrelas, excluded.estrelas), tempo=MIN(tempo, excluded.tempo)''', (conta, n, estrelas, tempo))

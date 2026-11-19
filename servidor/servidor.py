@@ -43,6 +43,17 @@ BASE_SALA = ['pvp'] * 4 + ['bots'] * 4
 ORDEM_BASES = {'pvp': (0, 2, 1, 3), 'bots': (4, 6, 5, 7)}   # os 2 primeiros ficam em bases opostas
 R_SAM_SALA = {'pvp': R_SAM, 'bots': 2500}
 MUN_LIMITADA = ('bots',)          # (11/11) sala com bots: munição acaba; recarrega num rasante na própria base
+
+
+def e_missao(sala):
+    return sala.startswith('m:')
+
+
+def lim(sala):
+    """Munição que acaba: sala com bots (recarrega no rasante) e missões (19/11: sem recarga nenhuma)."""
+    return sala in MUN_LIMITADA or e_missao(sala)
+
+
 BALAS_MAX = 500
 R_AA, AA_ESPERA, DANO_AA = 1200.0, 0.15, 4   # metralhadora antiaérea das baterias
 SAM_ESPERA, DANO_SAM = 3.5, 80
@@ -446,7 +457,7 @@ async def voar_misseis(dt, agora):
         if acabou:
             MIS.pop(m.id, None)
     for a in AV.values():   # recarga dos mísseis: um a cada RECARGA_MISSIL (sala com bots: só no rasante)
-        if a.sala not in MUN_LIMITADA and a.misseis < MISSEIS_MAX and agora - a.t_recarga > RECARGA_MISSIL:
+        if not lim(a.sala) and a.misseis < MISSEIS_MAX and agora - a.t_recarga > RECARGA_MISSIL:
             a.misseis += 1
             a.t_recarga = agora
             if not a.bot:
@@ -561,7 +572,7 @@ async def voar_bombas(dt, agora):
         if p[1] < chao - 60 or b['t'] > 40:   # o cliente não avisou (lento ou saiu): explode onde tocou
             await explodir_bomba(bid, b.get('toque') or [p[0], 0.0, p[2]])
     for a in AV.values():   # recarga: uma bomba a cada RECARGA_BOMBA (sala com bots: só no rasante)
-        if a.sala not in MUN_LIMITADA and a.bombas < BOMBAS_MAX and agora - a.t_rec_bomba > RECARGA_BOMBA:
+        if not lim(a.sala) and a.bombas < BOMBAS_MAX and agora - a.t_rec_bomba > RECARGA_BOMBA:
             a.bombas += 1
             a.t_rec_bomba = agora
             if not a.bot:
@@ -689,6 +700,8 @@ def passa_perto(p0, vb, alvo):
 
 async def voar_bot(b, dt, agora):
     if not b.vivo:
+        if e_missao(b.sala):            # (19/11) missão: abatido fica abatido
+            return
         if b.sala == 'live':
             await live_renascer(b, agora)
             return
@@ -697,7 +710,12 @@ async def voar_bot(b, dt, agora):
             b.vida, b.vivo, b.bank = 100, True, 0.0
             b.misseis, b.bombas, b.balas = MISSEIS_MAX, BOMBAS_MAX, BALAS_MAX
         return
+    if getattr(b, 'papel', None) == 'bomb':
+        await voar_bombardeiro(b, dt)
+        return
     vivos = [a for a in AV.values() if a.vivo and a is not b and a.sala == b.sala and ve(b, a, agora)]   # (18/11) atrás do morro o bot não vê
+    if e_missao(b.sala):   # (19/11) missão: só ataca o outro time
+        vivos = [a for a in vivos if a.time != b.time]
     furia = agora < b.furia_ate
 
     def dist(a):
@@ -707,7 +725,7 @@ async def voar_bot(b, dt, agora):
     else:
         alvo = alvo_todos(b, vivos, agora)
     modo = None
-    if b.sala == 'bots':   # (11/11) deathmatch: matar mais E sobreviver
+    if b.sala == 'bots' or e_missao(b.sala):   # (11/11) deathmatch: matar mais E sobreviver (19/11: missões também)
         mis = [m for m in MIS.values() if m.alvo is b and math.dist(m.p, b.p) < 1600]
         cauda = ameaca_na_cauda(b, vivos)
         if mis:                       # míssil vindo: põe ele de lado (beam) e solta flare perto
@@ -740,9 +758,13 @@ async def voar_bot(b, dt, agora):
         alvo = alvo_tiro
     elif alvo:
         d = dist(alvo)
-        t = min(1.5, d / (VEL_BALA + 118 if b.sala in MUN_LIMITADA else 950))
+        t = min(1.5, d / (VEL_BALA + 118 if lim(b.sala) else 950))
         mira = [alvo.p[i] + alvo.v[i] * t for i in range(3)]
         des = norm([mira[i] - b.p[i] for i in range(3)])
+    elif getattr(b, 'segue', None) in AV and AV[b.segue].vivo:   # (19/11) escolta: cola no bombardeiro até achar alguém
+        L = AV[b.segue]
+        ponto = [L.p[0] + b.off[0], L.p[1] + b.off[1], L.p[2] + b.off[2]]
+        des = norm([ponto[i] + L.v[i] * 2 - b.p[i] for i in range(3)])
     else:
         if not b.alvo_pts or math.dist(b.alvo_pts, b.p) < 300:
             x, z = random.uniform(-2500, 2500), random.uniform(-2500, 2500)
@@ -763,7 +785,7 @@ async def voar_bot(b, dt, agora):
         des[1] -= 0.6
     rh = math.hypot(b.p[0], b.p[2])
     b.modo = modo
-    if rh > (BASE_R_BOTS + 900 if b.sala == 'bots' else ARENA) and modo != 'casa':   # sala com bots: bases a 5,8 km
+    if rh > (BASE_R_BOTS + 900 if b.sala == 'bots' else 9500 if e_missao(b.sala) else ARENA) and modo != 'casa':   # sala com bots: bases a 5,8 km
         des[0] -= b.p[0] / rh * 1.5
         des[2] -= b.p[2] / rh * 1.5
     des = norm(des)
@@ -777,7 +799,7 @@ async def voar_bot(b, dt, agora):
     alvo_bank = max(-1.2, min(1.2, -omega_y * 1.6))
     b.bank += (alvo_bank - b.bank) * min(1.0, 3 * dt)
     b.f = f1
-    vel = 135.0 if furia else 118.0
+    vel = 135.0 if furia else getattr(b, 'vel_cru', 118.0)
     b.v = [f1[i] * vel for i in range(3)]
     b.p = [b.p[i] + b.v[i] * dt for i in range(3)]
     b.p[1] = max(b.p[1], relevo(b.p[0], b.p[2]) + 12)   # (18/11) nunca atravessa o morro
@@ -790,7 +812,7 @@ async def voar_bot(b, dt, agora):
     if alvo and alvo.vivo:
         d = math.dist(alvo.p, b.p)
         dirr = norm([alvo.p[i] - b.p[i] for i in range(3)])
-        if b.sala in MUN_LIMITADA:
+        if lim(b.sala):
             tl = d / (VEL_BALA + 118)
             dir_lead = norm([alvo.p[i] + alvo.v[i] * tl - b.p[i] for i in range(3)])   # o "◇" do bot
             if d < 900 and dot(f1, dir_lead) > math.cos(math.radians(4)) and agora - b.ult_tiro > 0.1 / min(1.0, fac(alvo)) and b.balas > 0:
@@ -808,6 +830,165 @@ async def voar_bot(b, dt, agora):
                 await dano(alvo, 6, b)
 
 
+# ---------------------------------------------------------------- (19/11) MODO HISTÓRIA: "Operação Arquipélago"
+# Cada missão roda numa sala particular 'm:<id do jogador>'. Munição sem recarga, morreu = missão fracassada.
+# Estrelas: ⭐ cumpriu · ⭐ terminou com mais de metade da vida · ⭐ abaixo do tempo-alvo. Progresso salvo na conta.
+CASA = 4                    # base de origem do Esquadrão Garoupa (a mesma ilha da sala com bots)
+MISSAO = {}                 # sala -> estado da missão
+COR_CINZA, COR_BOMB = '#e8443a', '#ff9a2a'
+
+
+def _eixo():
+    """Direção da base p/ o centro do arquipélago (no chão) e a posição da base."""
+    b = BASES[CASA]
+    return b, norm([-b[0], 0, -b[2]])
+
+
+def _ponto(dist, alt, lado=0.0):
+    b, f = _eixo()
+    return [b[0] + f[0] * dist - f[2] * lado, alt, b[2] + f[2] * dist + f[0] * lado]
+
+
+def _cinza(sala, nome, p, f, cor=COR_CINZA, **kw):
+    b = Aviao(nome, bot=True, sala=sala)
+    b.p, b.f = list(p), norm(f)
+    b.v = [b.f[i] * 118 for i in range(3)]
+    b.q = quat_de(b.f, 0)
+    b.time, b.cor = 'verm', cor
+    for k, v in kw.items():
+        setattr(b, k, v)
+    AV[b.id] = b
+    return b
+
+
+def _m1(M, a):
+    """Primeiro voo: 2 caças fracos, sem míssil."""
+    _, f = _eixo()
+    volta = [-f[0], 0, -f[2]]
+    for i, nome in enumerate(('Cinzento 1', 'Cinzento 2')):
+        b = _cinza(M['sala'], nome, _ponto(7200, 1000, (i - 0.5) * 500), volta,
+                   pontaria=0.055, misseis=0, balas=250)
+        M['alvos'].append(b.id)
+    M['t_alvo'] = 150
+    M['radio'] = [(0, 'Torre', 'Garoupa 1, aqui é a Torre. Dois caças da Frota Cinzenta cruzaram a linha. Vá lá e derrube os dois.'),
+                  (7, 'Torre', 'Eles aparecem no seu radar à frente. Munição contada: aqui não tem recarga.'),
+                  (20, 'Torre', 'Dica: chegue por trás. Míssil só depois do quadrado ficar vermelho.')]
+
+
+def _m2(M, a):
+    """Interceptação: 3 bombardeiros indo p/ a base, com 2 caças de escolta."""
+    _, f = _eixo()
+    volta = [-f[0], 0, -f[2]]
+    lider = None
+    for i in range(3):
+        b = _cinza(M['sala'], f'Bombardeiro {i + 1}', _ponto(12500 + abs(i - 1) * 250, 1500, (i - 1) * 260), volta, cor=COR_BOMB,
+                   papel='bomb', esc=1.6, vida=200, misseis=0, balas=0, vel_cru=88.0)
+        M['alvos'].append(b.id)
+        lider = lider or b
+    for i, lado in enumerate((-1, 1)):
+        b = _cinza(M['sala'], f'Escolta {i + 1}', _ponto(12100, 1650, lado * 600), volta,
+                   pontaria=0.04, misseis=1, segue=lider.id, off=[lado * 600 * -f[2], 150, lado * 600 * f[0]])
+        M['extras'].append(b.id)
+    M['t_alvo'] = 130
+    M['radio'] = [(0, 'Torre', 'Alerta, Garoupa 1! Três bombardeiros da Frota Cinzenta vêm direto p/ a nossa base, com escolta.'),
+                  (6, 'Torre', 'Derrube os 3 bombardeiros antes que cheguem. A escolta é opcional, mas ela vai atrás de você.'),
+                  (60, 'Torre', 'Eles estão chegando! Não deixe nenhum passar!')]
+
+
+MISSOES = {1: _m1, 2: _m2}
+
+
+def missao_iniciar(a, n):
+    M = {'sala': a.sala, 'n': n, 'dono': a.id, 'nasceu': False, 't0': 0.0, 'fim': False,
+         'alvos': [], 'extras': [], 'radio': [], 'mortos': 0, 'obj': '', 't_alvo': 120}
+    MISSAO[a.sala] = M
+    a.time = 'azul'
+    a.balas, a.misseis, a.bombas = 400, 2, 0
+    MISSOES[n](M, a)
+    b, f = _eixo()
+    p = _ponto(1600, 900)
+    print(f'missão {n} começou p/ {a.nome}', flush=True)
+    return {'missao': n, 'nasce': [p, math.atan2(-f[2], f[0])], 'time': 'azul'}
+
+
+def missao_limpar(sala):
+    M = MISSAO.pop(sala, None)
+    if M:
+        for i in M['alvos'] + M['extras']:
+            AV.pop(i, None)
+        for m in [m for m in MIS.values() if m.sala == sala]:
+            MIS.pop(m.id, None)
+
+
+def _checa(M, a, agora):
+    """-> (ok, motivo) quando acaba; atualiza o objetivo na tela."""
+    alvos = [AV.get(i) for i in M['alvos']]
+    mortos = sum(1 for b in alvos if not b or not b.vivo)
+    if M['n'] == 1:
+        obj = f'🎯 Caças inimigos derrubados: {mortos}/{len(alvos)}'
+    else:
+        vivos = [b for b in alvos if b and b.vivo]
+        casa = BASES[CASA]
+        perto = min((math.hypot(b.p[0] - casa[0], b.p[2] - casa[2]) for b in vivos), default=0)
+        obj = f'💣 Bombardeiros derrubados: {mortos}/{len(alvos)}' + (f' · chegam em {max(0, int((perto - 350) / 88))} s' if vivos else '')
+        if any(getattr(b, 'chegou', False) for b in vivos):
+            return False, '💥 Um bombardeiro chegou e bombardeou a base!', obj
+    if mortos > M['mortos']:
+        M['mortos'] = mortos
+        if mortos < len(alvos):
+            M['radio'].insert(0, (0, 'Torre', random.choice(('Um a menos! Continue.', 'Abatido! Boa, Garoupa 1.', 'Na mosca! Falta' + ('m ' if len(alvos) - mortos > 1 else ' ') + str(len(alvos) - mortos) + '.'))))
+    if mortos == len(alvos):
+        return True, None, obj
+    return None, None, obj
+
+
+async def missoes_passo(agora):
+    for sala, M in list(MISSAO.items()):
+        a = AV.get(M['dono'])
+        if not a or M['fim'] or not M['nasceu']:
+            continue
+        t = agora - M['t0']
+        while M['radio'] and t >= M['radio'][0][0]:
+            _, quem, txt = M['radio'].pop(0)
+            await mandar(a, {'t': 'radio', 'quem': quem, 'txt': txt})
+        ok, motivo, obj = _checa(M, a, agora)
+        if obj != M['obj']:
+            M['obj'] = obj
+            await mandar(a, {'t': 'obj', 'txt': obj})
+        if not a.vivo:
+            ok, motivo = False, '💀 Você foi abatido.'
+        if ok is None:
+            continue
+        M['fim'] = True
+        est = 0
+        if ok:
+            est = 1 + (a.vida >= 50) + (t <= M['t_alvo'])
+            contas.missao_feita(a.conta, M['n'], est, round(t, 1))
+        fala = None
+        if ok and M['n'] == 1:
+            fala = ('Torre', 'Céu limpo. Bom trabalho, novato. Volte p/ a base.')
+        elif ok and M['n'] == 2:
+            fala = ('Corvo', '...Garoupa 1, é? Vou lembrar desse nome.')
+        print(f'missão {M["n"]} de {a.nome}: {"ok" if ok else "falhou"} {est}★ {t:.0f}s', flush=True)
+        await mandar(a, {'t': 'fim', 'ok': ok, 'n': M['n'], 'estrelas': est, 'tempo': round(t), 't_alvo': M['t_alvo'],
+                         'vida': a.vida, 'motivo': motivo, 'fala': fala})
+
+
+async def voar_bombardeiro(b, dt):
+    """Voa reto p/ a base de origem a 1500 m; chegou em cima (350 m) = bombardeou."""
+    casa = BASES[CASA]
+    dh = math.hypot(casa[0] - b.p[0], casa[2] - b.p[2])
+    if dh < 350:
+        b.chegou = True
+    des = norm([(casa[0] - b.p[0]) / max(dh, 1), (1500 - b.p[1]) / 400, (casa[2] - b.p[2]) / max(dh, 1)])
+    f1 = girar(b.f, des, 0.3 * dt)
+    b.f = f1
+    b.v = [f1[i] * b.vel_cru for i in range(3)]
+    b.p = [b.p[i] + b.v[i] * dt for i in range(3)]
+    b.p[1] = max(b.p[1], relevo(b.p[0], b.p[2]) + 60)
+    b.q = quat_de(f1, 0)
+
+
 async def laco(app):
     dt = 0.05
     while True:
@@ -819,9 +1000,8 @@ async def laco(app):
             await voar_bombas(dt, t0)
             await defesa_bases(t0)
             await rasantes(t0)
-            for sala in SALAS:
-                if not any(not a.bot and a.sala == sala for a in AV.values()):
-                    continue
+            await missoes_passo(t0)
+            for sala in {a.sala for a in AV.values() if not a.bot}:
                 j = [[a.id] + [round(x, 1) for x in a.p] + [round(x, 4) for x in a.q] + [round(x, 1) for x in a.v]
                      + [a.vida, 1 if a.vivo else 0, a.trem] for a in AV.values() if a.sala == sala]
                 m = [[x.id] + [round(v, 1) for v in x.p] + [round(x.f[i] * x.vel, 1) for i in range(3)]
@@ -1179,7 +1359,7 @@ async def ws_jogo(req):
                 continue
             t = d.get('t')
             if t == 'entrar' and a is None:
-                sala = d.get('sala') if d.get('sala') in SALAS else 'bots'
+                sala = d.get('sala') if d.get('sala') in SALAS + ('missao',) else 'bots'
                 conta = contas.por_token(d.get('token'))
                 if conta:   # logado: usa o nome da conta e derruba outra conexão da mesma conta
                     nome = conta[1]
@@ -1189,19 +1369,32 @@ async def ws_jogo(req):
                             await x.ws.close()
                 else:       # convidado: nome sempre "Convidado NNN" (não dá p/ usar nome de conta)
                     nome = f'Convidado {random.randint(100, 999)}'
-                a = Aviao(nome, ws=ws, sala=sala)
+                if sala == 'missao':   # (19/11) modo história: sala particular 'm:<id>'
+                    n = d.get('missao') if isinstance(d.get('missao'), int) else 0
+                    if n not in MISSOES or (conta and n > 1 and (n - 1) not in contas.missoes_de(conta[0])):
+                        await ws.send_str(json.dumps({'t': 'expulso', 'msg': 'Essa missão ainda está bloqueada.'}))
+                        break
+                    a = Aviao(nome, ws=ws, sala='m:?')
+                    a.sala = f'm:{a.id}'
+                else:
+                    a = Aviao(nome, ws=ws, sala=sala)
                 if conta:
                     a.conta = conta[0]
-                    contas.somar(a.conta, sala, partidas=1)
+                    contas.somar(a.conta, a.sala, partidas=1)
                 AV[a.id] = a
-                print(f'entrou {a.id} {nome} sala={sala} base={a.base}', flush=True)
-                await ajustar_bots()
+                print(f'entrou {a.id} {nome} sala={a.sala} base={a.base}', flush=True)
+                extra = {}
+                if sala == 'missao':
+                    extra = missao_iniciar(a, n)
+                else:
+                    await ajustar_bots()
                 await mandar(a, {'t': 'bemvindo', 'id': a.id, 'cor': a.cor, 'sala': sala, 'base': a.base, 'nome': nome,
-                                 'bases': BASES, 'zona': ZONA, 'rsam': R_SAM})
+                                 'bases': BASES, 'zona': ZONA, 'rsam': R_SAM, **extra})
+                sala = a.sala
                 await placar(sala)
                 if sala in ORDEM_BASES:
                     await mandar(a, sams_msg())
-                await mandar(a, {'t': 'mun', 'm': a.misseis, 'g': a.balas if sala in MUN_LIMITADA else -1})
+                await mandar(a, {'t': 'mun', 'm': a.misseis, 'g': a.balas if lim(sala) else -1})
                 await mandar(a, {'t': 'bombas', 'n': a.bombas})
                 if sala == 'live':
                     await mandar(a, live_rank_msg())
@@ -1214,7 +1407,7 @@ async def ws_jogo(req):
                     a.trem = 1 if d.get('tr') else 0
             elif t == 'tiro' and a.vivo:
                 p, dd = nums(d.get('p', []), 3), nums(d.get('d', []), 3, 2)
-                if a.sala in MUN_LIMITADA:
+                if lim(a.sala):
                     if a.balas <= 0:
                         continue
                     a.balas -= 1
@@ -1224,7 +1417,7 @@ async def ws_jogo(req):
                 alvo = AV.get(d.get('alvo'))
                 agora = time.monotonic()
                 a.acertos = [x for x in a.acertos if agora - x < 1]
-                if alvo and alvo is not a and alvo.vivo and alvo.sala == a.sala and not (a.time and a.time == alvo.time) and len(a.acertos) < 18 and (a.balas > 0 or a.sala not in MUN_LIMITADA) and math.dist(a.p, alvo.p) < 1500:
+                if alvo and alvo is not a and alvo.vivo and alvo.sala == a.sala and not (a.time and a.time == alvo.time) and len(a.acertos) < 18 and (a.balas > 0 or not lim(a.sala)) and math.dist(a.p, alvo.p) < 1500:
                     a.acertos.append(agora)
                     await dano(alvo, DANO_TIRO, a)
             elif t == 'missil' and a.vivo:
@@ -1253,6 +1446,14 @@ async def ws_jogo(req):
                 await soltar_flare(a)
             elif t == 'caiu':
                 await matar(a, None)
+            elif t == 'renascer' and e_missao(a.sala):   # (19/11) missão: nasce uma vez só, com a munição da missão
+                M = MISSAO.get(a.sala)
+                p = nums(d.get('p', []), 3)
+                if M and not M['nasceu'] and p:
+                    M['nasceu'], M['t0'] = True, time.monotonic()
+                    a.p, a.vida, a.vivo = p, 100, True
+                    await mandar(a, {'t': 'mun', 'm': a.misseis, 'g': a.balas})
+                    await mandar(a, {'t': 'bombas', 'n': a.bombas})
             elif t == 'renascer' and not a.vivo and time.monotonic() - a.t_morte > 2.5:
                 p = nums(d.get('p', []), 3)
                 if p:
@@ -1261,7 +1462,7 @@ async def ws_jogo(req):
                 a.misseis = MISSEIS_MAX
                 a.bombas = BOMBAS_MAX
                 a.balas = BALAS_MAX
-                await mandar(a, {'t': 'mun', 'm': a.misseis, 'g': a.balas if a.sala in MUN_LIMITADA else -1})
+                await mandar(a, {'t': 'mun', 'm': a.misseis, 'g': a.balas if lim(a.sala) else -1})
                 await mandar(a, {'t': 'bombas', 'n': a.bombas})
     except asyncio.TimeoutError:
         pass                     # celular calado (tela apagada / app fechado): tira da sala
@@ -1275,6 +1476,8 @@ async def ws_jogo(req):
                 elif m.alvo is a:
                     m.alvo = None
             print(f'saiu {a.id} {a.nome}', flush=True)
+            if e_missao(a.sala):
+                missao_limpar(a.sala)
             await ajustar_bots()
             await placar(a.sala)
     return ws
@@ -1324,6 +1527,13 @@ async def api_eu(req):
     return web.json_response({'nome': c[1]} if c else {'erro': 'sessão inválida'}, status=200 if c else 401)
 
 
+async def api_missoes(req):
+    c = contas.por_token(req.query.get('token'))
+    if not c:
+        return web.json_response({'erro': 'sessão inválida'}, status=401)
+    return web.json_response({'feitas': contas.missoes_de(c[0])}, headers={'Cache-Control': 'no-store'})
+
+
 async def api_rank(req):
     sala = req.query.get('sala') if req.query.get('sala') in SALAS else 'pvp'
     return web.json_response({'sala': sala, 'l': contas.ranking(sala)}, headers={'Cache-Control': 'no-store'})
@@ -1339,6 +1549,7 @@ def main():
     app.router.add_post('/api/conta/{acao:criar|entrar|sair}', api_conta)
     app.router.add_get('/api/eu', api_eu)
     app.router.add_get('/api/rank', api_rank)
+    app.router.add_get('/api/missoes', api_missoes)
     app.router.add_post('/api/live', api_live)
     app.router.add_get('/', arquivo)
     app.router.add_get('/{arq}', arquivo)

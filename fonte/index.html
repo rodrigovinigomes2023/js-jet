@@ -131,6 +131,30 @@
   #menu .link{display:block;margin-top:12px;font-size:14px;color:#9fd4ff;text-decoration:underline;cursor:pointer}
   #ola{font-size:17px;font-weight:700;background:#0b1a2a;border-radius:12px;padding:10px;border:2px solid #7fd3ff33}
   #ola a{font-size:13px;font-weight:400;color:#9fd4ff;text-decoration:underline;cursor:pointer;margin-left:6px}
+  #menu button.mis{background:linear-gradient(180deg,#3fd0a0,#16806a);color:#fff}
+  #missoes,#fimMis{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 30%,#1c3d63,#0d1420 70%);z-index:7;padding:16px;overflow-y:auto;align-items:safe center}
+  #fimMis{background:#0d1420cc;z-index:8}
+  #missoes .card,#fimMis .card{width:min(680px,100%);text-align:center}
+  #missoes h2,#fimMis h2{margin:2px 0 12px;font-size:30px}
+  .mk{display:block;font-size:12px;letter-spacing:3px;opacity:.6;font-weight:700}
+  #mGrade{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .mc{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;padding:12px 8px 10px;border-radius:12px;border:2px solid #3fd0a066;background:#0b1a2a;color:#fff;cursor:pointer;font:inherit;min-height:128px}
+  .mc:hover:not([disabled]){border-color:#3fd0a0;background:#11283a}
+  .mc .mn{position:absolute;left:8px;top:6px;font-size:12px;opacity:.5;font-weight:800}
+  .mc .me{font-size:30px}.mc b{font-size:15px}.mc small{font-size:11px;opacity:.7;line-height:1.3}
+  .mc .ms{font-size:13px;margin-top:auto}.ms i,.fe i{font-style:normal;opacity:.35}
+  .mc.trancada{opacity:.45;border-color:#ffffff22;cursor:default}
+  .mc.feita{border-color:#ffd23a88}
+  #missoes button.sec,#fimMis button.sec{background:#ffffff1a;color:#fff;border:2px solid #7fd3ff66}
+  #missoes #mFechar,#mBrief button,#fimMis button{margin-top:12px;width:100%;font-size:20px;font-weight:800;padding:12px;border:0;border-radius:12px;cursor:pointer;background:linear-gradient(180deg,#ffd23a,#ff9a2a);color:#3a1d00}
+  #mBrief{text-align:left}#mBrief h2{text-align:left}#mBrief p{line-height:1.5;opacity:.9}
+  .mo{background:#0b1a2a;border:1px solid #7fd3ff33;border-radius:10px;padding:10px 12px;margin-top:10px;font-size:14px;line-height:1.6}.mo>b{display:block;font-size:12px;letter-spacing:2px;opacity:.6}
+  .md{font-size:14px;opacity:.8}
+  .fe{font-size:40px;margin:4px 0 10px}.fl{text-align:left;display:inline-block;font-size:15px;line-height:1.8}.fl i{opacity:.6;font-style:normal}
+  .ff{font-style:italic;opacity:.9}
+  #radio{left:50%;top:58px;transform:translateX(-50%);max-width:min(560px,92vw);background:#0b1a2ae6;border-left:4px solid #3fd0a0;border-radius:8px;padding:8px 12px;font-size:15px;line-height:1.4;z-index:4}
+  #radio b{color:#3fd0a0;margin-right:4px}#radio.corvo{border-left-color:#ff3b30}#radio.corvo b{color:#ff5a4a}
+  #placar .obj span{white-space:normal}
   #rank{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 30%,#1c3d63,#0d1420 70%);z-index:7;padding:16px}
   #rank .card{width:min(620px,100%);max-height:100%;overflow:auto;text-align:center}
   #rank h2{margin:0 0 10px;font-size:30px}
@@ -206,6 +230,7 @@
     <div id="pSalas" style="display:none">
       <div id="ola"></div>
       <label><input type="checkbox" id="inverter"> Inverter subir/descer</label>
+      <button id="bMissoes" class="mis">🎖️ MISSÕES · modo história</button>
       <button id="decolar">🤖 SALA COM BOTS</button>
       <button id="salaPvp" class="pvp">⚔️ SALA SEM BOTS · bases</button>
       <button id="salaLive" class="live">📺 SALA DA LIVE · o chat vira avião</button>
@@ -220,6 +245,15 @@
     </div>
   </div>
 </div>
+
+<div id="missoes" style="display:none">
+  <div class="card">
+    <div id="mLista"><small class="mk">OPERAÇÃO ARQUIPÉLAGO</small><h2>🎖️ Missões</h2><div id="mGrade"></div><button id="mFechar" class="sec">VOLTAR</button></div>
+    <div id="mBrief" style="display:none"></div>
+  </div>
+</div>
+<div id="fimMis" style="display:none"></div>
+<div class="hud" id="radio" style="display:none"></div>
 
 <div id="rank" style="display:none">
   <div class="card">
