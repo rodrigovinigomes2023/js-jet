@@ -1,8 +1,8 @@
 // (19/11) MODO HELICÓPTERO — ataque isométrico (gênero "helicóptero de ataque com câmera de cima"), offline como o tutorial.
 // Carregado depois do jogo.js e usa as mesmas funções (cena, EU, OUT, relevo, visada, bala, misLocal, explosao, radarC...).
 // Objetivos: destruir radares e estações SAM, afundar lanchas, resgatar pilotos com o guincho e levar p/ a base. Combustível acaba!
-const HELI={on:false,vel:new V3(),yaw:0,agl:32,comb:100,blind:100,vidas:3,bordo:0,salvos:0,tTiro:0,misAnt:false,tMorte:0,coisas:[],fogos:[],pausa:false,brief:false,mapa:null,pilotos:[],caixas:[],alvos:[],tGuincho:0,fim:false,idN:-5000,rotor:null,cauda:null};
-const _hP=new V3(),_hT=new V3(),_hX=new V3(1,0,0),_hQ2=new QT();
+const HELI={on:false,vel:new V3(),vs:0,yaw:0,agl:32,comb:100,blind:100,vidas:3,bordo:0,salvos:0,tTiro:0,misAnt:false,tMorte:0,coisas:[],fogos:[],pausa:false,brief:false,mapa:null,pilotos:[],caixas:[],alvos:[],tGuincho:0,fim:false,idN:-5000,rotor:null,cauda:null};
+const _hC1=new V3(),_hC2=new V3(),_hY=new V3(0,1,0),_hP=new V3(),_hT=new V3(),_hX=new V3(1,0,0),_hQ2=new QT();
 const HELI_CASA=4, HELI_VMAX=72, HELI_CAP=8, HELI_CAM=new V3(-95,165,95);   // base de origem, ~260 km/h, pilotos a bordo, câmera isométrica
 
 // ---------- modelo: helicóptero de ataque (cabine em tandem, asinhas com casulos, rotor de 4 pás), frente = +x, ~17 m
@@ -64,10 +64,22 @@ function criarHeli(){const G_=sabreGeo();if(!G_){carregaSabre();const g=criarHel
   g.userData.rotor=rotor;g.userData.cauda=cauda;g.userData.torre=tor;g.scale.setScalar(1.4);cena.add(g);return g;}   /* 1,4x: aparece melhor de cima */
 
 // ---------- objetos do mapa
-function heliPiloto(){const g=new THREE.Group(),lar=M('#ff7a1a',0.7);cil(0.35,0.4,1.2,lar,0,0.8,0,g,8);esf(0.3,M('#e0b090',0.7),0,1.65,0,g);
-  const raio=new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.6,60,8,1,true),new THREE.MeshBasicMaterial({color:0xffb030,transparent:true,opacity:0.35,depthWrite:false,side:THREE.DoubleSide}));raio.position.y=30;g.add(raio);
+// (19/11) piloto abatido em escala real (1,8 m × 1,4 = mesma escala do Sabre): macacão de voo verde, colete, capacete, acenando com os 2 braços
+// por cima da cabeça; painel de sinalização laranja no chão e fumaça laranja (o facho e o anel continuam p/ achar de longe)
+function heliMilitar(){const h=new THREE.Group(),mac=M('#5b6b45',0.9),col=M('#3b4630',0.85),bot=M('#1c1c1a',0.8),pele=M('#c99470',0.8),cap=M('#c3c7c0',0.5),vis=M('#1d2a33',0.2),luv=M('#2b2b26',0.9);
+  for(const z of[-0.1,0.1]){box(0.27,0.11,0.12,bot,0.04,0.055,z,h);cil(0.07,0.065,0.42,mac,0,0.32,z,h,8);cil(0.08,0.07,0.42,mac,0,0.74,z,h,8);}   // botas, canelas, coxas
+  box(0.2,0.12,0.36,col,0,0.98,0,h);box(0.22,0.5,0.38,mac,0,1.2,0,h);box(0.25,0.32,0.4,col,0.01,1.24,0,h);   // quadril, tronco, colete
+  box(0.05,0.12,0.14,M('#d8c040',0.6),0.14,1.3,0.08,h);box(0.04,0.06,0.18,M('#2f5f9f',0.7),0.13,1.4,-0.1,h);   // rádio + bandeirinha
+  cil(0.05,0.06,0.08,pele,0,1.49,0,h,8);esf(0.105,pele,0,1.6,0,h);esf(0.125,cap,-0.01,1.64,0,h,1,0.95,1);box(0.04,0.07,0.17,vis,0.11,1.63,0,h);   // pescoço, cabeça, capacete, viseira
+  const bracos=[];for(const z of[-1,1]){const o=new THREE.Group();o.position.set(0,1.42,z*0.23);h.add(o);cil(0.055,0.05,0.3,mac,0,-0.15,0,o,8);
+    const c=new THREE.Group();c.position.y=-0.3;o.add(c);cil(0.05,0.045,0.28,mac,0,-0.14,0,c,8);esf(0.05,luv,0,-0.3,0,c);bracos.push({o,c,z});}
+  h.userData.bracos=bracos;h.scale.setScalar(1.4);return h;}
+function heliPiloto(){const g=new THREE.Group();const mil=heliMilitar();g.add(mil);g.userData.mil=mil;
+  const pan=box(2.6,0.04,0.9,M('#ff6a1a',0.8),3.2,0.03,1.6,g);pan.rotation.y=0.6;box(0.32,0.5,0.32,M('#3b4630',0.8),1.4,0.25,-1.2,g);   // painel de sinalização + mochila de sobrevivência
+  g.userData.lata=new V3(-1.6,0.2,1.2);const lata=cil(0.07,0.07,0.3,M('#e06a20',0.6),-1.6,0.15,1.2,g,8);lata.rotation.z=1.4;   // lata de fumaça
+  const raio=new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.6,60,8,1,true),new THREE.MeshBasicMaterial({color:0xffb030,transparent:true,opacity:0.35,depthWrite:false,side:THREE.DoubleSide}));raio.position.set(-1.6,30,1.2);g.add(raio);   /* facho sai da lata de fumaça, não do militar */
   const fum=new THREE.Mesh(new THREE.RingGeometry(4,5,24),new THREE.MeshBasicMaterial({color:0xffb030,transparent:true,opacity:0.7,side:THREE.DoubleSide}));fum.rotation.x=-Math.PI/2;fum.position.y=0.3;g.add(fum);
-  cena.add(g);return g;}
+  const anel=g.children[g.children.length-1];g.userData.anel=anel;g.userData.raio=raio;raio.material.opacity=0.22;cena.add(g);return g;}
 function heliCaixa(tipo){const g=new THREE.Group();
   if(tipo==='comb'){cil(1.1,1.1,2.4,M('#c0392b',0.5),0,1.2,0,g,12);cil(1.12,1.12,0.2,M('#e8e8e8',0.5),0,1.8,0,g,12);}
   else if(tipo==='mun'){box(3,1.6,2,M('#556b2f',0.8),0,0.8,0,g);box(3.05,0.3,2.05,M('#c9b037',0.6),0,1.2,0,g);}
@@ -80,6 +92,14 @@ function heliAA(){const g=new THREE.Group(),o=M('#5d6b4a',0.8),e=M('#2f363c',0.6
 function heliPonto(r0,r1,terra,rng){for(let i=0;i<300;i++){const a=rng()*Math.PI*2,r=r0+rng()*(r1-r0),x=Math.cos(a)*r,z=Math.sin(a)*r,h=relevo(x,z);
     if(terra?(h>6&&h<380):h<0.5){let plano=true;for(const [dx,dz] of[[12,0],[-12,0],[0,12],[0,-12]])if(Math.abs(relevo(x+dx,z+dz)-h)>9)plano=false;if(plano||!terra)return new V3(x,Math.max(0,h),z);}}
   return new V3(0,0,0);}
+// (19/11) piloto abatido longe de TODAS as bases (senão pega e entrega na hora) e longe dos outros pilotos: das ilhas, a mais afastada
+// altura do chão DESENHADO (a malha é mais grosseira que relevo(): sem isso o militar afunda ou flutua na encosta)
+const _rcC=new THREE.Raycaster();function chaoMalha(x,z){_rcC.set(_hC1.set(x,3000,z),_hC2.set(0,-1,0));const ilhas=cena.children.filter(o=>o.userData.ilha);const h=_rcC.intersectObjects(ilhas)[0];return h?h.point.y:relevo(x,z);}
+function heliPontoResgate(rng){const bases=BASES.filter(B=>Math.hypot(B.x,B.z)<9000);let melhor=null,nota=-1;
+  for(let k=0;k<70;k++){const p=heliPonto(1500,6800,true,rng);if(!p.lengthSq())continue;
+    const dB=Math.min(...bases.map(B=>Math.hypot(B.x-p.x,B.z-p.z))),dP=Math.min(1e9,...HELI.pilotos.map(o=>o.p.distanceTo(p)));
+    if(dP<1300||[[6,0],[-6,0],[0,6],[0,-6]].some(([dx,dz])=>Math.abs(relevo(p.x+dx,p.z+dz)-p.y)>1.2))continue;   /* só lugar plano (o militar e o painel no chão) */const n=dB+0.3*Math.min(dP,3000);if(dB>2200&&n>nota){nota=n;melhor=p;}}
+  return melhor||heliPonto(1500,6800,true,rng);}
 function heliAlvo(nome,cor,g,p,vida,tipo){const id=HELI.idN--,o={g,pos:p.clone(),vel:new V3(),q:new QT(),alvoP:p.clone(),alvoQ:new QT(),tRec:performance.now(),vida,vidaMax:vida,vivo:true,
     nome,cor,navio:true,esc:1,tipo,t:0,id};g.position.copy(p);g.visible=true;
   o.rot=document.createElement('div');o.rot.className='rot';o.rot.innerHTML='<span></span><b><i></i></b>';o.rot.style.color=cor;$('#rotulos').appendChild(o.rot);
@@ -92,10 +112,13 @@ function heliIniciar(){const rng=rnd(4242);HELI.on=true;HELI.fim=false;HELI.vida
   for(let i=0;i<6;i++){const p=heliPonto(800,6000,true,rng);const g=heliAA();const o=heliAlvo(`🔫 Antiaérea ${i+1}`,'#e8443a',g,p,40,'aa');}
   for(let i=0;i<2;i++){const p=heliPonto(1500,4500,false,rng);const o=heliAlvo(`🚤 Lancha ${i+1}`,'#e8443a',navioB('#8a96a8'),p,120,'lancha');o.g.scale.setScalar(0.45);o.c=p.clone();o.ang=rng()*6;}
   for(const o of HELI.alvos)cena.add(o.g);
-  for(let i=0;i<4;i++){const p=heliPonto(1200,5600,true,rng);const g=heliPiloto();g.position.copy(p);HELI.pilotos.push({g,p,ok:false});}
+  for(let i=0;i<4;i++){const p=heliPontoResgate(rng);const g=heliPiloto();g.position.copy(p);g.rotation.y=rng()*6.28;g.updateMatrixWorld();
+    for(const c of g.children){if(c===g.userData.raio)continue;c.getWorldPosition(_v1);const ch=chaoMalha(_v1.x,_v1.z);c.position.y+=ch-p.y;}   /* tudo em cima do chão (encosta) */
+    g.userData.lata.y+=chaoMalha(...(()=>{_v1.copy(g.userData.lata).applyAxisAngle(_hY,g.rotation.y).add(p);return[_v1.x,_v1.z];})())-p.y;
+    HELI.pilotos.push({g,p,ok:false});}
   for(const [tipo,n] of[['comb',4],['mun',3],['blind',2]])for(let i=0;i<n;i++){const p=heliPonto(900,5600,true,rng);const g=heliCaixa(tipo);g.position.copy(p);HELI.caixas.push({g,p,tipo,ok:false});}
   heliNascer();setTimeout(()=>heliMapaAbre(true),300);}
-function heliNascer(){const B=BASES[HELI_CASA];EU.pos.set(B.x,BASE_H+30,B.z);HELI.yaw=Math.atan2(B.z,-B.x);HELI.vel.set(0,0,0);HELI.agl=32;HELI.comb=100;EU.vida=100;HELI.bordo=0;
+function heliNascer(){const B=BASES[HELI_CASA];EU.pos.set(B.x,BASE_H+30,B.z);HELI.yaw=Math.atan2(B.z,-B.x);HELI.vel.set(0,0,0);HELI.vs=0;HELI.comb=100;EU.vida=100;HELI.bordo=0;
   BALAS_N=1200;MUN=8;BOMBAS=0;EU.vivo=true;EU.vel=0;EU.turbo=1;JATO.visible=true;document.body.classList.remove('morto');$('#morte').style.display='none';TRAVA.id=0;TRAVA.t=0;
   EU.q.setFromAxisAngle(_v1.set(0,1,0),HELI.yaw);}
 function heliSair(){if(!HELI.on)return;HELI.on=false;for(const p of HELI.pilotos)cena.remove(p.g);for(const c of HELI.caixas)cena.remove(c.g);for(const c of HELI.coisas)cena.remove(c);for(const o of HELI.alvos)cena.remove(o.g);HELI.pausa=false;$('#heliMapa').style.display='none';
@@ -135,22 +158,37 @@ function heliPasso(dt){if(!HELI.on||HELI.pausa)return;const agora=performance.no
   _hF.copy(HELI_CAM).negate().setY(0).normalize();_hR.set(-_hF.z,0,_hF.x);
   const ix=((TEC.KeyD||TEC.ArrowRight)?1:0)-((TEC.KeyA||TEC.ArrowLeft)?1:0)+(JOY.x||0),iy=((TEC.KeyW||TEC.ArrowUp)?1:0)-((TEC.KeyS||TEC.ArrowDown)?1:0)-(JOY.y||0);
   _hD.copy(_hF).multiplyScalar(iy).addScaledVector(_hR,ix);if(_hD.lengthSq()>1)_hD.normalize();
-  const k=1-Math.exp(-1.8*dt);HELI.vel.lerp(_v1.copy(_hD).multiplyScalar(HELI_VMAX),k);
-  // altura: E/🔥 sobe, C/🪂 desce; segue o terreno (olha também à frente p/ não bater no morro)
-  if(TEC.KeyE||BT.turbo)HELI.agl=Math.min(160,HELI.agl+40*dt);if(TEC.KeyC||BT.freio)HELI.agl=Math.max(6,HELI.agl-40*dt);
-  const chao=Math.max(relevo(EU.pos.x,EU.pos.z),relevo(EU.pos.x+HELI.vel.x*1.5,EU.pos.z+HELI.vel.z*1.5),relevo(EU.pos.x+HELI.vel.x*3,EU.pos.z+HELI.vel.z*3)*0.9,0);
-  const alvoY=chao+HELI.agl;EU.pos.x+=HELI.vel.x*dt;EU.pos.z+=HELI.vel.z*dt;EU.pos.y+=(alvoY-EU.pos.y)*Math.min(1,2.5*dt);EU.pos.y=Math.max(EU.pos.y,relevo(EU.pos.x,EU.pos.z)+3);
+  // (19/11) ALTITUDE MANTIDA (não segue mais o relevo): E/🔥 sobe, C/🪂 desce, solto = segura a altura.
+  // Subir pede potência: devagar (13 m/s), tira velocidade e gasta mais combustível; descer é a 9 m/s. O morro é obstáculo: bate e machuca.
+  const agl=EU.pos.y-Math.max(0,relevo(EU.pos.x,EU.pos.z));   /* (19/11) mais rápido p/ jogabilidade: sobe 20, desce 15; perto do chão (<25 m) a descida amacia p/ 6 m/s */
+  const vsAlvo=(TEC.KeyE||BT.turbo)?20:(TEC.KeyC||BT.freio)?(agl<25?-6:-15):0;HELI.vs+=(vsAlvo-HELI.vs)*Math.min(1,(vsAlvo>HELI.vs?2.2:3)*dt);
+  const subindo=Math.max(0,HELI.vs)/20,k=1-Math.exp(-1.8*dt);HELI.vel.lerp(_v1.copy(_hD).multiplyScalar(HELI_VMAX*(1-0.4*subindo)),k);
+  const vh0=Math.hypot(HELI.vel.x,HELI.vel.z),nx=EU.pos.x+HELI.vel.x*dt,nz=EU.pos.z+HELI.vel.z*dt;
+  const chN=Math.max(0,relevo(nx,nz),vh0>1?relevo(nx+HELI.vel.x/vh0*10,nz+HELI.vel.z/vh0*10)-2:0)+2;   // chão sob o helicóptero e sob o disco do rotor à frente
+  if(chN>EU.pos.y+0.5&&vh0>3){   // encosta na frente mais alta que o helicóptero: bate
+    if(vh0>14&&performance.now()-(HELI.tBate||0)>800){HELI.tBate=performance.now();heliDano(Math.min(30,vh0*0.35));heliMsg('💥 Bateu no morro! Suba antes (E / 🔥)',2500);fx(_v1.copy(EU.pos).addScaledVector(HELI.vel,0.15),0xb39872,10,1,2,false,2);}
+    HELI.vel.multiplyScalar(-0.25);}
+  else{EU.pos.x=nx;EU.pos.z=nz;}
+  EU.pos.y=Math.min(900,EU.pos.y+HELI.vs*dt);
+  const chao=Math.max(0,relevo(EU.pos.x,EU.pos.z))+2;
+  if(EU.pos.y<chao){if(HELI.vs<-7&&performance.now()-(HELI.tBate||0)>800){HELI.tBate=performance.now();heliDano(Math.min(40,(-HELI.vs-7)*8));heliMsg('💥 Pouso duro!',1800);}
+    EU.pos.y=chao;if(HELI.vs<0)HELI.vs=0;}
+  // aviso de terreno: morro à frente nos próximos ~3 s acima da altura atual
+  if(vh0>15){const ah=Math.max(relevo(EU.pos.x+HELI.vel.x*1.5,EU.pos.z+HELI.vel.z*1.5),relevo(EU.pos.x+HELI.vel.x*3,EU.pos.z+HELI.vel.z*3));
+    if(ah+4>EU.pos.y&&agora-(HELI.tAvisoT||0)>1200){HELI.tAvisoT=agora;heliMsg("⚠️ MORRO À FRENTE — SUBA! (E / 🔥)",1100);}}
   const sp=Math.hypot(HELI.vel.x,HELI.vel.z);EU.vel=sp;
   // nariz vira p/ onde está indo (ou p/ o alvo travado quando parado)
   const ot=TRAVA.id&&OUT.get(TRAVA.id);let yawAlvo=HELI.yaw;
   if(sp>6)yawAlvo=Math.atan2(-HELI.vel.z,HELI.vel.x);else if(ot)yawAlvo=Math.atan2(-(ot.pos.z-EU.pos.z),ot.pos.x-EU.pos.x);
   let dy=((yawAlvo-HELI.yaw+Math.PI*3)%(Math.PI*2))-Math.PI;HELI.yaw+=dy*Math.min(1,3*dt);
+  /* (19/11) câmera trava atrás do nariz quando anda p/ frente (W / joystick p/ cima); arrastar a tela solta por 2 s */
+  if(iy>0.2&&sp>10&&!_arr&&agora-(HCAM.tMan||0)>2000){const az=Math.PI-HELI.yaw,da=((az-HCAM.az+Math.PI*3)%(Math.PI*2))-Math.PI;HCAM.az+=da*Math.min(1,1.6*dt);heliCamAplica();}
   // inclina na direção do movimento (pitch p/ frente, roll na curva)
   const fwdV=HELI.vel.x*Math.cos(HELI.yaw)-HELI.vel.z*Math.sin(HELI.yaw);_hE.set(0,HELI.yaw,0);_hQ.setFromEuler(_hE);
   EU.q.copy(_hQ).multiply(_v4q.setFromEuler(_hE2.set(-dy*0.5,0,-fwdV/HELI_VMAX*0.28)));
   JATO.position.copy(EU.pos);JATO.quaternion.copy(EU.q);   // o modelo acompanha
   // combustível
-  HELI.comb-=dt*100/300;EU.turbo=Math.max(0,HELI.comb/100);if(HELI.comb<=0){heliCaiu('⛽ Sem combustível!');return;}
+  HELI.comb-=dt*100/300*(1+0.7*Math.max(0,HELI.vs)/20);EU.turbo=Math.max(0,HELI.comb/100);if(HELI.comb<=0){heliCaiu('⛽ Sem combustível!');return;}
   if(HELI.comb<20&&Math.floor(agora/600)%2)$('#aviso').style.display='block',$('#aviso').textContent='⛽ COMBUSTÍVEL ACABANDO! Pegue um barril vermelho';else if(HELI.comb>=20)$('#aviso').style.display='none';
   // trava (Hellfire): o mais perto na frente, só se já aparece na tela (19/11: antes travava fora da vista)
   let melhor=null,dm=1600;frente(EU.q,_v2).setY(0).normalize();
@@ -194,11 +232,16 @@ function heliPasso(dt){if(!HELI.on||HELI.pausa)return;const agora=performance.no
   // caixas
   for(const c of HELI.caixas){if(c.ok)continue;c.g.rotation.y+=dt;if(Math.hypot(c.p.x-EU.pos.x,c.p.z-EU.pos.z)<20&&EU.pos.y-c.p.y<30){c.ok=true;c.g.visible=false;SOM.ok();
     if(c.tipo==='comb'){HELI.comb=100;heliMsg('⛽ Tanque cheio!',2000);}else if(c.tipo==='mun'){BALAS_N=1200;MUN=8;heliMsg('🔫 Munição recarregada!',2000);}else{EU.vida=100;heliMsg('🛡️ Blindagem consertada!',2000);}}}
-  for(const p of HELI.pilotos)if(!p.ok&&!p.aBordo)p.g.children[3].scale.setScalar(1+0.25*Math.sin(agora/200));
+  for(const p of HELI.pilotos){if(p.ok||p.aBordo)continue;const u=p.g.userData;u.anel.scale.setScalar(1+0.25*Math.sin(agora/200));
+    const d=p.p.distanceTo(EU.pos);if(d>3000)continue;const t=agora/1000,mil=u.mil;
+    mil.rotation.y=Math.atan2(-(EU.pos.z-p.p.z),EU.pos.x-p.p.x)-p.g.rotation.y;   // vira p/ o helicóptero
+    for(const B of mil.userData.bracos){const a=2.55+0.5*Math.sin(t*5.5);B.o.rotation.x=-B.z*a;B.c.rotation.x=-B.z*0.25;}   // acena c/ os 2 braços por cima da cabeça
+    p.tF=(p.tF||0)+dt*(d<1600?7:3);while(p.tF>1){p.tF--;_v1.copy(u.lata).applyAxisAngle(_hY,p.g.rotation.y).add(p.p);
+      fx(_v1.add(_v2.set((Math.random()-0.5)*0.6,0.4,(Math.random()-0.5)*0.6)),Math.random()<0.5?0xff7a22:0xff9a3a,2.5+Math.random()*2,3.5+Math.random()*1.5,4,false,4+Math.random()*3);}}
   // painel
   const radar=HELI.alvos.filter(o=>o.tipo==='radar'),sam=HELI.alvos.filter(o=>o.tipo==='sam');
   $('#placar').innerHTML=`<div class="eu obj"><span>📡 ${radar.filter(o=>!o.vivo).length}/${radar.length} · 🚀 ${sam.filter(o=>!o.vivo).length}/${sam.length} · 🪂 ${HELI.salvos}/${HELI.pilotos.length}${HELI.bordo?' (a bordo '+HELI.bordo+')':''} · ⛽ ${Math.round(HELI.comb)}% · 🚁×${HELI.vidas}</span></div>`;
-  heliPoeira(dt);SOM.motor(60+sp,false,true);}
+  heliPoeira(dt);SOM.motor(60+sp+Math.max(0,HELI.vs)*6,false,true);}
 const _v4q=new QT(),_hE2=new THREE.Euler(0,0,0,'XYZ');
 
 // câmera isométrica: segue o helicóptero de longe, sempre do mesmo ângulo
@@ -217,7 +260,7 @@ function heliCamPadrao(){HCAM.az=HCAM0.az;HCAM.el=HCAM0.el;heliCamAplica();}
 let _arr=null;
 addEventListener('pointerdown',e=>{if(SALA!=='heli'||!HELI.on||HELI.pausa||e.target.closest('button,#zonaJoy,#heliMapa,#fimMis,#menu'))return;_arr={id:e.pointerId,x:e.clientX,y:e.clientY};});
 addEventListener('pointermove',e=>{if(!_arr||e.pointerId!==_arr.id||_pinca)return;const dx=e.clientX-_arr.x,dy=e.clientY-_arr.y;_arr.x=e.clientX;_arr.y=e.clientY;
-  HCAM.az+=dx*0.006;HCAM.el=Math.min(1.45,Math.max(0.3,HCAM.el+dy*0.005));heliCamAplica();});
+  HCAM.tMan=performance.now();HCAM.az+=dx*0.006;HCAM.el=Math.min(1.45,Math.max(0.3,HCAM.el+dy*0.005));heliCamAplica();});
 addEventListener('pointerup',e=>{if(_arr&&e.pointerId===_arr.id)_arr=null;});addEventListener('pointercancel',()=>{_arr=null;});
 addEventListener('contextmenu',e=>{if(SALA==='heli')e.preventDefault();});
 addEventListener('dblclick',e=>{if(SALA==='heli'&&HELI.on&&!e.target.closest('button,#heliMapa'))heliCamPadrao();});

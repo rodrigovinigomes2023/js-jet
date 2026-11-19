@@ -39,6 +39,7 @@
   #bVida i{background:linear-gradient(90deg,#3ad07a,#9be15d)}
   #bTurboB i{background:linear-gradient(90deg,#ff9a2a,#ffd23a)}
   #info{display:flex;justify-content:space-between;font-weight:700}
+  #pLive .liveTit{font-size:22px;font-weight:800;margin:6px 0}#pLive .liveTxt{opacity:.85;font-size:14px;margin-bottom:10px}#liveEst{min-height:20px;font-size:14px;margin-top:8px}
   #menu button.live{background:linear-gradient(180deg,#ff2d6f,#7a2cff);color:#fff}
   #liveA{left:50%;top:22%;transform:translateX(-50%);width:min(92vw,560px);text-align:center;pointer-events:none}
   #liveA .la{background:#0b1a2add;border:2px solid #7fd3ff55;border-radius:12px;padding:6px 12px;margin-bottom:6px;font-size:16px;font-weight:800;animation:some 3.5s forwards}
@@ -245,17 +246,25 @@
       <div id="ola"></div>
       <label><input type="checkbox" id="inverter"> Inverter subir/descer</label>
       <button id="bMissoes" class="mis">🎖️ MISSÕES · modo história</button>
-      <button id="bHeli" class="heli">🚁 HELICÓPTERO · ataque isométrico</button>
+      <button id="bHeli" class="heli">🚁 HELICÓPTERO</button>
       <button id="decolar">🤖 SALA COM BOTS</button>
-      <button id="salaPvp" class="pvp">⚔️ SALA SEM BOTS · bases</button>
+      <button id="salaPvp" class="pvp">⚔️ DEATHMATCH</button>
       <button id="salaLive" class="live">📺 SALA DA LIVE · o chat vira avião</button>
       <button id="bTreino" class="sec">🎓 TUTORIAL DE VOO</button>
+    </div>
+    <div id="pLive" style="display:none">
+      <div class="liveTit">📺 SALA DA LIVE</div>
+      <div class="liveTxt">Digite o <b>@ do TikTok</b> de quem está transmitindo. O chat dessa live vira avião no jogo.</div>
+      <input type="text" id="liveUser" maxlength="25" placeholder="@usuario" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <div id="liveEst"></div>
+      <button id="bLiveIr" class="live">📡 CONECTAR E DECOLAR</button>
+      <a id="bLiveVolta" class="link">← voltar</a>
     </div>
     <button id="bRank" class="sec">🏆 RANKING</button>
     <div id="erro"></div>
     <div class="dica">
       📱 <b>Celular:</b> arraste no lado esquerdo para pilotar · 🎯 atira · 🚀 míssil (trave a mira 1 s) · ✨ flare · 🔥 turbo<br>
-      ⚔️ <b>Sala sem bots:</b> você decola da sua base; chegar perto da base dos outros = míssil terra-ar 🛡️<br>
+      ⚔️ <b>Deathmatch:</b> você decola da sua base; chegar perto da base dos outros = míssil terra-ar 🛡️<br>
       ⌨️ <b>Teclado:</b> W/S acelera/desacelera · ↑ ↓ desce/sobe · ← → gira · A/D leme · E freio · G trem de pouso · Espaço atira · F míssil · Q bomba · X flare · Shift turbo · V cabine · Esc sai
     </div>
   </div>
@@ -276,7 +285,7 @@
 <div id="rank" style="display:none">
   <div class="card">
     <h2>🏆 Ranking</h2>
-    <div class="abas"><button data-s="pvp" class="on">⚔️ Sem bots</button><button data-s="bots">🤖 Com bots</button></div>
+    <div class="abas"><button data-s="pvp" class="on">⚔️ Deathmatch</button><button data-s="bots">🤖 Com bots</button></div>
     <div id="tRank"></div>
     <button id="bFecharRank" class="sec">VOLTAR</button>
   </div>

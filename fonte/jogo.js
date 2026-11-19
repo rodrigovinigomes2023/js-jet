@@ -104,7 +104,7 @@ function relevo(x,z){let h=0;for(const I of TER.ilhas)if(x>=I.x0&&x<=I.x1&&z>=I.
         if(oc>0){const f=1-0.5*oc;C[k]*=f;C[k+1]*=f;C[k+2]*=f*1.04;}}}
      for(let j=0;j<nz-1;j++)for(let i=0;i<nx-1;i++){const a=j*nx+i;ix.push(a,a+nx,a+1,a+1,a+nx,a+nx+1);}
      const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(P,3));g.setAttribute('color',new THREE.BufferAttribute(C,3));g.setIndex(ix);g.computeVertexNormals();
-     cena.add(new THREE.Mesh(g,mI));
+     {const mi=new THREE.Mesh(g,mI);mi.userData.ilha=true;cena.add(mi);}   /* (19/11) marcada: o modo heli mede o chão pela malha */
      // água rasa: células com algum canto entre -14 m e +1 m
      const mapa=new Int32Array(nx*nz).fill(-1),vtx=(id)=>{if(mapa[id]<0){mapa[id]=PR.length/3;const h=HH[id],k=id*3;PR.push(P[k],0.5,P[k+2]);
          const t=Math.min(1,Math.max(0,1+h/14)),es=Math.min(1,Math.max(0,(h+2.5)/2.5));CR4.push(0.25+0.7*es,0.75+0.22*es,0.75+0.2*es,h>0.8?0:0.55*t+0.3*es);}return mapa[id];};
@@ -1301,7 +1301,20 @@ $('#bCam').addEventListener('click',async()=>{
     if(CAM_I>=cams.length){paraCam();CAM_I=-1;liveAlerta({k:'info',txt:'📷 câmera desligada'});return;}
     const nome=await abreCam(cams[CAM_I].deviceId);liveAlerta({k:'info',txt:`📷 ${nome||'câmera '+(CAM_I+1)} (${CAM_I+1}/${cams.length})`});}
   catch(e){paraCam();CAM_I=-1;liveAlerta({k:'info',txt:'📷 não deu p/ abrir a câmera: '+(e.name==='NotAllowedError'?'permissão negada':e.message)});}});
-$('#salaLive').addEventListener('click',()=>{$('#decolar').dataset.sala='live';$('#decolar').click();});
+/* (19/11) sala da live: primeiro o @ de quem transmite; o servidor liga a ponte do TikTok p/ esse @ */
+$('#salaLive').addEventListener('click',()=>{$('#pSalas').style.display='none';$('#pLive').style.display='';$('#liveEst').textContent='';
+  let u='';try{u=localStorage.getItem('jsjet-live')||'';}catch(e){}$('#liveUser').value=u;$('#liveUser').focus();});
+$('#bLiveVolta').addEventListener('click',()=>{$('#pLive').style.display='none';$('#pSalas').style.display='';});
+$('#liveUser').addEventListener('keydown',e=>{if(e.key==='Enter')$('#bLiveIr').click();});
+$('#bLiveIr').addEventListener('click',async()=>{const u=$('#liveUser').value.trim().replace(/^@+/,''),est=$('#liveEst');
+  if(!/^[A-Za-z0-9_.]{2,24}$/.test(u)){est.textContent='⚠️ Digite um @ válido (letras, números, ponto e _).';return;}
+  est.textContent='📡 ligando a ponte do TikTok…';$('#bLiveIr').disabled=true;
+  try{const r=await fetch('/api/live/ponte',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({usuario:u})}),j=await r.json();
+    if(!r.ok){est.textContent='⚠️ '+(j.erro||'erro');return;}
+    try{localStorage.setItem('jsjet-live',u);}catch(e){}
+    $('#pLive').style.display='none';$('#pSalas').style.display='';$('#decolar').dataset.sala='live';$('#decolar').click();
+    setTimeout(()=>liveAlerta({k:'info',txt:j.estado==='conectada'?'📡 conectado na live de '+j.usuario:'⏳ procurando a live de '+j.usuario+'…'}),800);}
+  catch(e){est.textContent='⚠️ servidor não respondeu';}finally{$('#bLiveIr').disabled=false;}});
 $('#salaPvp').addEventListener('click',()=>{SALA='pvp';$('#decolar').dataset.sala='pvp';$('#decolar').click();});
 $('#decolar').addEventListener('click',async()=>{SALA=$('#decolar').dataset.sala||'bots';delete $('#decolar').dataset.sala;EU.nome=CONTA?CONTA.nome:'Convidado';
   try{localStorage.setItem('jsjet-inv',$('#inverter').checked?'1':'0');}catch(e){}

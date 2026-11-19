@@ -109,8 +109,27 @@ function criarSabre3D(pint){const g=new THREE.Group(),G_=miGeo(),d=window.MI35,c
     obj.position.copy(h.point).addScaledVector(h.face.normal,0.03);obj.lookAt(_o.copy(h.point).add(h.face.normal));g.add(obj);};
   for(const z of[-1,1]){const c=new THREE.Group();[['#1e8a3c',0.6],['#f2c230',0.43],['#1f4fa8',0.27],['#ffffff',0.09]].forEach(([k,r],i)=>{const dd=new THREE.Mesh(new THREE.CircleGeometry(r,24),M(k,0.6));dd.position.z=i*0.006;c.add(dd);});cola(-4.6,2.6,z,c);
     const f=new THREE.Group();box(0.5,0.9,0.01,M('#1e8a3c',0.6),-0.25,0,0,f);box(0.5,0.9,0.01,M('#f2c230',0.6),0.25,0,0,f);cola(-12.2,4.2,z,f);}
-  g.userData={rotor,cauda,disco,portas:[],eixoCauda:'z'};return g;}
+  cabineInterior(g);g.userData={rotor,cauda,disco,portas:[],eixoCauda:'z'};return g;}
 const _o=new THREE.Vector3();
+// (19/11) interior das 2 cabines (o modelo baixado só tem o vidro): painel com telas, mostradores, consoles laterais, manche, assento; atirador com a mira periscópica
+function telaTex(tipo){const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d');x.fillStyle='#04140a';x.fillRect(0,0,128,128);x.strokeStyle='#5dff8a';x.fillStyle='#5dff8a';x.lineWidth=2;x.font='12px monospace';
+  if(tipo==='mapa'){for(let i=0;i<9;i++){x.globalAlpha=0.35;x.beginPath();x.moveTo(0,i*16);x.lineTo(128,i*16+20);x.stroke();}x.globalAlpha=1;x.beginPath();x.moveTo(64,52);x.lineTo(58,70);x.lineTo(70,70);x.closePath();x.fill();x.fillText('N',60,14);x.fillStyle='#ff5a4a';x.fillRect(90,30,6,6);x.fillRect(30,90,6,6);}
+  else if(tipo==='hor'){x.fillStyle='#173a5c';x.fillRect(0,0,128,64);x.fillStyle='#4a3218';x.fillRect(0,64,128,64);x.strokeStyle='#fff';x.beginPath();x.moveTo(30,64);x.lineTo(98,64);x.stroke();x.beginPath();x.moveTo(44,64);x.lineTo(56,72);x.lineTo(72,72);x.lineTo(84,64);x.stroke();x.fillStyle='#fff';x.fillText('ALT 50',4,120);x.fillText('120',96,120);}
+  else{x.beginPath();x.arc(64,64,40,0,7);x.stroke();x.beginPath();x.moveTo(64,20);x.lineTo(64,108);x.moveTo(20,64);x.lineTo(108,64);x.stroke();x.fillText('TV 10x',38,122);x.strokeRect(54,54,20,20);}
+  const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;return t;}
+function cabineInterior(g){const pr=M('#1b1f22',0.85),cz=M('#3b4247',0.8),ass=M('#2a2f24',0.95),tela=t=>new THREE.MeshBasicMaterial({map:telaTex(t)});
+  const relogio=(x,y,z,pai)=>{const m=new THREE.Mesh(G('rel',()=>new THREE.CircleGeometry(0.045,16)),new THREE.MeshBasicMaterial({color:0x8e9086}));m.position.set(x,y,z);m.rotation.y=Math.PI/2;pai.add(m);};
+  // piloto (atrás, em cima): olho ~ (3.55, 2.62)
+  const P=new THREE.Group();P.position.set(4.3,2.12,0);P.rotation.z=-0.55;g.add(P);box(0.08,0.36,1.0,pr,0,0,0,P);box(0.12,0.04,1.0,pr,0.02,0.2,0,P);
+  for(const [z,t] of[[-0.27,'mapa'],[0.0,'hor'],[0.27,'mapa']]){const m=new THREE.Mesh(G('tela',()=>new THREE.PlaneGeometry(0.22,0.22)),tela(t));m.position.set(-0.045,0.0,z);m.rotation.y=-Math.PI/2;P.add(m);}
+  for(const z of[-0.44,0.44])for(const y of[-0.1,0.08])relogio(-0.045,y,z,P);
+  for(const z of[-1,1])box(0.9,0.2,0.22,cz,3.7,1.95,z*0.42,g);cil(0.02,0.02,0.45,pr,3.75,2.1,0,g,6).rotation.z=-0.2;esf(0.04,pr,3.82,2.32,0,g);   // consoles + manche
+  box(0.15,0.8,0.6,ass,3.05,2.4,0,g);box(0.55,0.12,0.55,ass,3.3,2.0,0,g);
+  // atirador (frente, embaixo): olho ~ (5.55, 1.95)
+  const A=new THREE.Group();A.position.set(6.12,1.74,0);A.rotation.z=-0.6;g.add(A);box(0.08,0.3,0.7,pr,0,0,0,A);
+  const mi=new THREE.Mesh(G('tela2',()=>new THREE.PlaneGeometry(0.24,0.24)),tela('mira'));mi.position.set(-0.045,0.02,-0.15);mi.rotation.y=-Math.PI/2;A.add(mi);
+  for(const z of[0.1,0.24])relogio(-0.045,0.05,z,A);   // mira periscópica
+  for(const z of[-1,1])box(0.6,0.16,0.18,cz,5.6,1.4,z*0.36,g);box(0.15,0.7,0.55,ass,5.1,1.75,0,g);}
 
 // ---------- modelo atual do jogo (p/ comparar)
 function criarAtual(cor='#4d5a3c'){const g=new THREE.Group(),ve=M(cor,0.7),ve2=M('#3c4730',0.7),esc_=M('#22282b',0.6),vid=M('#1a2733',0.15),pre=M('#2b2f33',0.5);
@@ -159,14 +178,19 @@ const $n=document.getElementById('nome');
 function linha(id,itens,f,ativo){const l=document.getElementById(id);for(const it of itens){const b=document.createElement('button');b.textContent=it.nome;if(it===ativo)b.classList.add('on');
   b.onclick=()=>{[...l.querySelectorAll('button')].forEach(x=>x.classList.remove('on'));b.classList.add('on');f(it);};l.appendChild(b);}}
 linha('lM',MOD,m=>{mod=m;monta();},mod);linha('lP',PINT,p=>{pint=p;monta();},pint);
-const X=[{nome:'🚪 Porta aberta + tropa'},{nome:'⏯️ Rotor'},{nome:'🔭 Distância de jogo'}];
+const X=[{nome:'🚪 Porta aberta + tropa'},{nome:'⏯️ Rotor'},{nome:'🔭 Distância de jogo'},{nome:'👨‍✈️ Cabine do piloto'},{nome:'🎯 Cabine do atirador'},{nome:'↩️ Vista de fora'}];
 {const l=document.getElementById('lX');X.forEach((it,i)=>{const b=document.createElement('button');b.textContent=it.nome;if(i===1)b.classList.add('on');l.appendChild(b);
   b.onclick=()=>{if(i===0){porta=!porta;b.classList.toggle('on',porta);aplicaPorta();}else if(i===1){gira=!gira;b.classList.toggle('on',gira);}
-    else{cam.position.set(-95,165,95).add(ctl.target);}};});}
+    else if(i===2){cam.position.set(-95,165,95).add(ctl.target);}else if(i===3)cabine(3.55,2.62);else if(i===4)cabine(5.72,2.08,0.3);else fora();};});}
+// vista de dentro: câmera no olho do tripulante, olhando p/ frente; arrastar = virar a cabeça (gira em volta de um ponto 5 cm à frente)
+function cabine(x,y,baixo=0.16){if(mod.id!=='sabre3d'){mod=MOD[0];monta();}dentro=true;heli.traverse(m=>{if(m.isMesh&&m.material.side!==THREE.DoubleSide){m.material.side=THREE.DoubleSide;m.material.needsUpdate=true;}});
+  cam.fov=75;cam.near=0.05;cam.updateProjectionMatrix();cam.position.set(x,y,0);ctl.target.set(x+0.05*Math.cos(baixo),y-0.05*Math.sin(baixo),0);ctl.minDistance=0.01;ctl.maxDistance=0.06;ctl.enablePan=false;ctl.rotateSpeed=-0.35;ctl.update();}
+function fora(){dentro=false;cam.fov=40;cam.near=0.3;cam.updateProjectionMatrix();ctl.minDistance=0;ctl.maxDistance=Infinity;ctl.enablePan=true;ctl.rotateSpeed=1;ctl.target.set(-1,2.5,0);cam.position.set(22,12,26);ctl.update();}
+let dentro=false;
 monta();
 addEventListener('resize',()=>{R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();});
 let t0=performance.now();(function loop(){requestAnimationFrame(loop);const t=performance.now(),dt=Math.min(0.05,(t-t0)/1000);t0=t;const u=heli.userData;
   if(u.rotor){u.rotor.rotation.y+=gira?dt*14:0;u.cauda.rotation[mod.id==='sabre'?'z':'z']+=gira?dt*30:0;if(u.disco)u.disco.visible=gira;}
   heli.updateMatrixWorld();CAMO_INV.value.copy(heli.matrixWorld).invert();ctl.update();R.render(cena,cam);})();
-window.PV={cena,cam,ctl,set:(m,p,po)=>{mod=MOD.find(x=>x.id===m)||mod;pint=PINT.find(x=>x.id===p)||pint;porta=!!po;monta();}};
+window.PV={cena,cam,ctl,cabine,fora,set:(m,p,po)=>{mod=MOD.find(x=>x.id===m)||mod;pint=PINT.find(x=>x.id===p)||pint;porta=!!po;monta();}};
 </script></body></html>

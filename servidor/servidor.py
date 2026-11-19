@@ -1622,6 +1622,65 @@ async def api_live(req):
     return web.json_response({'ok': ok, 'avioes': sum(1 for a in AV.values() if a.sala == 'live' and a.bot)})
 
 
+
+# (19/11) ponte do TikTok ligada pelo próprio jogo: antes de entrar na sala da live, o host digita o @ de quem
+# está transmitindo; o servidor sobe scripts/tiktok/ponte.py p/ esse @ (uma ponte por vez; @ novo troca a ponte).
+import re as _re
+PONTE = {'proc': None, 'usuario': None, 'estado': 'desligada', 'tarefa': None}
+_RAIZ = Path(__file__).resolve().parent.parent
+_PONTE_PY = _RAIZ / 'scripts' / 'tiktok' / '.venv' / 'bin' / 'python'
+
+
+def _ponte_estado(linha):
+    for marca, est in (('✅', 'conectada'), ('⏳', 'aguardando'), ('🔚', 'acabou'), ('🔌', 'aguardando'), ('⚠️ jogo', None), ('⚠️', 'erro')):
+        if marca in linha:
+            return est
+    return None
+
+
+async def _ponte_le(proc, usuario):
+    async for b in proc.stdout:
+        linha = b.decode('utf-8', 'replace').rstrip()
+        print('[ponte]', linha, flush=True)
+        est = _ponte_estado(linha)
+        if est and PONTE['proc'] is proc and est != PONTE['estado']:
+            PONTE['estado'] = est
+            txt = {'conectada': f'📡 conectado na live de {usuario}', 'aguardando': f'⏳ esperando {usuario} abrir a live…',
+                   'acabou': f'🔚 a live de {usuario} acabou', 'erro': f'⚠️ problema na ponte do TikTok ({usuario}) — tentando de novo'}[est]
+            await todos({'t': 'live', 'k': 'info', 'txt': txt}, 'live')
+    if PONTE['proc'] is proc:
+        PONTE.update(proc=None, estado='desligada')
+
+
+async def ponte_liga(usuario):
+    if PONTE['proc'] and PONTE['proc'].returncode is None:
+        if PONTE['usuario'] == usuario:
+            return
+        PONTE['proc'].terminate()
+    proc = await asyncio.create_subprocess_exec(str(_PONTE_PY), '-u', str(_RAIZ / 'scripts' / 'tiktok' / 'ponte.py'), usuario,
+                                                f'http://127.0.0.1:{PORTA}', cwd=str(_RAIZ),
+                                                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+    PONTE.update(proc=proc, usuario=usuario, estado='iniciando')
+    PONTE['tarefa'] = asyncio.create_task(_ponte_le(proc, usuario))
+
+
+async def api_ponte(req):
+    if req.method == 'GET':
+        return web.json_response({'usuario': PONTE['usuario'], 'estado': PONTE['estado']})
+    if not _rede_de_casa(req):
+        return web.json_response({'erro': 'A ponte do TikTok só liga pela rede de casa.'}, status=403)
+    try:
+        d = await req.json()
+    except Exception:
+        return web.json_response({'erro': 'json'}, status=400)
+    u = str(d.get('usuario') or '').strip().lstrip('@')
+    if not _re.fullmatch(r'[A-Za-z0-9_.]{2,24}', u):
+        return web.json_response({'erro': 'Esse @ não parece válido (só letras, números, ponto e _).'}, status=400)
+    if not _PONTE_PY.exists():
+        return web.json_response({'erro': 'Ponte do TikTok não instalada neste servidor.'}, status=500)
+    await ponte_liga('@' + u)
+    return web.json_response({'usuario': PONTE['usuario'], 'estado': PONTE['estado']})
+
 # ---------------------------------------------------------------- jogadores
 async def ws_jogo(req):
     ws = web.WebSocketResponse(heartbeat=10, receive_timeout=10)   # 10 s calado (app em 2º plano) = saiu
@@ -1829,6 +1888,7 @@ def main():
     app.router.add_get('/api/rank', api_rank)
     app.router.add_get('/api/missoes', api_missoes)
     app.router.add_post('/api/live', api_live)
+    app.router.add_route('*', '/api/live/ponte', api_ponte)
     app.router.add_get('/', arquivo)
     app.router.add_get('/{arq}', arquivo)
     app.on_startup.append(iniciar)
