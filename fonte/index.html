@@ -75,6 +75,12 @@
   .rot{position:fixed;transform:translate(-50%,-100%);font-size:12px;font-weight:700;white-space:nowrap;pointer-events:none;text-align:center;text-shadow:0 1px 3px #000}
   .rot b{display:block;height:3px;background:#0008;margin-top:2px;border-radius:2px;overflow:hidden}
   .rot b i{display:block;height:100%;background:#ff5a4a}
+  .aq{position:fixed;pointer-events:none;display:none;transform:translate(-50%,-50%) rotate(45deg);filter:drop-shadow(0 0 1px #000);--l:30%;--w:1.5px;background-repeat:no-repeat;
+    background-image:linear-gradient(currentColor,currentColor),linear-gradient(currentColor,currentColor),linear-gradient(currentColor,currentColor),linear-gradient(currentColor,currentColor),linear-gradient(currentColor,currentColor),linear-gradient(currentColor,currentColor),linear-gradient(currentColor,currentColor),linear-gradient(currentColor,currentColor);
+    background-position:left top,left top,right top,right top,left bottom,left bottom,right bottom,right bottom;
+    background-size:var(--l) var(--w),var(--w) var(--l),var(--l) var(--w),var(--w) var(--l),var(--l) var(--w),var(--w) var(--l),var(--l) var(--w),var(--w) var(--l)}
+  .aq.trav{transform:translate(-50%,-50%);--w:2px;animation:aqPisca .3s steps(1) infinite}
+  @keyframes aqPisca{0%{color:#ff3b30}50%{color:#ffd23a}}
   #trava{left:0;top:0;width:58px;height:58px;border:3px solid #ffd23a;border-radius:6px;display:none;transition:transform .08s}
   #trava.ok{border-color:#ff3b30;box-shadow:0 0 12px #ff3b30}
   #alerta{left:50%;top:22%;transform:translateX(-50%);font-size:24px;font-weight:900;color:#fff;background:#d01c1ccc;padding:6px 16px;border-radius:10px;display:none;animation:pisca .3s infinite alternate}

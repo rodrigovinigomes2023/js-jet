@@ -136,17 +136,20 @@ function relevo(x,z){let h=0;for(const I of TER.ilhas)if(x>=I.x0&&x<=I.x1&&z>=I.
     anelP(x,z,r*0.985,r*1.005,0.0,0.85,es,1.0,48);anelP(x,z,r*1.005,r*1.045,0.85,0,es,1.0,48);}
   const gR=new THREE.BufferGeometry();gR.setAttribute('position',new THREE.Float32BufferAttribute(P,3));gR.setAttribute('color',new THREE.Float32BufferAttribute(C,4));gR.setIndex(ix);
   const rasa=new THREE.Mesh(gR,new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-16}));rasa.renderOrder=1;cena.add(rasa);}
-let mNuvem=null;   // (10/11) nuvens: o sprite gira junto com a câmera; desfaz o giro (rolagem) a cada quadro
-const mNuvens=[];
-{const r=rnd(77);   // (11/11) 4 formatos de nuvem desenhados uma vez: bolhas brancas, topo claro e base cinza-azulada
-  for(let v=0;v<4;v++){const c=cv(256,128),g=c.getContext('2d'),rv=rnd(31+v*97);
-    for(let b=0;b<14;b++){const bx=40+rv()*176,by=58+rv()*34-(1-Math.abs(bx-128)/128)*22,br=18+rv()*30*(1-Math.abs(bx-128)/200),gr=g.createRadialGradient(bx,by,0,bx,by,br);
-      gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(0.6,'rgba(255,255,255,.8)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,256,128);}
-    g.globalCompositeOperation='source-atop';const lg=g.createLinearGradient(0,20,0,110);lg.addColorStop(0,'#ffffff');lg.addColorStop(0.55,'#f2f5f9');lg.addColorStop(1,'#a9b6c8');g.fillStyle=lg;g.fillRect(0,0,256,128);
-    mNuvens.push(new THREE.SpriteMaterial({map:tex(c),color:0xffffff,transparent:true,opacity:0.92,depthWrite:false,fog:true}));}
-  mNuvem=mNuvens[0];
-  for(let i=0;i<160;i++){const a=r()*Math.PI*2,d=i<70?r()*6500:6500+r()*11000,y=900+r()*900;for(let k=0;k<3;k++){const s=new THREE.Sprite(mNuvens[(i+k)%4]),e=300+r()*420;
-    s.scale.set(e*1.6,e*0.7,1);s.position.set(Math.cos(a)*d+(r()-0.5)*400,y+(r()-0.5)*80,Math.sin(a)*d+(r()-0.5)*400);cena.add(s);}}}
+// (18/11) nuvens 3D: cada nuvem é um cacho de bolhas (base reta, topo branco, base cinza-azulada), tudo numa malha só.
+// Antes eram sprites que viravam de frente p/ câmera e giravam junto com ela (looping ficava estranho).
+{const r=rnd(77),det=TOQUE?0:1,base=new THREE.IcosahedronGeometry(1,det),bp=base.attributes.position,nv=bp.count;
+  const P=[],N=[],C=[],cT=new THREE.Color('#ffffff').convertSRGBToLinear(),cB=new THREE.Color('#9fb0c4').convertSRGBToLinear(),c=new THREE.Color();
+  for(let i=0;i<160;i++){const a=r()*Math.PI*2,d=i<70?r()*6500:6500+r()*11000,y0=900+r()*900,cx=Math.cos(a)*d,cz=Math.sin(a)*d,e=420+r()*520,rot=r()*Math.PI;
+    const nb=6+Math.floor(r()*5),ca=Math.cos(rot),sa=Math.sin(rot);
+    for(let k=0;k<nb;k++){const u=(r()-0.5)*2,w=(r()-0.5)*0.9,lx=(u*ca-w*sa)*e*0.75,lz=(u*sa+w*ca)*e*0.75;
+      const rb=e*(0.22+r()*0.2)*(1-Math.abs(u)*0.35),hy=rb*(0.7+r()*0.35),by=(1-Math.abs(u))*e*0.12*r();
+      for(let v=0;v<nv;v++){let x=bp.getX(v),yy=bp.getY(v),z=bp.getZ(v);const fundo=yy<-0.3;if(fundo)yy=-0.3;
+        P.push(cx+lx+x*rb,y0+by+yy*hy,cz+lz+z*rb);
+        if(fundo)N.push(0,-1,0);else{const l=Math.hypot(x,yy*1.4,z)||1;N.push(x/l,yy*1.4/l,z/l);}
+        const t=Math.min(1,Math.max(0,(by+yy*hy+hy*0.3)/(hy*1.6+e*0.12)));c.copy(cB).lerp(cT,t*t*(3-2*t));C.push(c.r,c.g,c.b);}}}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(P,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(N,3));g.setAttribute('color',new THREE.Float32BufferAttribute(C,3));
+  const m=new THREE.Mesh(g,new THREE.MeshLambertMaterial({vertexColors:true,emissive:new THREE.Color('#5d6f86'),emissiveIntensity:0.35}));m.frustumCulled=false;cena.add(m);}
 
 // (11/11) texturas da base (desenhadas uma vez, servem p/ todas): pista inteira com marcas, concreto do pátio, taxiway, grama
 function texPistaC(){const L=4096,H=128,c=cv(L,H),g=c.getContext('2d'),r=rnd(77),pm=L/PISTA,py=H/46;g.fillStyle='#3e4146';g.fillRect(0,0,L,H);
@@ -767,7 +770,7 @@ function recebePlacar(l){PLACAR=l;const ids=new Set(l.map(x=>x.id));corBandeiras
     o.nome=(x.time&&x.time===MEU_TIME?'🟦 ':'')+x.nome;o.cor=x.cor;o.bot=x.bot;o.aliado=!!(x.time&&x.time===MEU_TIME);o.esc=x.esc||1;o.vidaMax=o.esc>1?400:100;o.g.scale.setScalar(o.navio?1:1.25*o.esc);if(o.navio&&!o.anel){o.anel=anelNavio(x.time===MEU_TIME);}
     o.rot.firstChild.textContent=o.nome;o.rot.style.color=x.cor;o.kh=x.kh||0;
     if(SALA==='live'&&o.bot&&x.time!==MEU_TIME&&o.avK!==(x.av||x.nome)){o.avK=x.av||x.nome;o.av=x.av;o.rav?.remove();o.rav=document.createElement('span');o.rav.className='rav';o.rav.innerHTML=avHTML(x.av,x.nome);o.rot.insertBefore(o.rav,o.rot.lastChild);}}
-  for(const [id,o] of OUT)if(!ids.has(id)){cena.remove(o.g);if(o.anel)cena.remove(o.anel);o.rot.remove();OUT.delete(id);}
+  for(const [id,o] of OUT)if(!ids.has(id)){cena.remove(o.g);if(o.anel)cena.remove(o.anel);o.rot.remove();o.aq?.remove();OUT.delete(id);}
   const ord=[...l].filter(x=>SALA!=='live'||!x.bot||x.pontos>0||x.id===EU.id).sort((a,b)=>b.pontos-a.pontos||a.mortes-b.mortes);
   $('#placar').innerHTML=ord.map(x=>`<div class="${x.id===EU.id?'eu':''}"><span style="color:${x.cor}">${SALA==='live'&&x.bot?(x.time===MEU_TIME?'🟦':'🟥'):x.bot?'🤖':'✈️'} ${esc(x.nome)}</span><span>${x.pontos} 🏆</span></div>`).join('');}
 function recebeSnap(j){const agora=performance.now();
@@ -866,17 +869,21 @@ function compensacao(W,H){const el=$('#lead');LEADD=0;if(!EU.vivo){el.style.disp
   _v1.copy(_lp).project(cam);if(_v1.z>=1){el.style.display='none';return;}
   el.style.display='block';el.style.left=((_v1.x+1)/2*W)+'px';el.style.top=((1-_v1.y)/2*H)+'px';el.style.color=alvo.cor||'#fff';
   _v1.subVectors(_lp,EU.pos).normalize();const erro=Math.acos(Math.min(1,_v1.dot(fw)))*d;el.classList.toggle('ok',erro<(alvo.navio?22:9*(alvo.esc||1)));}
+const _AQ=new V3();
 function hud(dt){const W=innerWidth,H=innerHeight;compensacao(W,H);
   const mira=$('#mira');if(EU.vivo){_v1.copy(EU.pos).addScaledVector(frente(EU.q),LEADD||700).project(cam);mira.style.display=CABINE?'none':'block';mira.style.left=((_v1.x+1)/2*W)+'px';mira.style.top=((1-_v1.y)/2*H)+'px';}else mira.style.display='none';
   tAcerto-=dt;mira.classList.toggle('acertou',tAcerto>0);
   let perto=null,dP=1e9;
-  const agoraH=performance.now();
+  const agoraH=performance.now(),otv=TRAVA.id&&OUT.get(TRAVA.id);
   for(const o of OUT.values()){const d=o.pos.distanceTo(EU.pos);
-    if(!o.vivo||agoraH-o.tRec>2500){o.rot.style.display='none';o.vis=false;continue;}if(d<dP&&!o.aliado){dP=d;perto=o;}
+    if(!o.aq){o.aq=document.createElement('div');o.aq.className='aq';$('#rotulos').appendChild(o.aq);}   // (19/11) marcador A 45°: quinas em losango, cresce perto
+    if(!o.vivo||agoraH-o.tRec>2500){o.rot.style.display='none';o.aq.style.display='none';o.vis=false;continue;}if(d<dP&&!o.aliado){dP=d;perto=o;}
     _v1.copy(o.pos).y+=o.navio?34:9;_v1.project(cam);
     if(!o.aliado&&agoraH>(o.tVis||0)){o.tVis=agoraH+250;o.semMorro=visada(EU.pos,o.pos);}   // (18/11) atrás do morro: sem rótulo (aliado vem por datalink)
-    if(_v1.z<1&&Math.abs(_v1.x)<1.1&&Math.abs(_v1.y)<1.1&&d<4500&&(o.aliado||o.semMorro!==false)){o.rot.style.display='block';o.rot.style.left=((_v1.x+1)/2*W)+'px';o.rot.style.top=((1-_v1.y)/2*H)+'px';
-      o.rot.firstChild.textContent=o.nome+' · '+Math.round(d)+'m';o.rot.lastChild.firstChild.style.width=Math.min(100,o.vida*100/(o.vidaMax||100))+'%';o.vis=true;}else{o.rot.style.display='none';o.vis=false;}}
+    if(_v1.z<1&&Math.abs(_v1.x)<1.1&&Math.abs(_v1.y)<1.1&&d<4500&&(o.aliado||o.semMorro!==false)){_AQ.copy(o.pos).project(cam);const ax=(_AQ.x+1)/2*W,ay=(1-_AQ.y)/2*H,as=Math.max(15,(o.navio?70:13)*H/(2*Math.tan(cam.fov*Math.PI/360)*d));
+      o.aq.style.display='block';o.aq.style.left=ax+'px';o.aq.style.top=ay+'px';o.aq.style.width=o.aq.style.height=as+'px';o.aq.style.color=o.rot.style.color;o.aq.classList.toggle('trav',o===otv&&TRAVA.t>=1);
+      o.rot.style.display='block';o.rot.style.left=ax+'px';o.rot.style.top=Math.min((1-_v1.y)/2*H,ay-as*0.72-4)+'px';
+      o.rot.firstChild.textContent=o.nome+' · '+Math.round(d)+'m';o.rot.lastChild.firstChild.style.width=Math.min(100,o.vida*100/(o.vidaMax||100))+'%';o.vis=true;}else{o.rot.style.display='none';o.aq.style.display='none';o.vis=false;}}
   const tv=$('#trava'),ot=TRAVA.id&&OUT.get(TRAVA.id);
   if(ot&&ot.vis&&EU.vivo&&MUN>0){_v1.copy(ot.pos).project(cam);tv.style.display='block';tv.style.left=((_v1.x+1)/2*W)+'px';tv.style.top=((1-_v1.y)/2*H)+'px';
     const ok=TRAVA.t>=1;tv.className='hud'+(ok?' ok':'');tv.style.transform=`translate(-50%,-50%) scale(${ok?1:1.6-0.6*Math.min(1,TRAVA.t)}) rotate(${ok?0:45*(1-Math.min(1,TRAVA.t))}deg)`;}else tv.style.display='none';
@@ -1065,11 +1072,11 @@ function quadro(){requestAnimationFrame(quadro);const agora=performance.now(),dt
   for(const o of OUT.values()){o.trem=(o.trem||0)+Math.sign((o.tremAlvo||0)-(o.trem||0))*Math.min(Math.abs((o.tremAlvo||0)-(o.trem||0)),0.4*dt);poeTrem(o.g,Math.round(o.trem*50)/50);}
   if(jogando)atualizaILS();else ILS.aneis.forEach(m=>m.visible=false);
   outros(dt);sombras();sprayOutros(dt);passoEspuma(dt);balas(dt);misseis(dt);bombas(dt);efeitos(dt);efeitosQueda(dt);if(jogando)mostraCcip();else ccip.visible=false;
-  if(jogando&&JATO){camera(dt);hud(dt);}
+  if(jogando&&JATO){camera(dt);hud(dt);}else{camAng+=dt*0.05;cam.up.set(0,1,0);cam.position.set(Math.cos(camAng)*2600,700,Math.sin(camAng)*2600);cam.lookAt(0,250,0);cam.updateMatrixWorld();}   // (18/11) câmera girando no menu (estava comentada por engano)
   if(Q.has('foto')&&GRIPEN){if(!window.__fJ){window.__fJ=criarJato('#3cd070');window.__fJ.position.set(0,3000,0);}   // ?foto: Gripen parado p/ conferir o modelo
     const f=window.__foto||[-20,6,14];cam.position.set(f[0],3000+f[1],f[2]);cam.up.set(0,1,0);cam.lookAt(0,3000,0);}
   if(window.__camFixa){const f=window.__camFixa;cam.position.set(...f[0]);cam.up.set(0,1,0);cam.lookAt(...f[1]);}   // (11/11) só p/ fotos de teste
-  cam.updateMatrixWorld();_v1.set(0,1,0).transformDirection(cam.matrixWorldInverse);{const rr=Math.atan2(-_v1.x,_v1.y);for(const m of mNuvens)m.rotation=rr;}if(marT)marT.value=agora/1000;   // nuvem deitada no horizonteelse{camAng+=dt*0.05;cam.up.set(0,1,0);cam.position.set(Math.cos(camAng)*2600,700,Math.sin(camAng)*2600);cam.lookAt(0,250,0);}
+  cam.updateMatrixWorld();if(marT)marT.value=agora/1000;
   const dentro=CABINE&&EU.vivo&&jogando&&JATO;document.body.classList.toggle('cabine',!!dentro);if(JATO)for(const m of JATO.userData.cab)m.visible=!dentro;
   R.autoClear=true;R.render(cena,cam);
   if(dentro){cabine(ULT_I);R.autoClear=false;R.clearDepth();R.render(cenaCab,camCab);R.autoClear=true;}
@@ -1129,7 +1136,7 @@ $('#decolar').addEventListener('click',async()=>{SALA=$('#decolar').dataset.sala
   SOM.ini();$('#erro').textContent='';
   if(TOQUE){try{await document.documentElement.requestFullscreen?.();}catch(e){}try{await screen.orientation?.lock?.('landscape');}catch(e){}}
   $('#menu').style.display='none';jogando=true;document.body.classList.add('jogando');
-  for(const o of OUT.values()){cena.remove(o.g);o.rot.remove();}OUT.clear();
+  for(const o of OUT.values()){cena.remove(o.g);o.rot.remove();o.aq?.remove();}OUT.clear();
   if(ws)try{ws.onclose=null;ws.close();}catch(e){}
   conectar();});
 // ------------------------------------------------ (10/11) tutorial de voo: offline (sem servidor, sem ranking), etapas com anéis no céu
@@ -1137,7 +1144,7 @@ const TREINO={passo:0,aneis:[],alvo:null,t:0,lados:0,leme:0,stallOk:false,idB:0,
 const mAnel=new THREE.MeshBasicMaterial({color:0xffd23a,transparent:true,opacity:0.9,fog:false}),gAnel=new THREE.TorusGeometry(55,6,10,40);
 function poeAnel(x,y,z,dx,dz){const m=new THREE.Mesh(gAnel,mAnel.clone());m.position.set(x,y,z);m.lookAt(x+dx,y,z+dz);cena.add(m);const A={m,feito:false};TREINO.aneis.push(A);return A;}
 function limpaAneis(){for(const A of TREINO.aneis)cena.remove(A.m);TREINO.aneis=[];TREINO.alvo=null;
-  for(const [id,o] of OUT)if(id<0){cena.remove(o.g);o.rot.remove();OUT.delete(id);}
+  for(const [id,o] of OUT)if(id<0){cena.remove(o.g);o.rot.remove();o.aq?.remove();OUT.delete(id);}
   for(const B of TREINO.barcos)cena.remove(B.g);TREINO.barcos=[];TREINO.foco=null;
   for(const m of TREINO.mis){cena.remove(m.g);MISV.delete(m.id);}TREINO.mis=[];}
 // (10/11) combate no tutorial (tudo local): drones voando em círculo, mísseis simulados aqui, barcos p/ bombardear
@@ -1225,17 +1232,17 @@ function avancaPasso(){{SOM.ok();limpaAneis();TREINO.passo++;const N=PASSOS[TREI
 $('#bTreino').addEventListener('click',async()=>{SALA='treino';SOM.ini();$('#erro').textContent='';
   if(TOQUE){try{await document.documentElement.requestFullscreen?.();}catch(e){}try{await screen.orientation?.lock?.('landscape');}catch(e){}}
   if(ws)try{ws.onclose=null;ws.close();}catch(e){}ws=null;conectado=false;
-  for(const o of OUT.values()){cena.remove(o.g);o.rot.remove();}OUT.clear();
+  for(const o of OUT.values()){cena.remove(o.g);o.rot.remove();o.aq?.remove();}OUT.clear();
   $('#menu').style.display='none';jogando=true;document.body.classList.add('jogando','treinando');
   EU.id=-1;EU.cor='#3cd070';EU.nome=CONTA?CONTA.nome:'Piloto';MINHA_BASE=0;ZONA=15200;LIMITE=20900;mostrarBases();corBandeiras([{base:0,cor:'#3cd070'}]);
   $('#placar').innerHTML='<div class="eu"><span>🎓 Tutorial de voo</span></div>';
   limpaAneis();TREINO.passo=0;mostraPasso();if(JATO)cena.remove(JATO);JATO=criarJato(EU.cor);nascer();$('#dicaDec').style.display='none';});
-window.JJ={EU,OUT,PLACAR:()=>PLACAR,TREINO,ccip,BOMBV,BASES,envia,lead:()=>LEADD?_lp:null,BALAS,queda,morrer,JATO:()=>JATO,efeitosPasso:(n,dt)=>{for(let i=0;i<n;i++)efeitosQueda(dt);},nFX:()=>FX.length,efeitos:()=>({destrocos:DESTROCOS.map(D=>Math.round(D.pos.y)),pilotos:PILOTOS.length,para:PILOTOS.filter(P=>P.aberto).length,fumos:FUMOS.length,trilhaVis:[...TRILHAS.values()].some(T=>T.k>0.05)})};   // p/ testes headless
+window.JJ={EU,OUT,TRAVA,PLACAR:()=>PLACAR,TREINO,ccip,BOMBV,BASES,envia,lead:()=>LEADD?_lp:null,BALAS,queda,morrer,JATO:()=>JATO,efeitosPasso:(n,dt)=>{for(let i=0;i<n;i++)efeitosQueda(dt);},nFX:()=>FX.length,efeitos:()=>({destrocos:DESTROCOS.map(D=>Math.round(D.pos.y)),pilotos:PILOTOS.length,para:PILOTOS.filter(P=>P.aberto).length,fumos:FUMOS.length,trilhaVis:[...TRILHAS.values()].some(T=>T.k>0.05)})};   // p/ testes headless
 
 // (09/11) Esc sai da partida e volta ao menu
 function sair(){for(const b of BOMBV.values())cena.remove(b.g);BOMBV.clear();ccip.visible=false;jogando=false;document.body.classList.remove('jogando','treinando');limpaAneis();
   if(ws){ws.onclose=null;try{ws.close();}catch(e){}ws=null;}conectado=false;EU.vivo=false;SOM.motor(0,false,false);
-  for(const o of OUT.values()){cena.remove(o.g);o.rot.remove();}OUT.clear();for(const m of MISV.values())cena.remove(m.g);MISV.clear();
+  for(const o of OUT.values()){cena.remove(o.g);o.rot.remove();o.aq?.remove();}OUT.clear();for(const m of MISV.values())cena.remove(m.g);MISV.clear();
   if(JATO){cena.remove(JATO);JATO=null;}for(const k in TEC)TEC[k]=false;
   for(const id of['#mira','#seta','#trava','#alerta','#aviso','#morte','#dicaDec'])$(id).style.display='none';
   $('#placar').innerHTML='';$('#feed').innerHTML='';$('#erro').textContent='';$('#menu').style.display='flex';}

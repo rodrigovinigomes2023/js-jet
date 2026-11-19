@@ -237,6 +237,24 @@ def ponto_base(i, alt=260):
     return [b[0] - f[0] * 400, alt, b[2] - f[2] * 400], f
 
 
+# (18/11) DIFICULDADE DINÂMICA (escondida, sem aviso): cada humano tem um "nível" que regula os bots/bases que miram nele.
+# Morreu p/ bot ou base -> cai (mais rápido se morrer várias seguidas); derrubou alguém -> sobe (mais rápido em sequência).
+# 1.0 = bots como eram até a v0.9. Lembrado pelo nome enquanto o servidor estiver no ar.
+NIVEL_INI, NIVEL_MIN, NIVEL_MAX = 0.8, 0.3, 1.25
+NIVEL = {}
+
+
+def fac(alvo):
+    """Força dos bots contra este alvo (1 = normal; só humanos têm nível)."""
+    return alvo.nivel if (alvo is not None and not alvo.bot) else 1.0
+
+
+def ajusta_nivel(a, delta):
+    a.nivel = max(NIVEL_MIN, min(NIVEL_MAX, a.nivel + delta))
+    NIVEL[a.nome.lower()] = a.nivel
+    print(f'nivel {a.nome}: {a.nivel:.2f} ({delta:+.2f})', flush=True)
+
+
 class Aviao:
     def __init__(self, nome, bot=False, ws=None, sala='bots'):
         self.id = _prox[0]; _prox[0] += 1
@@ -278,6 +296,8 @@ class Aviao:
         self.dono_chave = None     # live: @ de quem criou (navios/chefão contam p/ a pessoa)
         self.balas = BALAS_MAX      # (11/11) munição do canhão (só conta na sala com bots)
         self.pontaria = random.uniform(0.014, 0.035)   # bot: erro de mira (rad) — cada piloto é de um jeito
+        self.nivel = NIVEL.get(nome.lower(), NIVEL_INI) if not bot else 1.0   # (18/11) dificuldade escondida (humano)
+        self.mortes_seg = 0        # mortes seguidas sem derrubar ninguém
         self.navio = False         # live: navio com metralhadora antiaérea
 
 
@@ -338,6 +358,12 @@ async def matar(alvo, por, arma='canhao'):
         contas.somar(por.conta, por.sala, abates=1, abates_missil=1 if arma == 'missil' else 0)
         contas.recorde_seq(por.conta, por.sala, por.seq)
     contas.somar(alvo.conta, alvo.sala, mortes=1)
+    if not alvo.bot and (por is None or por.bot) and por is not alvo:   # morreu p/ bot, SAM ou antiaérea: alivia
+        alvo.mortes_seg += 1
+        ajusta_nivel(alvo, -0.08 * (1 + 0.5 * min(3, alvo.mortes_seg - 1)))
+    if por is not None and por is not alvo and not por.bot:            # humano derrubou alguém: aperta
+        por.mortes_seg = 0
+        ajusta_nivel(por, 0.04 * (1 + 0.3 * min(3, por.seq - 1)))
     alvo.seq = 0
     if alvo.sala == 'live':
         live_abate(alvo, por)
@@ -449,7 +475,7 @@ async def defesa_bases(agora):
                 continue
             if all(LANC_MORTO[i]):          # base com os 3 lançadores destruídos: sem defesa
                 continue
-            T_SAM[i] = agora
+            T_SAM[i] = agora + SAM_ESPERA * max(0.0, 1 / fac(a) - 1)   # (18/11) nível baixo: SAM demora mais
             m = Missil(None, a, base=i)
             MIS[m.id] = m
             await todos({'t': 'missil', 'id': m.id, 'dono': 0, 'base': i, 'alvo': a.id}, a.sala)
@@ -473,7 +499,7 @@ async def defesa_bases(agora):
             t = d / 900
             mira = [alvo.p[j] + alvo.v[j] * t + random.gauss(0, 5 + d * 0.02) for j in range(3)]
             await todos({'t': 'tiro', 'id': 0, 'p': [round(x, 1) for x in boca], 'd': [round(x, 3) for x in norm([mira[j] - boca[j] for j in range(3)])]}, sala)
-            if random.random() < 0.3 * (1 - d / R_AA) ** 1.5:
+            if random.random() < 0.3 * (1 - d / R_AA) ** 1.5 * min(1.0, fac(alvo)):
                 await dano(alvo, DANO_AA, None, 'sam')
 
 
@@ -620,7 +646,7 @@ def alvo_todos(b, vivos, agora):
             em_cima[x.alvo_id] = em_cima.get(x.alvo_id, 0) + 1
     nbots = sum(1 for x in AV.values() if x.bot and x.sala == b.sala)
     lim = 1 if nbots <= 4 else MAX_EM_CIMA
-    cand = [a for a in vivos if a.bot or em_cima.get(a.id, 0) < lim]
+    cand = [a for a in vivos if a.bot or em_cima.get(a.id, 0) < (1 if a.nivel < 0.6 else lim)]
 
     def custo(a):   # menor = melhor presa: perto, machucado, de costas p/ mim, ocupado com outro
         d = math.dist(a.p, b.p)
@@ -744,6 +770,8 @@ async def voar_bot(b, dt, agora):
     f0 = b.f
     ang = math.acos(max(-1.0, min(1.0, dot(f0, des))))
     passo = (1.15 if furia or modo in ('missil', 'defesa') else 0.85) * dt
+    if not modo and alvo is not None and not alvo.bot:
+        passo *= 0.7 + 0.3 * min(1.0, fac(alvo))   # (18/11) contra humano fraco curva menos
     f1 = girar(f0, des, passo) if ang > passo else des
     omega_y = cross(f0, f1)[1] / max(dt, 1e-3)
     alvo_bank = max(-1.2, min(1.2, -omega_y * 1.6))
@@ -756,7 +784,7 @@ async def voar_bot(b, dt, agora):
     b.q = quat_de(f1, b.bank)
     if b.sala != 'bots' and any(m.alvo is b and math.dist(m.p, b.p) < 900 for m in MIS.values()) and random.random() < 0.03:
         await soltar_flare(b)
-    if alvo and alvo.vivo and agora - b.t_missil_bot > 7 and math.dist(alvo.p, b.p) < 2200 and random.random() < (0.05 if furia else 0.02):
+    if alvo and alvo.vivo and agora - b.t_missil_bot > 7 / fac(alvo) and math.dist(alvo.p, b.p) < 2200 and random.random() < (0.05 if furia else 0.02) * fac(alvo):
         b.t_missil_bot = agora
         await lancar(b, alvo)
     if alvo and alvo.vivo:
@@ -765,10 +793,10 @@ async def voar_bot(b, dt, agora):
         if b.sala in MUN_LIMITADA:
             tl = d / (VEL_BALA + 118)
             dir_lead = norm([alvo.p[i] + alvo.v[i] * tl - b.p[i] for i in range(3)])   # o "◇" do bot
-            if d < 900 and dot(f1, dir_lead) > math.cos(math.radians(4)) and agora - b.ult_tiro > 0.1 and b.balas > 0:
+            if d < 900 and dot(f1, dir_lead) > math.cos(math.radians(4)) and agora - b.ult_tiro > 0.1 / min(1.0, fac(alvo)) and b.balas > 0:
                 b.ult_tiro = agora
                 b.balas -= 1
-                sig = b.pontaria
+                sig = b.pontaria / fac(alvo) ** 1.3   # (18/11) nível baixo = mira pior
                 tiro = norm([f1[i] + random.gauss(0, sig) for i in range(3)])
                 await todos({'t': 'tiro', 'id': b.id, 'p': [round(x, 1) for x in b.p], 'd': [round(x, 3) for x in tiro]}, b.sala)
                 if passa_perto(b.p, [tiro[i] * (VEL_BALA + 118) for i in range(3)], alvo) < 10:
@@ -776,7 +804,7 @@ async def voar_bot(b, dt, agora):
         elif d < 850 and dot(f1, dirr) > math.cos(math.radians(6)) and agora - b.ult_tiro > 0.1:
             b.ult_tiro = agora
             await todos({'t': 'tiro', 'id': b.id, 'p': [round(x, 1) for x in b.p], 'd': [round(x, 3) for x in f1]}, b.sala)
-            if random.random() < (0.16 if b.sala != 'live' else 0.18 if furia else 0.09):
+            if random.random() < (0.16 if b.sala != 'live' else 0.18 if furia else 0.09) * fac(alvo):
                 await dano(alvo, 6, b)
 
 
