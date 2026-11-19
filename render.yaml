@@ -12,3 +12,5 @@ services:
         value: "1"
       - key: PYTHON_VERSION
         value: "3.10.12"
+      - key: DATABASE_URL   # (19/11) Postgres do Neon: contas/ranking permanentes (valor colocado no painel do Render)
+        sync: false
