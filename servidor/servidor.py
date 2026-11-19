@@ -974,6 +974,7 @@ def _onda_carga(M, lado):
                    pontaria=0.045, misseis=1, caca=C.id)
         M['alvos'].append(b.id)
     M['onda'] = M.get('onda', 0) + 1
+    M['novos'] = True   # (19/11) avisa o cliente (placar) — sem isso a onda ficava invisível até alguém morrer
     _diz(M, 'Torre', f'Dois caças vindo pela {"esquerda" if lado < 0 else "direita"} do Carcará! ({M["onda"]}/3)')
 
 
@@ -1055,6 +1056,7 @@ def _onda_base(M, graus, nb, ne):
     for i in range(ne):
         _escolta(M, lider, f'Escolta {len(M["extras"])}', (-1, 1, 0)[i % 3], 200 if i == 2 else 0)
     M['onda'] = M.get('onda', 0) + 1
+    M['novos'] = True   # (19/11) avisa o cliente (placar) — sem isso a onda ficava invisível até alguém morrer
     lado = 'de frente' if graus == 0 else 'pela esquerda' if graus < 0 else 'pela direita'
     _diz(M, 'Torre', f'Onda {M["onda"]}/3: {nb} bombardeiros vindo {lado}!')
 
@@ -1220,6 +1222,8 @@ async def missoes_passo(agora):
             continue
         t = agora - M['t0']
         ok, motivo, obj = _checa(M, a, agora)
+        if M.pop('novos', False):
+            await placar(sala)
         while M['radio'] and t >= M['radio'][0][0]:
             _, quem, txt = M['radio'].pop(0)
             await mandar(a, {'t': 'radio', 'quem': quem, 'txt': txt})

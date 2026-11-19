@@ -216,8 +216,7 @@ function texGramaC(){const S=256,c=cv(S,S),g=c.getContext('2d'),r=rnd(55);g.fill
     cil(0.35,0.35,24,mPo,60,12,-70,g);B.mBand=new THREE.MeshStandardMaterial({color:0x888888,roughness:0.7,side:THREE.DoubleSide});
     const band=new THREE.Mesh(new THREE.PlaneGeometry(9,5.5),B.mBand);band.position.set(64.5,21,-70);g.add(band);
     B.lanc=[];B.samOn=true;   // (10/11) 3 lançadores SAM: bomba destrói (volta em 90 s); sem nenhum de pé, a base fica sem defesa
-    for(const [x,z] of B.lpos){const L=new THREE.Group();L.position.set(x,0,z);g.add(L);box(9,2.2,6,mOl,0,1.1,0,L);
-      for(let k=0;k<4;k++){const t=cil(0.7,0.7,7,mOl,k%2?1.6:-1.6,4.6,k<2?1.3:-1.3,L,8);t.rotation.z=-0.75;}
+    for(const [x,z] of B.lpos){const L=new THREE.Group();L.position.set(x,0,z);L.rotation.y=Math.atan2(x,z)+Math.PI;g.add(L);L.add(radarC('#ff7f2a'));   /* (19/11) estação SAM nova (radar + 2 lançadores p/ fora) */
       const q=new THREE.Mesh(G('queim',()=>new THREE.CircleGeometry(16,16)),po(M('#1d1d1d',1)));q.rotation.x=-Math.PI/2;q.position.set(x,0.3,z);q.visible=false;g.add(q);
       B.lanc.push({L,q,vivo:true});}}
   {const ga=new THREE.ConeGeometry(4,11,6);ga.translate(0,7.5,0);const tr=new THREE.CylinderGeometry(0.5,0.6,2.5,5);tr.translate(0,1.25,0);
@@ -893,7 +892,7 @@ function radarC(cor){const g=new THREE.Group(),con=M('#8a9196',0.85),esc_=M('#4a
   box(8,4,6,oli,0,3,0,g);cil(1.2,1.6,8,esc_,0,9,0,g,8);const pr=new THREE.Group();pr.position.set(0,14,0);g.add(pr);
   const d=new THREE.Mesh(new THREE.SphereGeometry(7,18,8,0,Math.PI*2,0,Math.PI/3),dupla(bra));d.rotation.x=-2.0;pr.add(d);cil(0.3,0.3,5,esc_,0,0,2.5,pr,6).rotation.x=Math.PI/2;
   esf(0.9,fx,0,1.5,5.4,pr);gira(pr,0.03);
-  for(const [x,z,a] of[[-10,-8,0.5],[10,-8,-0.5]]){const l=new THREE.Group();l.position.set(x,1,z);l.rotation.y=a;g.add(l);box(6,2,6,oli,0,1,0,l);
+  for(const [x,z] of[[-10,-8],[10,-8]]){const l=new THREE.Group();l.position.set(x,1,z);l.rotation.y=Math.atan2(x,z);/* (19/11) mísseis apontando p/ fora */g.add(l);box(6,2,6,oli,0,1,0,l);
     const tr=new THREE.Group();tr.position.y=2.5;tr.rotation.x=-0.75;l.add(tr);box(5,0.8,9,oli,0,0,0,tr);
     for(const k of[-1.4,1.4]){cil(0.6,0.6,8,bra,k,1,0.5,tr,8).rotation.x=Math.PI/2;const p=new THREE.Mesh(new THREE.ConeGeometry(0.6,1.6,8),fx);p.rotation.x=Math.PI/2;p.position.set(k,1,5.3);tr.add(p);}}
   box(6,3,5,oli,9,2.5,9,g);box(6.2,0.5,5.2,fx,9,4.2,9,g);return g;}

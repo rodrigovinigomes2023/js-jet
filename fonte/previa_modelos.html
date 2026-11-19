@@ -109,7 +109,7 @@ function radarC(cor){const g=new THREE.Group(),con=M('#8a9196',0.85),esc_=M('#4a
   box(8,4,6,oli,0,3,0,g);cil(1.2,1.6,8,esc_,0,9,0,g,8);const pr=new THREE.Group();pr.position.set(0,14,0);g.add(pr);
   const d=new THREE.Mesh(new THREE.SphereGeometry(7,18,8,0,Math.PI*2,0,Math.PI/3),dupla(bra));d.rotation.x=-2.0;pr.add(d);cil(0.3,0.3,5,esc_,0,0,2.5,pr,6).rotation.x=Math.PI/2;
   esf(0.9,fx,0,1.5,5.4,pr);gira(pr,0.03);
-  for(const [x,z,a] of[[-10,-8,0.5],[10,-8,-0.5]]){const l=new THREE.Group();l.position.set(x,1,z);l.rotation.y=a;g.add(l);box(6,2,6,oli,0,1,0,l);
+  for(const [x,z] of[[-10,-8],[10,-8]]){const l=new THREE.Group();l.position.set(x,1,z);l.rotation.y=Math.atan2(x,z);/* (19/11) mísseis apontando p/ fora */g.add(l);box(6,2,6,oli,0,1,0,l);
     const tr=new THREE.Group();tr.position.y=2.5;tr.rotation.x=-0.75;l.add(tr);box(5,0.8,9,oli,0,0,0,tr);
     for(const k of[-1.4,1.4]){cil(0.6,0.6,8,bra,k,1,0.5,tr,8).rotation.x=Math.PI/2;const p=new THREE.Mesh(new THREE.ConeGeometry(0.6,1.6,8),fx);p.rotation.x=Math.PI/2;p.position.set(k,1,5.3);tr.add(p);}}
   box(6,3,5,oli,9,2.5,9,g);box(6.2,0.5,5.2,fx,9,4.2,9,g);return g;}
