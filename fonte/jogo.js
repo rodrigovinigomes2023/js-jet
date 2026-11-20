@@ -1307,10 +1307,13 @@ $('#bCam').addEventListener('click',async()=>{
   catch(e){paraCam();CAM_I=-1;liveAlerta({k:'info',txt:'📷 não deu p/ abrir a câmera: '+(e.name==='NotAllowedError'?'permissão negada':e.message)});}});
 /* (19/11) versão publicada: sem sala da live; servidor grátis dorme sem jogadores -> acorda ao abrir a página */
 if(window.JJ_PUBLICO)document.body.classList.add('publico');
-if(window.JJ_SERVIDOR){const st=$('#servEst');let t0=Date.now(),ok=false;
-  const ping=async()=>{try{const r=await fetch('api/ping',{cache:'no-store'});if(r.ok){ok=true;st.textContent='🟢 servidor online';setTimeout(()=>{if(ok)st.textContent='';},4000);return;}}catch(e){}
-    st.textContent='⏳ acordando o servidor… '+Math.round((Date.now()-t0)/1000)+' s (até ~1 min). Helicóptero e tutorial já funcionam!';setTimeout(ping,3000);};
-  st.textContent='⏳ conectando ao servidor…';ping();}
+if(window.JJ_SERVIDOR){const fx=$('#servFaixa'),tx=$('#sfTxt'),t0=Date.now();let ok=false;   // (20/11) faixa fixa bem visível
+  const mostra=()=>{if(ok)return;const seg=Math.round((Date.now()-t0)/1000);fx.style.display='flex';
+    tx.innerHTML=seg<4?'⏳ Conectando ao servidor…':'⏳ Acordando o servidor… <span id="sfSeg">'+seg+' s</span> (até ~1 min)<small>🚁 Helicóptero e tutorial já funcionam enquanto isso!</small>';};
+  const tic=setInterval(mostra,1000);mostra();
+  const ping=async()=>{try{const r=await fetch('api/ping',{cache:'no-store'});if(r.ok){ok=true;clearInterval(tic);fx.style.display='flex';fx.classList.add('ok');tx.innerHTML='🟢 Servidor online!';setTimeout(()=>{fx.style.display='none';},3000);return;}}catch(e){}
+    setTimeout(ping,3000);};
+  ping();}
 /* (19/11) sala da live: primeiro o @ de quem transmite; o servidor liga a ponte do TikTok p/ esse @ */
 $('#salaLive').addEventListener('click',()=>{$('#pSalas').style.display='none';$('#pLive').style.display='';$('#liveEst').textContent='';
   let u='';try{u=localStorage.getItem('jsjet-live')||'';}catch(e){}$('#liveUser').value=u;$('#liveUser').focus();});

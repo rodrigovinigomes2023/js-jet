@@ -42,6 +42,11 @@
   #conectando{position:fixed;inset:0;z-index:60;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(5,12,24,.88);color:#fff;text-align:center;padding:16px;font-family:inherit}
   #conectando .gira{width:64px;height:64px;border:6px solid rgba(255,255,255,.2);border-top-color:#ffc94a;border-radius:50%;animation:gira 1s linear infinite}
   #conectando h2{margin:0;font-size:clamp(24px,6vw,38px);letter-spacing:1px}#conSeg{font-size:20px;color:#ffc94a;font-weight:700}#conDica{max-width:420px;font-size:15px;opacity:.9;min-height:20px}
+  /* (20/11) faixa fixa: servidor do Render acordando */
+  #servFaixa{position:fixed;top:0;left:0;right:0;z-index:20;display:none;align-items:center;justify-content:center;gap:12px;padding:12px 16px;background:repeating-linear-gradient(135deg,#ffb020 0 22px,#ffc94a 22px 44px);color:#1a1200;font-weight:800;font-size:clamp(14px,2.6vw,19px);text-align:center;box-shadow:0 4px 18px rgba(0,0,0,.55);border-bottom:3px solid #1a1200}
+  #servFaixa .gira{flex:none;width:26px;height:26px;border:4px solid rgba(26,18,0,.25);border-top-color:#1a1200;border-radius:50%;animation:gira 1s linear infinite}
+  #servFaixa small{display:block;font-weight:600;font-size:.78em;opacity:.85}#sfSeg{font-variant-numeric:tabular-nums}
+  #servFaixa.ok{background:#1fae4b;color:#fff;border-bottom-color:#0b5a22}#servFaixa.ok .gira{display:none}
   @keyframes gira{to{transform:rotate(360deg)}}
   #servEst{font-size:13px;opacity:.85;margin-top:6px;min-height:18px}body.publico #salaLive{display:none}
   #pLive .liveTit{font-size:22px;font-weight:800;margin:6px 0}#pLive .liveTxt{opacity:.85;font-size:14px;margin-bottom:10px}#liveEst{min-height:20px;font-size:14px;margin-top:8px}
@@ -339,6 +344,7 @@
 
 <div id="conectando"><div class="gira"></div><h2>📡 CONECTANDO AO SERVIDOR…</h2><div id="conSeg">0 s</div><div id="conDica"></div></div>
 <div id="menu">
+<div id="servFaixa"><div class="gira"></div><div id="sfTxt"></div></div>
   <div class="card">
     <picture id="mTopo"><source media="(max-width:760px)" srcset="menu_topo_cel.jpg"><img src="menu_topo.jpg" alt="JS-JET · Combate aéreo multiplayer"></picture>
     <div id="mEsq" aria-hidden="true"><img src="menu_radar.jpg" alt=""></div><div id="mDir" aria-hidden="true"><img src="menu_cenas.jpg" alt=""></div>
