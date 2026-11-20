@@ -225,6 +225,23 @@
   #menu button.rk{--bd:linear-gradient(180deg,#c9ced3,#3a3f44);--bg:linear-gradient(180deg,#2a2e32,#0e1012)}
   #menu .dica{background:#0d1117e0;border:2px solid #ffc94a66;border-radius:10px;padding:10px 14px;opacity:1;text-align:left;font-size:13px}
   #menu #erro{text-shadow:0 1px 3px #000}
+  /* (20/11) identidade do kit: fibra de carbono, botões com arte, colunas laterais no PC, faixa zebrada */
+  #menu{background:radial-gradient(ellipse 90% 45% at 50% 0%,#1e4a8a88,transparent 70%),radial-gradient(ellipse at 50% 120%,#0b2a4a,transparent 60%),
+    repeating-linear-gradient(45deg,#16191d 0 3px,#1c2026 3px 6px),repeating-linear-gradient(-45deg,#0000 0 3px,#00000040 3px 6px),#131518;padding:0 12px 16px}
+  #mTopo img{display:block;width:100%;height:auto}#mTopo{display:block;width:calc(100% + 24px);margin:0 -12px 4px;-webkit-mask-image:linear-gradient(#000 85%,transparent);mask-image:linear-gradient(#000 85%,transparent)}
+  #menu button.mb.arte{padding:0;background:none;clip-path:none;margin-top:8px;line-height:0}
+  #menu button.mb.arte img{display:block;width:100%;height:auto;clip-path:polygon(2.6% 0,97.4% 0,100% 50%,97.4% 100%,2.6% 100%,0 50%)}
+  #menu button.mb.arte:hover img{filter:brightness(1.12)}
+  #menu button.mb.live .in{border-radius:0}
+  #mEsq,#mDir{display:none}
+  #menu .faixa{height:10px;margin-top:16px;background:repeating-linear-gradient(-45deg,#ffc400 0 12px,#111 12px 24px);clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%)}
+  #menu .dica{margin-top:8px;border-color:#ffc40088}
+  #menu input[type=text],#menu input[type=password]{background:#0d1117;border-color:#9aa3ad66}
+  @media (min-width:1100px){
+    #menu .card{width:min(1280px,100%);display:grid;grid-template-columns:300px minmax(0,560px) 300px;justify-content:center;column-gap:28px;align-content:start}
+    #menu .card>*{grid-column:2}#menu .card>#mTopo{grid-column:1/-1;width:100%;margin:0 0 6px}
+    #menu .card>#mEsq{display:block;grid-column:1;grid-row:2/span 8;align-self:start;margin-top:70px}#menu .card>#mDir{display:block;grid-column:3;grid-row:2/span 8;align-self:start;margin-top:8px}
+    #mEsq img,#mDir img{width:100%;height:auto;display:block;border-radius:8px}#mEsq img{opacity:.9}}
   @media (max-width:420px){#menu button.mb b{font-size:22px}#menu button.mb small{font-size:11px}#menu button.mb .ic{font-size:28px;width:38px}#menu button.mb .in{min-height:56px;gap:10px;padding:5px 22px}}
   @media (max-height:520px){#mTopo{width:min(420px,100%);margin:0 auto}#menu button.mb .in{min-height:46px}#menu button.mb b{font-size:20px}}
 
@@ -283,7 +300,8 @@
 <div id="conectando"><div class="gira"></div><h2>📡 CONECTANDO AO SERVIDOR…</h2><div id="conSeg">0 s</div><div id="conDica"></div></div>
 <div id="menu">
   <div class="card">
-    <img id="mTopo" src="menu_topo.jpg" alt="JS-JET · Combate aéreo multiplayer" width="1086" height="388">
+    <picture id="mTopo"><source media="(max-width:760px)" srcset="menu_topo_cel.jpg"><img src="menu_topo.jpg" alt="JS-JET · Combate aéreo multiplayer"></picture>
+    <div id="mEsq" aria-hidden="true"><img src="menu_radar.jpg" alt=""></div><div id="mDir" aria-hidden="true"><img src="menu_cenas.jpg" alt=""></div>
     <div id="pLogin">
       <input type="text" id="nome" maxlength="16" placeholder="Nome de piloto" autocomplete="username">
       <input type="password" id="senha" maxlength="100" placeholder="Senha" autocomplete="current-password">
@@ -293,12 +311,12 @@
     <div id="pSalas" style="display:none">
       <div id="ola"></div>
       <label><input type="checkbox" id="inverter"> Inverter subir/descer</label>
-      <button id="bMissoes" class="mb mis"><span class="in"><i class="ic">🎖️</i><span class="tx"><b>MISSÕES</b><small>MODO HISTÓRIA</small></span><span class="seta">›</span></span></button>
-      <button id="bHeli" class="mb heli"><span class="in"><i class="ic">🚁</i><span class="tx"><b>HELICÓPTERO</b><small>OPERAÇÕES DE ATAQUE</small></span><span class="seta">›</span></span></button>
-      <button id="decolar" class="mb bots"><span class="in"><i class="ic">🤖</i><span class="tx"><b>SALA COM BOTS</b><small>TREINE SUAS HABILIDADES</small></span><span class="seta">›</span></span></button>
-      <button id="salaPvp" class="mb pvp"><span class="in"><i class="ic">⚔️</i><span class="tx"><b>DEATHMATCH</b><small>TODOS CONTRA TODOS</small></span><span class="seta">›</span></span></button>
+      <button id="bMissoes" class="mb arte mis"><img src="bt_mis.jpg" alt="MISSÕES · modo história"></button>
+      <button id="bHeli" class="mb arte heli"><img src="bt_heli.jpg" alt="HELICÓPTERO · operações de ataque"></button>
+      <button id="decolar" class="mb arte bots"><img src="bt_bots.jpg" alt="SALA COM BOTS · treine suas habilidades"></button>
+      <button id="salaPvp" class="mb arte pvp"><img src="bt_pvp.jpg" alt="DEATHMATCH · todos contra todos"></button>
       <button id="salaLive" class="mb live"><span class="in"><i class="ic">📺</i><span class="tx"><b>SALA DA LIVE</b><small>O CHAT VIRA AVIÃO</small></span><span class="seta">›</span></span></button>
-      <button id="bTreino" class="mb tut"><span class="in"><i class="ic">🎓</i><span class="tx"><b>TUTORIAL DE VOO</b><small>APRENDA A VOAR</small></span><span class="seta">›</span></span></button>
+      <button id="bTreino" class="mb arte tut"><img src="bt_tut.jpg" alt="TUTORIAL DE VOO · aprenda a voar"></button>
     </div>
     <div id="pLive" style="display:none">
       <div class="liveTit">📺 SALA DA LIVE</div>
@@ -308,9 +326,10 @@
       <button id="bLiveIr" class="live">📡 CONECTAR E DECOLAR</button>
       <a id="bLiveVolta" class="link">← voltar</a>
     </div>
-    <button id="bRank" class="mb rk"><span class="in"><i class="ic">🏆</i><span class="tx"><b>RANKING</b><small>COMPARE SEUS RESULTADOS</small></span><span class="seta">›</span></span></button>
+    <button id="bRank" class="mb arte rk"><img src="bt_rk.jpg" alt="RANKING · compare seus resultados"></button>
     <div id="erro"></div>
     <div id="servEst"></div>
+    <div class="faixa" aria-hidden="true"></div>
     <div class="dica">
       📱 <b>Celular:</b> arraste no lado esquerdo para pilotar · 🎯 atira · 🚀 míssil (trave a mira 1 s) · ✨ flare · 🔥 turbo<br>
       ⚔️ <b>Deathmatch:</b> você decola da sua base; chegar perto da base dos outros = míssil terra-ar 🛡️<br>
