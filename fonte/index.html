@@ -138,6 +138,17 @@
   #ola{font-size:17px;font-weight:700;background:#0b1a2a;border-radius:12px;padding:10px;border:2px solid #7fd3ff33}
   #ola a{font-size:13px;font-weight:400;color:#9fd4ff;text-decoration:underline;cursor:pointer;margin-left:6px}
   #menu button.heli{background:linear-gradient(180deg,#9aa86a,#4d5a3c);color:#fff}
+  /* (19/11) heli: objetivo no canto, rádio do comando (cartão B) e alerta de zona antiaérea */
+  #placar .hobj{display:block;text-align:right;min-width:190px;max-width:min(300px,46vw)}#placar .hobj div{display:block;line-height:1.3}
+  .hobj .op{font-size:10px;letter-spacing:2px;color:#ffc94a;text-transform:uppercase;font-weight:800}.hobj .tit{font-size:17px;font-weight:800;color:#fff}
+  .hobj .det{font-weight:500;color:#dfe8ef}.hobj .det b{color:#ffc94a}.hobj .prox{font-size:11px;font-weight:500;color:#ffffff99}.hobj .rec{font-size:12px;font-weight:600;color:#cfe3f2;margin-top:3px}
+  .hobj.pisca .tit{color:#5fd38a}body.toque #placar .hobj .rec{display:block!important}
+  body.toque #placar .hobj .tit{font-size:14px}body.toque #placar .hobj .prox{display:none}
+  #heliRadio{left:max(10px,env(safe-area-inset-left));top:140px;width:min(330px,calc(100vw - 20px));display:none;gap:10px;align-items:flex-start;background:#0b1118e6;border:1px solid #ffffff22;border-radius:10px;padding:8px 12px 8px 8px;z-index:4}
+  #heliRadio svg{flex:none;width:48px;height:48px;border-radius:8px}#heliRadio .quem{font-weight:800;color:#ffc94a;font-size:14px}#heliRadio .quem i{font-style:normal;color:#8fa3b6;font-weight:600;font-size:11px;margin-left:6px}
+  #heliRadio .ond{display:none;gap:2px;margin-left:6px;vertical-align:middle}#heliRadio.fala .ond{display:inline-flex}#heliRadio .ond i{width:3px;height:10px;background:#5fd38a;animation:hond .5s infinite alternate}
+  #heliRadio .ond i:nth-child(2){animation-delay:.15s}#heliRadio .ond i:nth-child(3){animation-delay:.3s}@keyframes hond{to{transform:scaleY(.3)}}#hrTxt{font-size:13px;line-height:1.35;color:#fff}
+  #heliAlerta{left:50%;top:12px;transform:translateX(-50%);font-weight:800;letter-spacing:1px;color:#fff;background:#ff4a3d;padding:4px 14px;border-radius:6px;display:none;animation:halerta .6s infinite alternate;z-index:4;pointer-events:none}@keyframes halerta{to{opacity:.55}}
   #heliMsg{left:50%;top:58px;transform:translateX(-50%);max-width:min(560px,92vw);background:#0b1a2ae6;border-left:4px solid #9aa86a;border-radius:8px;padding:8px 12px;font-size:15px;z-index:4;text-align:center}
   #heliZoom{display:none;position:fixed;right:10px;top:38%;z-index:30;flex-direction:column;gap:8px}
   body.heli #heliZoom{display:flex}
@@ -286,6 +297,8 @@
 <div id="fimMis" style="display:none"></div>
 <div class="hud" id="radio" style="display:none"></div>
 <div class="hud" id="heliMsg" style="display:none"></div>
+<div class="hud" id="heliRadio"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" fill="#2f4634"/><path d="M8 64c2-12 12-17 24-17s22 5 24 17z" fill="#4b5a3a"/><path d="M27 47h10l-1 6h-8z" fill="#c08a64"/><path d="M28 50l4 5 4-5" fill="none" stroke="#e8c84a" stroke-width="1.6"/><ellipse cx="32" cy="32" rx="12" ry="14" fill="#c99470"/><path d="M19 27c0-10 6-15 13-15s13 5 13 15c-4-3-9-4-13-4s-9 1-13 4z" fill="#3c4a2c"/><path d="M18 26c3-9 9-12 16-12 7 0 11 3 12 6l-4 2c-3-3-6-4-10-4-6 0-10 3-12 9z" fill="#2c3820"/><circle cx="40" cy="19" r="2" fill="#e8c84a"/><path d="M25 32h5M34 32h5" stroke="#3a2a20" stroke-width="2" stroke-linecap="round"/><path d="M27 41c3 2 7 2 10 0" stroke="#7a4a35" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M19 33a13 13 0 0 1 0-6" stroke="#222" stroke-width="3" fill="none"/><path d="M19 36c2 5 6 7 10 7" stroke="#222" stroke-width="2" fill="none"/><circle cx="29" cy="43" r="2" fill="#222"/></svg><div><div class="quem">Cel. Moraes<i>Comando Harpia</i><span class="ond"><i></i><i></i><i></i></span></div><div id="hrTxt"></div></div></div>
+<div class="hud" id="heliAlerta">⚠️ ZONA ANTIAÉREA</div>
 <div id="heliZoom"><button id="bZoomMais">🔍＋</button><button id="bZoomMenos">🔍－</button><button id="bMapa">🗺️</button><button id="bCamPadrao">🎥</button></div>
 <div id="heliMapa" style="display:none"><div class="card"><h2 id="hmTit"></h2><div class="hmCorpo"><canvas id="hmCv" width="560" height="560"></canvas><div id="hmObj"></div></div><button id="hmOk">DECOLAR</button></div></div>
 

@@ -115,7 +115,7 @@ function heliEquip(){const esc=new THREE.Group(),corda=M('#c9b78a',0.9),mad=M('#
   const cabo=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,1,6),M('#1e1e1e',0.6)),gan=new THREE.Group();
   box(0.5,0.55,0.35,M('#ffc94a',0.5),0,0,0,gan);const cv=new THREE.Mesh(new THREE.TorusGeometry(0.3,0.08,6,14,Math.PI*1.4),M('#b8c0c8',0.3));cv.position.y=-0.55;cv.rotation.z=Math.PI*0.8;gan.add(cv);
   cabo.visible=gan.visible=false;cena.add(cabo,gan);HELI.coisas.push(cabo,gan);HELI.cabo=cabo;HELI.gan=gan;HELI.ganL=0;HELI.tGancho=0;}
-function heliIniciar(){const rng=rnd(4242);HELI.on=true;HELI.fim=false;HELI.vidas=3;HELI.salvos=0;HELI.bordo=0;HELI.alvos=[];HELI.pilotos=[];HELI.caixas=[];HELI.coisas=[];HELI.fogos=[];HELI.mapa=null;HELI.pausa=false;
+function heliIniciar(){const rng=rnd(4242);HELI.on=true;HELI.fim=false;HELI.vidas=3;HELI.salvos=0;HELI.bordo=0;HELI.alvos=[];HELI.pilotos=[];HELI.caixas=[];HELI.coisas=[];HELI.fogos=[];HELI.mapa=null;HELI.pausa=false;HELI.fase=undefined;HELI.naZona=false;HELI.tZona=0;HELI.avComb=false;
   for(let i=0;i<3;i++){const p=heliPonto(1500,5200,true,rng);heliAlvo(`📡 Radar ${i+1}`,'#ff7f2a',(i%2?radarB:radarA)('#ff7f2a'),p,60,'radar');}
   for(let i=0;i<2;i++){const p=heliPonto(2000,5500,true,rng);const o=heliAlvo(`🚀 SAM ${i+1}`,'#ff3b30',radarC('#ff3b30'),p,80,'sam');o.tSam=4+i*2;}
   for(let i=0;i<6;i++){const p=heliPonto(800,6000,true,rng);const g=heliAA();const o=heliAlvo(`🔫 Antiaérea ${i+1}`,'#e8443a',g,p,40,'aa');}
@@ -131,7 +131,7 @@ function heliNascer(){HELI.escL=0;HELI.ganL=0;HELI.tGancho=0;for(const p of HELI
   const B=BASES[HELI_CASA];EU.pos.set(B.x,BASE_H+30,B.z);HELI.yaw=Math.atan2(B.z,-B.x);HELI.vel.set(0,0,0);HELI.vs=0;HELI.comb=100;EU.vida=100;HELI.bordo=0;
   BALAS_N=1200;MUN=8;BOMBAS=0;EU.vivo=true;EU.vel=0;EU.turbo=1;JATO.visible=true;document.body.classList.remove('morto');$('#morte').style.display='none';TRAVA.id=0;TRAVA.t=0;
   EU.q.setFromAxisAngle(_v1.set(0,1,0),HELI.yaw);}
-function heliSair(){if(!HELI.on)return;HELI.on=false;for(const p of HELI.pilotos)cena.remove(p.g);for(const c of HELI.caixas)cena.remove(c.g);for(const c of HELI.coisas)cena.remove(c);for(const o of HELI.alvos)cena.remove(o.g);HELI.pausa=false;$('#heliMapa').style.display='none';
+function heliSair(){if(!HELI.on)return;HELI.on=false;for(const p of HELI.pilotos)cena.remove(p.g);for(const c of HELI.caixas)cena.remove(c.g);for(const c of HELI.coisas)cena.remove(c);for(const o of HELI.alvos)cena.remove(o.g);HELI.pausa=false;$('#heliMapa').style.display='none';$('#heliRadio').style.display='none';$('#heliAlerta').style.display='none';
   for(const m of TREINO.mis){cena.remove(m.g);MISV.delete(m.id);}TREINO.mis.length=0;document.body.classList.remove('heli');$('#heliMsg').style.display='none';$('#fimMis').style.display='none';}
 let tHeliMsg=0;function heliMsg(t,ms=4000){const e=$('#heliMsg');e.innerHTML=t;e.style.display='block';clearTimeout(tHeliMsg);tHeliMsg=setTimeout(()=>e.style.display='none',ms);}
 
@@ -142,6 +142,7 @@ function heliDestroi(o){if(!o.vivo)return;o.vivo=false;o.rot.style.display='none
   const F={p:o.pos.clone().setY(o.pos.y+FOGO_ALT[o.tipo]),t:0,e:0,esc:FOGO_TAM[o.tipo],tv:0};HELI.fogos.push(F);
   if(o.tipo==='lancha')o.afunda={t:0,v:9,ex:0.6,lado:Math.random()<0.5?-1:1,F};else heliCarboniza(o);
   for(let i=0;i<5;i++)fx(_v2.copy(o.pos).add(_v3.set((Math.random()-0.5)*20,4+i*5,(Math.random()-0.5)*20)),0x333333,30,3+i,2,false,6);
+  {const vr=HELI.alvos.filter(a=>a.tipo===o.tipo&&a.vivo).length;if(o.tipo==='radar'&&vr)heliRadio(vr===1?'Falta só um radar. Atenção às antiaéreas no caminho.':'Um radar a menos. Continue, Harpia 1.');else if(o.tipo==='sam'&&vr)heliRadio('Uma bateria a menos. Acabe com a outra.');}
   const n={radar:'Radar destruído! 📡',sam:'Estação SAM destruída! 🚀',aa:'Antiaérea destruída!',lancha:'Lancha atingida! Está afundando… 🚤🔥'}[o.tipo];heliMsg('✅ '+n,2200);heliChecaFim();}
 function heliDano(d){if(!EU.vivo)return;EU.vida-=d*(HELI.blind>0?1:1);$('#dor').style.opacity=0.8;setTimeout(()=>$('#dor').style.opacity=0,180);SOM.dor();
   if(EU.vida<=0){EU.vida=0;heliCaiu('💥 Abatido!');}}
@@ -256,7 +257,7 @@ function heliPasso(dt){if(!HELI.on||HELI.pausa)return;const agora=performance.no
       fx(_v1.add(_v2.set((Math.random()-0.5)*0.6,0.4,(Math.random()-0.5)*0.6)),Math.random()<0.5?0xff7a22:0xff9a3a,2.5+Math.random()*2,3.5+Math.random()*1.5,4,false,4+Math.random()*3);}}
   // painel
   const radar=HELI.alvos.filter(o=>o.tipo==='radar'),sam=HELI.alvos.filter(o=>o.tipo==='sam');
-  $('#placar').innerHTML=`<div class="eu obj"><span>📡 ${radar.filter(o=>!o.vivo).length}/${radar.length} · 🚀 ${sam.filter(o=>!o.vivo).length}/${sam.length} · 🪂 ${HELI.salvos}/${HELI.pilotos.length}${HELI.bordo?' (a bordo '+HELI.bordo+')':''} · ⛽ ${Math.round(HELI.comb)}% · 🚁×${HELI.vidas}</span></div>`;
+  heliObjetivo(radar,sam);heliZonas(agora);
   heliPoeira(dt);SOM.motor(60+sp+Math.max(0,HELI.vs)*6,false,true);}
 const _v4q=new QT(),_hE2=new THREE.Euler(0,0,0,'XYZ');
 
@@ -283,6 +284,31 @@ function heliGancho(dt,c){const cabo=HELI.cabo,gan=HELI.gan;if(!cabo||!JATO)retu
   const L=Math.max(0,HELI.ganL*fundo);cabo.visible=gan.visible=L>0.2;
   cabo.scale.y=Math.max(0.01,L);cabo.position.set(_eT.x,_eT.y-L/2,_eT.z);gan.position.set(_eT.x,_eT.y-L-0.3,_eT.z);gan.rotation.y=Math.atan2(-_eF.z,_eF.x);
   for(const k of HELI.caixas){if(k.ok)continue;if(k===c&&t>=0.45){k.g.position.set(_eT.x,_eT.y-L-3.6,_eT.z);}else if(k.g.position.distanceToSquared(k.p)>0.01)k.g.position.lerp(k.p,Math.min(1,dt*4));}}
+/* (19/11) painel de objetivo (tarefa atual + próxima), rádio do Cel. Moraes e zonas das antiaéreas */
+const HOBJ=[{k:'radar',tit:'Cegue o inimigo',det:'Destrua os radares 📡',prox:'Próximo: baterias SAM 🚀'},{k:'sam',tit:'Abra o espaço aéreo',det:'Destrua as baterias SAM 🚀',prox:'Próximo: resgatar os pilotos 🪂'},
+  {k:'pil',tit:'Ninguém fica pra trás',det:'Leve os pilotos à base 🪂',prox:''},{k:'fim',tit:'Missão cumprida',det:'Defesas neutralizadas',prox:''}];
+function heliObjetivo(radar,sam){const vr=radar.filter(o=>o.vivo).length,vs=sam.filter(o=>o.vivo).length,np=HELI.pilotos.length;
+  const f=vr?0:vs?1:HELI.salvos<np?2:3,o=HOBJ[f],n=f===0?[radar.length-vr,radar.length]:f===1?[sam.length-vs,sam.length]:f===2?[HELI.salvos,np]:null;
+  if(HELI.fase!==undefined&&f>HELI.fase){HELI.tPisca=performance.now();heliRadio({1:'Radares fora do ar! Agora as baterias SAM, já estão no seu mapa.',2:'Espaço aéreo aberto! Agora busque os pilotos abatidos, siga a fumaça laranja.',3:'Excelente trabalho, Harpia 1. Todos em casa.'}[f]);}
+  HELI.fase=f;const _ep=performance.now()-(HELI.tPisca||0),pis=_ep<1800&&Math.floor(_ep/300)%2===0?' pisca':'';
+  $('#placar').innerHTML=`<div class="hobj${pis}"><div class="op">Operação Arquipélago · ${f+1}/3</div><div class="tit">${o.tit}</div><div class="det">${o.det}${n?` <b>(${n[0]}/${n[1]})</b>`:''}${HELI.bordo?` · a bordo <b>${HELI.bordo}</b>`:''}</div>${o.prox?`<div class="prox">${o.prox}</div>`:''}<div class="rec">⛽ ${Math.round(HELI.comb)}% · 🚁×${HELI.vidas}</div></div>`;
+  if(HELI.comb<25&&!HELI.avComb){HELI.avComb=true;heliRadio('Harpia 1, combustível baixo! Pegue um tambor ⛽ ou pouse numa base.');}else if(HELI.comb>40)HELI.avComb=false;}
+let _hrT=null,_hrE=null;
+function heliRadio(txt){const r=$('#heliRadio'),el=$('#hrTxt');if(!r||!txt)return;clearInterval(_hrT);clearTimeout(_hrE);r.style.display='flex';r.classList.add('fala');let i=0;el.textContent='';try{SOM.ok();}catch(e){}
+  _hrT=setInterval(()=>{i+=2;el.textContent=txt.slice(0,i);if(i>=txt.length){clearInterval(_hrT);r.classList.remove('fala');_hrE=setTimeout(()=>r.style.display='none',Math.max(4500,txt.length*55));}},28);}
+const AA_ALC=900;
+function heliZonaCria(o){const N=64,K=14,pos=[],idx=[],borda=[];
+  for(let k=0;k<=K;k++)for(let i=0;i<N;i++){const r=AA_ALC*k/K,a=i/N*Math.PI*2,x=o.pos.x+Math.cos(a)*r,z=o.pos.z+Math.sin(a)*r,y=Math.max(0,relevo(x,z))+3;pos.push(x,y,z);if(k===K)borda.push(x,y+0.5,z);}
+  for(let k=0;k<K;k++)for(let i=0;i<N;i++){const a=k*N+i,b=k*N+(i+1)%N,c=a+N,d=b+N;idx.push(a,c,b,b,c,d);}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);
+  const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:0xff4a3d,transparent:true,opacity:0.13,depthWrite:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4}));
+  const lg=new THREE.BufferGeometry();lg.setAttribute('position',new THREE.Float32BufferAttribute(borda,3));const l=new THREE.LineLoop(lg,new THREE.LineBasicMaterial({color:0xff4a3d,transparent:true,opacity:0.7}));
+  const z=new THREE.Group();z.add(m,l);z.userData={m,l};cena.add(z);HELI.coisas.push(z);o.zona=z;}
+function heliZonas(agora){let dentro=false;const pul=0.5+0.5*Math.sin(agora/180);
+  for(const o of HELI.alvos){if(o.tipo!=='aa')continue;if(!o.vivo){if(o.zona&&o.zona.visible){o.zona.visible=false;heliRadio('Antiaérea destruída. Céu limpo nessa área.');}continue;}if(!o.zona)heliZonaCria(o);
+    const d=Math.hypot(o.pos.x-EU.pos.x,o.pos.z-EU.pos.z),u=o.zona.userData;if(d<AA_ALC){dentro=true;u.m.material.opacity=0.1+0.12*pul;u.l.material.opacity=0.6+0.4*pul;}else{u.m.material.opacity=0.13;u.l.material.opacity=0.7;}}
+  $('#heliAlerta').style.display=dentro&&EU.vivo?'block':'none';
+  if(dentro&&!HELI.naZona&&agora-(HELI.tZona||0)>20000){HELI.tZona=agora;heliRadio('Cuidado, Harpia 1! Você entrou no alcance da antiaérea. Saia do círculo vermelho ou destrua a peça.');}HELI.naZona=dentro;}
 let HELI_ZOOM=1;function heliZoom(f){HELI_ZOOM=Math.min(3,Math.max(0.45,HELI_ZOOM*f));}
 addEventListener('wheel',e=>{if(SALA==='heli'&&HELI.on){heliZoom(e.deltaY>0?1.12:1/1.12);e.preventDefault();}},{passive:false});
 addEventListener('keydown',e=>{if(SALA!=='heli'||!HELI.on)return;if(e.code==='Equal'||e.code==='NumpadAdd')heliZoom(1/1.15);else if(e.code==='Minus'||e.code==='NumpadSubtract')heliZoom(1.15);});
@@ -379,7 +405,7 @@ function heliMapaAbre(brief){if(!HELI.on||HELI.fim)return;HELI.pausa=true;heliMa
   $('#hmTit').innerHTML=brief?'🚁 OPERAÇÃO ARQUIPÉLAGO<small>Inteligência: radares e baterias SAM protegem as ilhas. Pilotos nossos foram abatidos. Destrua as defesas, resgate todos e volte p/ a base. Aeronave: 🇧🇷 AH-2 Sabre (cabem 8 resgatados).<br><i style="font-size:11px;opacity:.7">Modelo 3D do Sabre: "Russian Mil Mi-35M" por 42manako (Sketchfab, CC-BY-4.0)</i></small>':'🗺️ MAPA<small>jogo pausado</small>';
   $('#hmOk').textContent=brief?'🚁 DECOLAR':'▶️ VOLTAR (M)';$('#heliMapa').style.display='flex';HELI.brief=brief;}
 function heliMapaFecha(){$('#heliMapa').style.display='none';HELI.pausa=false;for(const k in TEC)TEC[k]=false;
-  if(HELI.brief){HELI.brief=false;heliMsg('🚁 Prioridade: 📡 radares e 🚀 SAMs. Resgate os 🪂 pilotos. <b>M</b> / 🗺️ abre o mapa.',6000);}}
+  if(HELI.brief){HELI.brief=false;heliMsg('🗺️ <b>M</b> abre o mapa',3500);heliRadio('Harpia 1, aqui é o Comando. Três radares inimigos vigiam o arquipélago. Derrube todos e o caminho fica livre.');}}
 $('#hmOk').addEventListener('click',heliMapaFecha);
 $('#bMapa').addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();HELI.pausa?heliMapaFecha():heliMapaAbre(false);});
 addEventListener('keydown',e=>{if(SALA!=='heli'||!HELI.on||e.code!=='KeyM'||e.repeat)return;HELI.pausa?heliMapaFecha():heliMapaAbre(false);});
