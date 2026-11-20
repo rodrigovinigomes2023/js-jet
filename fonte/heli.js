@@ -106,6 +106,15 @@ function heliAlvo(nome,cor,g,p,vida,tipo){const id=HELI.idN--,o={g,pos:p.clone()
   OUT.set(id,o);HELI.alvos.push(o);return o;}
 
 // ---------- começar / sair
+/* (19/11) escada de corda (resgate) e gancho no cabo (caixas): ficam no mundo, presos à porta/barriga do Sabre */
+const ESC_N=40,ESC_P=0.75;
+function heliEquip(){const esc=new THREE.Group(),corda=M('#c9b78a',0.9),mad=M('#8a5a2b',0.8);esc.userData.cordas=[];esc.userData.deg=[];
+  for(const x of[-0.45,0.45]){const c=new THREE.Mesh(new THREE.BoxGeometry(0.07,1,0.07),corda);c.position.x=x;esc.add(c);esc.userData.cordas.push(c);}
+  for(let i=0;i<ESC_N;i++){const d=new THREE.Mesh(new THREE.BoxGeometry(0.95,0.09,0.12),mad);d.position.y=-(i+1)*ESC_P;esc.add(d);esc.userData.deg.push(d);}
+  esc.visible=false;cena.add(esc);HELI.coisas.push(esc);HELI.esc=esc;HELI.escL=0;
+  const cabo=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,1,6),M('#1e1e1e',0.6)),gan=new THREE.Group();
+  box(0.5,0.55,0.35,M('#ffc94a',0.5),0,0,0,gan);const cv=new THREE.Mesh(new THREE.TorusGeometry(0.3,0.08,6,14,Math.PI*1.4),M('#b8c0c8',0.3));cv.position.y=-0.55;cv.rotation.z=Math.PI*0.8;gan.add(cv);
+  cabo.visible=gan.visible=false;cena.add(cabo,gan);HELI.coisas.push(cabo,gan);HELI.cabo=cabo;HELI.gan=gan;HELI.ganL=0;HELI.tGancho=0;}
 function heliIniciar(){const rng=rnd(4242);HELI.on=true;HELI.fim=false;HELI.vidas=3;HELI.salvos=0;HELI.bordo=0;HELI.alvos=[];HELI.pilotos=[];HELI.caixas=[];HELI.coisas=[];HELI.fogos=[];HELI.mapa=null;HELI.pausa=false;
   for(let i=0;i<3;i++){const p=heliPonto(1500,5200,true,rng);heliAlvo(`📡 Radar ${i+1}`,'#ff7f2a',(i%2?radarB:radarA)('#ff7f2a'),p,60,'radar');}
   for(let i=0;i<2;i++){const p=heliPonto(2000,5500,true,rng);const o=heliAlvo(`🚀 SAM ${i+1}`,'#ff3b30',radarC('#ff3b30'),p,80,'sam');o.tSam=4+i*2;}
@@ -117,8 +126,9 @@ function heliIniciar(){const rng=rnd(4242);HELI.on=true;HELI.fim=false;HELI.vida
     g.userData.lata.y+=chaoMalha(...(()=>{_v1.copy(g.userData.lata).applyAxisAngle(_hY,g.rotation.y).add(p);return[_v1.x,_v1.z];})())-p.y;
     HELI.pilotos.push({g,p,ok:false});}
   for(const [tipo,n] of[['comb',4],['mun',3],['blind',2]])for(let i=0;i<n;i++){const p=heliPonto(900,5600,true,rng);const g=heliCaixa(tipo);g.position.copy(p);HELI.caixas.push({g,p,tipo,ok:false});}
-  heliNascer();setTimeout(()=>heliMapaAbre(true),300);}
-function heliNascer(){const B=BASES[HELI_CASA];EU.pos.set(B.x,BASE_H+30,B.z);HELI.yaw=Math.atan2(B.z,-B.x);HELI.vel.set(0,0,0);HELI.vs=0;HELI.comb=100;EU.vida=100;HELI.bordo=0;
+  heliEquip();heliNascer();setTimeout(()=>heliMapaAbre(true),300);}
+function heliNascer(){HELI.escL=0;HELI.ganL=0;HELI.tGancho=0;for(const p of HELI.pilotos){p.sobe=0;if(p.mil0&&!p.aBordo)p.g.userData.mil.position.copy(p.mil0);p.subindo=false;}if(HELI.esc){HELI.esc.visible=HELI.cabo.visible=HELI.gan.visible=false;}
+  const B=BASES[HELI_CASA];EU.pos.set(B.x,BASE_H+30,B.z);HELI.yaw=Math.atan2(B.z,-B.x);HELI.vel.set(0,0,0);HELI.vs=0;HELI.comb=100;EU.vida=100;HELI.bordo=0;
   BALAS_N=1200;MUN=8;BOMBAS=0;EU.vivo=true;EU.vel=0;EU.turbo=1;JATO.visible=true;document.body.classList.remove('morto');$('#morte').style.display='none';TRAVA.id=0;TRAVA.t=0;
   EU.q.setFromAxisAngle(_v1.set(0,1,0),HELI.yaw);}
 function heliSair(){if(!HELI.on)return;HELI.on=false;for(const p of HELI.pilotos)cena.remove(p.g);for(const c of HELI.caixas)cena.remove(c.g);for(const c of HELI.coisas)cena.remove(c);for(const o of HELI.alvos)cena.remove(o.g);HELI.pausa=false;$('#heliMapa').style.display='none';
@@ -217,10 +227,11 @@ function heliPasso(dt){if(!HELI.on||HELI.pausa)return;const agora=performance.no
     if(o.tipo==='sam'&&d<2400&&EU.pos.y-relevo(EU.pos.x,EU.pos.z)>12&&visada(_v1.copy(o.pos).setY(o.pos.y+20),EU.pos)){o.tSam-=dt;
       if(o.tSam<=0){o.tSam=7;SOM.lanca(d<1500);heliMsg('🚀 MÍSSIL! solte flare (X / ✨) ou se esconda atrás do morro',2500);const m=misLocal(_v1.copy(o.pos).setY(o.pos.y+12),_v2.set(0,1,0),EU,80,260);m.L.samHeli=true;}}}
   // pilotos: paire baixinho em cima (guincho)
-  let guinchando=false;
+  let guinchando=null;
   for(const p of HELI.pilotos){if(p.ok||p.aBordo)continue;const dh=Math.hypot(p.p.x-EU.pos.x,p.p.z-EU.pos.z),agl=EU.pos.y-p.p.y;
-    if(dh<22&&agl<30&&sp<18&&HELI.bordo<HELI_CAP){guinchando=true;HELI.tGuincho+=dt;if(HELI.tGuincho>1.6){p.aBordo=true;p.g.visible=false;HELI.bordo++;HELI.tGuincho=0;SOM.ok();heliMsg(`🪝 Piloto a bordo! (${HELI.bordo}/${HELI_CAP}) Leve p/ a base`,2500);}}}
-  if(!guinchando)HELI.tGuincho=0;else if(Math.floor(agora/250)%2)heliMsg(`🪝 Guinchando… ${Math.round(HELI.tGuincho/1.6*100)}% (fique parado e baixo)`,400);
+    if(!guinchando&&dh<22&&agl<30&&sp<18&&HELI.bordo<HELI_CAP){guinchando=p;HELI.tGuincho+=dt;if(HELI.tGuincho>1.6){p.aBordo=true;p.g.visible=false;p.sobe=0;if(p.mil0)p.g.userData.mil.position.copy(p.mil0);HELI.bordo++;HELI.tGuincho=0;SOM.ok();heliMsg(`🪜 Piloto a bordo! (${HELI.bordo}/${HELI_CAP}) Leve p/ a base`,2500);}}}
+  if(!guinchando)HELI.tGuincho=0;else if(Math.floor(agora/250)%2)heliMsg(`🪜 Piloto subindo a escada… ${Math.round(HELI.tGuincho/1.6*100)}% (fique parado e baixo)`,400);
+  heliEscada(dt,guinchando);
   // entrega na base
   // (19/11) qualquer base amiga: entrega pilotos e, pairando baixo e devagar, reabastece/rearma/conserta aos poucos
   const B=BASES.find(B=>Math.hypot(B.x-EU.pos.x,B.z-EU.pos.z)<400)&&EU.pos.y-BASE_H<45?BASES.find(B=>Math.hypot(B.x-EU.pos.x,B.z-EU.pos.z)<400):null;
@@ -230,10 +241,15 @@ function heliPasso(dt){if(!HELI.on||HELI.pausa)return;const agora=performance.no
     HELI.tRearma=(HELI.tRearma||0)+dt;if(HELI.tRearma>0.6&&MUN<8){MUN++;HELI.tRearma=0;}
     if(Math.floor(agora/300)%2)heliMsg(`🛠️ Na base: ⛽ ${Math.round(HELI.comb)}% · 🛡️ ${Math.round(EU.vida)}% · 🚀 ${MUN}/8`,500);}
   // caixas
-  for(const c of HELI.caixas){if(c.ok)continue;c.g.rotation.y+=dt;if(Math.hypot(c.p.x-EU.pos.x,c.p.z-EU.pos.z)<20&&EU.pos.y-c.p.y<30){c.ok=true;c.g.visible=false;SOM.ok();
-    if(c.tipo==='comb'){HELI.comb=100;heliMsg('⛽ Tanque cheio!',2000);}else if(c.tipo==='mun'){BALAS_N=1200;MUN=8;heliMsg('🔫 Munição recarregada!',2000);}else{EU.vida=100;heliMsg('🛡️ Blindagem consertada!',2000);}}}
+  let enganchada=null;
+  for(const c of HELI.caixas){if(c.ok)continue;c.g.rotation.y+=dt;if(!enganchada&&Math.hypot(c.p.x-EU.pos.x,c.p.z-EU.pos.z)<20&&EU.pos.y-c.p.y<30&&sp<18)enganchada=c;}
+  if(enganchada){HELI.tGancho+=dt;if(HELI.tGancho>=1.1){const c=enganchada;c.ok=true;c.g.visible=false;HELI.tGancho=0;SOM.ok();
+      if(c.tipo==='comb'){HELI.comb=100;heliMsg('⛽ Tanque cheio!',2000);}else if(c.tipo==='mun'){BALAS_N=1200;MUN=8;heliMsg('🔫 Munição recarregada!',2000);}else{EU.vida=100;heliMsg('🛡️ Blindagem consertada!',2000);}enganchada=null;}
+    else if(Math.floor(agora/250)%2)heliMsg(HELI.tGancho<0.45?'🪝 Gancho descendo…':`🪝 Puxando a caixa… ${Math.round(HELI.tGancho/1.1*100)}%`,400);}
+  else HELI.tGancho=0;
+  heliGancho(dt,enganchada);
   for(const p of HELI.pilotos){if(p.ok||p.aBordo)continue;const u=p.g.userData;u.anel.scale.setScalar(1+0.25*Math.sin(agora/200));
-    const d=p.p.distanceTo(EU.pos);if(d>3000)continue;const t=agora/1000,mil=u.mil;
+    const d=p.p.distanceTo(EU.pos);if(d>3000||p.sobe>0.01)continue;const t=agora/1000,mil=u.mil;
     mil.rotation.y=Math.atan2(-(EU.pos.z-p.p.z),EU.pos.x-p.p.x)-p.g.rotation.y;   // vira p/ o helicóptero
     for(const B of mil.userData.bracos){const a=2.55+0.5*Math.sin(t*5.5);B.o.rotation.x=-B.z*a;B.c.rotation.x=-B.z*0.25;}   // acena c/ os 2 braços por cima da cabeça
     p.tF=(p.tF||0)+dt*(d<1600?7:3);while(p.tF>1){p.tF--;_v1.copy(u.lata).applyAxisAngle(_hY,p.g.rotation.y).add(p.p);
@@ -246,6 +262,27 @@ const _v4q=new QT(),_hE2=new THREE.Euler(0,0,0,'XYZ');
 
 // câmera isométrica: segue o helicóptero de longe, sempre do mesmo ângulo
 // zoom (19/11): roda do mouse, + / - no teclado, pinça ou botões 🔍 no celular
+const _eT=new V3(),_eF=new V3(),_eA=new V3(),_eL=new V3();
+function heliEscada(dt,alvo){const esc=HELI.esc;if(!esc||!JATO)return;
+  _eT.set(1.5,0.8,1.45);JATO.localToWorld(_eT);_eF.set(1,0,0).applyQuaternion(EU.q);   /* topo = porta lateral do Sabre */
+  const chao=Math.max(0,relevo(_eT.x,_eT.z)),Lmax=Math.min(ESC_N*ESC_P,Math.max(0,_eT.y-chao-0.2));
+  HELI.escL+=((alvo?1:0)-HELI.escL)*Math.min(1,(alvo?4:2.5)*dt);const L=HELI.escL*Lmax;
+  esc.visible=L>0.3;esc.position.copy(_eT);esc.rotation.set(Math.sin(performance.now()/500)*0.03,Math.atan2(-_eF.z,_eF.x),0);
+  for(const c of esc.userData.cordas){c.scale.y=Math.max(0.01,L);c.position.y=-L/2;}esc.userData.deg.forEach((d,i)=>d.visible=(i+1)*ESC_P<=L);
+  for(const p of HELI.pilotos){if(p.ok||p.aBordo)continue;const mil=p.g.userData.mil;if(!p.mil0)p.mil0=mil.position.clone();
+    const meta=p===alvo?Math.max(0,Math.min(1,(HELI.tGuincho/1.6-0.25)/0.75)):0;p.sobe=(p.sobe||0)+(meta-(p.sobe||0))*Math.min(1,6*dt);
+    if(p.sobe<0.005&&meta===0){if(p.subindo){mil.position.copy(p.mil0);p.subindo=false;}continue;}p.subindo=true;
+    _eL.set(-_eF.z,0,_eF.x).normalize();_eA.set(_eT.x,chao+p.sobe*Math.max(0,Lmax-2.4),_eT.z).addScaledVector(_eL,0.35);   /* encostado na escada */
+    p.g.worldToLocal(_eA);const w=Math.min(1,p.sobe*5);mil.position.set(p.mil0.x+(_eA.x-p.mil0.x)*w,p.mil0.y+(_eA.y-p.mil0.y)*Math.min(1,p.sobe*1.2),p.mil0.z+(_eA.z-p.mil0.z)*w);
+    mil.rotation.y=Math.atan2(_eF.x,_eF.z)-p.g.rotation.y+Math.PI/2;const c=Math.sin(performance.now()/90);
+    for(const B of mil.userData.bracos){B.o.rotation.x=-B.z*(2.7+B.z*c*0.35);B.c.rotation.x=-B.z*0.6;}}}
+function heliGancho(dt,c){const cabo=HELI.cabo,gan=HELI.gan;if(!cabo||!JATO)return;
+  _eT.set(1.2,0.4,0);JATO.localToWorld(_eT);_eF.set(1,0,0).applyQuaternion(EU.q);   /* barriga */
+  const chao=c?c.p.y+3.2:Math.max(0,relevo(_eT.x,_eT.z))+3,fundo=Math.max(0,_eT.y-chao),t=HELI.tGancho;
+  const alvo=c?(t<0.45?t/0.45:1-(t-0.45)/0.65):0;HELI.ganL=c?alvo:Math.max(0,HELI.ganL-dt*2.5);
+  const L=Math.max(0,HELI.ganL*fundo);cabo.visible=gan.visible=L>0.2;
+  cabo.scale.y=Math.max(0.01,L);cabo.position.set(_eT.x,_eT.y-L/2,_eT.z);gan.position.set(_eT.x,_eT.y-L-0.3,_eT.z);gan.rotation.y=Math.atan2(-_eF.z,_eF.x);
+  for(const k of HELI.caixas){if(k.ok)continue;if(k===c&&t>=0.45){k.g.position.set(_eT.x,_eT.y-L-3.6,_eT.z);}else if(k.g.position.distanceToSquared(k.p)>0.01)k.g.position.lerp(k.p,Math.min(1,dt*4));}}
 let HELI_ZOOM=1;function heliZoom(f){HELI_ZOOM=Math.min(3,Math.max(0.45,HELI_ZOOM*f));}
 addEventListener('wheel',e=>{if(SALA==='heli'&&HELI.on){heliZoom(e.deltaY>0?1.12:1/1.12);e.preventDefault();}},{passive:false});
 addEventListener('keydown',e=>{if(SALA!=='heli'||!HELI.on)return;if(e.code==='Equal'||e.code==='NumpadAdd')heliZoom(1/1.15);else if(e.code==='Minus'||e.code==='NumpadSubtract')heliZoom(1.15);});
