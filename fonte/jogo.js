@@ -1469,8 +1469,8 @@ async function abreMissoes(){const box=$('#missoes');box.style.display='flex';$(
   await carregaMissoes();
   $('#mGrade').innerHTML=MISSOES.map((M,i)=>{const n=i+1,lib=liberada(n),pronta=!!M.ok,est=MIS_FEITAS[n]||0;
     return `<button class="mc${lib&&pronta?'':' trancada'}${est?' feita':''}" data-n="${n}" ${lib&&pronta?'':'disabled'}>
-      <span class="mn">${n}</span><span class="me">${lib?M.e:'🔒'}</span><b>${lib?M.t:'Bloqueada'}</b>
-      <small>${lib?(pronta?M.r:'🚧 em breve'):'Passe da missão '+(n-1)+' p/ liberar'}</small>${lib&&pronta?'<span class="ms">'+estrelas(est)+'</span>':''}</button>`;}).join('');
+      <span class="mn">${n}</span><span class="mcIn"><span class="me">${lib?M.e:'🔒'}</span><b>${lib?M.t:'Bloqueada'}</b>
+      <small>${lib?(pronta?M.r:'🚧 em breve'):'Passe da missão '+(n-1)+' p/ liberar'}</small>${lib&&pronta?'<span class="ms">'+'<i class="on">★</i>'.repeat(est)+'<i class="off">★</i>'.repeat(3-est)+'</span>':''}</span></button>`;}).join('');
   for(const b of document.querySelectorAll('#mGrade .mc:not([disabled])'))b.onclick=()=>briefing(+b.dataset.n);}
 function briefing(n){const M=MISSOES[n-1];$('#mLista').style.display='none';const B=$('#mBrief');B.style.display='block';
   B.innerHTML=`<small class="mk">MISSÃO ${n} DE ${MISSOES.length}</small><h2>${M.e} ${M.t}</h2><p>${M.b}</p>

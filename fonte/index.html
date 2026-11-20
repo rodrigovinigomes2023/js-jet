@@ -180,6 +180,46 @@
   #missoes #mFechar,#mBrief button,#fimMis button{margin-top:12px;width:100%;font-size:20px;font-weight:800;padding:12px;border:0;border-radius:12px;cursor:pointer;background:linear-gradient(180deg,#ffd23a,#ff9a2a);color:#3a1d00}
   #mBrief{text-align:left}#mBrief h2{text-align:left}#mBrief p{line-height:1.5;opacity:.9}
   .mo{background:#0b1a2a;border:1px solid #7fd3ff33;border-radius:10px;padding:10px 12px;margin-top:10px;font-size:14px;line-height:1.6}.mo>b{display:block;font-size:12px;letter-spacing:2px;opacity:.6}
+  /* (20/11) tela de missões no estilo do kit: painel de metal escuro, cards chanfrados, radar girando, VOLTAR zebrado */
+  #missoes{background:radial-gradient(ellipse 90% 45% at 50% 0%,#1e4a8a66,transparent 70%),repeating-linear-gradient(45deg,#16191d 0 3px,#1c2026 3px 6px),#131518}
+  #missoes .card{width:min(1040px,100%);position:relative;background:linear-gradient(180deg,#1f242acc,#121519ee);border:2px solid #4a525c;border-radius:6px;padding:22px 22px 18px;
+    box-shadow:inset 0 0 0 1px #00000080,0 10px 30px #0009;clip-path:polygon(18px 0,calc(100% - 18px) 0,100% 18px,100% calc(100% - 18px),calc(100% - 18px) 100%,18px 100%,0 calc(100% - 18px),0 18px)}
+  #missoes .card::before,#missoes .card::after{content:"";position:absolute;width:34px;height:34px;border:3px solid #9aa3ad;pointer-events:none}
+  #missoes .card::before{left:10px;top:10px;border-right:0;border-bottom:0}#missoes .card::after{right:10px;bottom:10px;border-left:0;border-top:0}
+  #mLista .mk{font-size:14px;letter-spacing:5px;opacity:.85;color:#d6dbe0}
+  #missoes h2.mTit{margin:0 0 16px;font:900 italic clamp(40px,8vw,64px)/1 "Exo 2",system-ui,sans-serif;letter-spacing:1px;background:linear-gradient(180deg,#fff 0%,#d9dde2 45%,#8a929b 55%,#e8ebee 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 3px 0 #000a)}
+  .mRadar{position:absolute;left:34px;top:22px;width:92px;height:92px;border-radius:50%;border:2px solid #2bd96a88;opacity:.75;pointer-events:none;
+    background:repeating-radial-gradient(circle,transparent 0 18px,#2bd96a44 18px 19px),linear-gradient(#2bd96a33,#2bd96a33) center/1px 100% no-repeat,linear-gradient(#2bd96a33,#2bd96a33) center/100% 1px no-repeat,#04140a}
+  .mRadar::after{content:"";position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,#2bd96aaa,transparent 70deg);animation:mvarre 3s linear infinite}
+  @keyframes mvarre{to{transform:rotate(360deg)}}
+  @media (max-width:760px){.mRadar{display:none}}
+  #mGrade{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+  @media (max-width:760px){#mGrade{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}}
+  .mc{padding:3px;border:0;border-radius:0;min-height:0;background:linear-gradient(160deg,#c9ced3,#4a5058 40%,#9aa3ad 60%,#3a3f44);
+    clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 14px,100% calc(100% - 14px),calc(100% - 14px) 100%,14px 100%,0 calc(100% - 14px),0 14px);transition:transform .12s,filter .12s}
+  .mc .mcIn{display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;height:100%;padding:16px 10px 12px;
+    clip-path:polygon(12px 0,calc(100% - 12px) 0,100% 12px,100% calc(100% - 12px),calc(100% - 12px) 100%,12px 100%,0 calc(100% - 12px),0 12px);
+    background:radial-gradient(120% 80% at 50% 0%,#ffffff14,transparent 60%),repeating-linear-gradient(115deg,#ffffff06 0 2px,transparent 2px 7px),linear-gradient(180deg,#2c3238,#191d21)}
+  .mc .mn{left:3px;top:3px;font-size:15px;opacity:1;color:#e8ebee;background:#0d1013;border-right:2px solid #6a727b;border-bottom:2px solid #6a727b;padding:3px 9px;z-index:1}
+  .mc .me{font-size:52px;line-height:1.1;filter:drop-shadow(0 4px 3px #000c);margin-top:4px}
+  .mc b{font-size:20px;font-weight:800;color:#fff;text-shadow:0 2px 2px #000}
+  .mc small{font-size:13px;opacity:.85;color:#d6dbe0;line-height:1.3;min-height:2.6em}
+  .mc .ms{font-size:22px;letter-spacing:3px;margin-top:auto;padding-top:6px}.mc .ms .on{color:#ffc94a;font-style:normal;text-shadow:0 0 6px #ffb40088}.mc .ms .off{color:transparent;-webkit-text-stroke:1.2px #aab2bb;font-style:normal;opacity:1}
+  .mc:hover:not([disabled]),.mc:focus-visible{background:linear-gradient(160deg,#ffe48a,#b8860b 45%,#ffd23a 60%,#8a6508);filter:drop-shadow(0 0 10px #ffb400aa);transform:translateY(-2px);outline:none}
+  .mc:hover:not([disabled]) .mcIn,.mc:focus-visible .mcIn{background:radial-gradient(120% 90% at 50% 10%,#ffd23a33,transparent 65%),repeating-linear-gradient(115deg,#ffffff06 0 2px,transparent 2px 7px),linear-gradient(180deg,#3a3524,#1d1b14)}
+  .mc:hover:not([disabled]) b,.mc:focus-visible b{color:#ffd23a}
+  .mc.feita{border:0}.mc.trancada{opacity:.5;filter:grayscale(1)}
+  @media (max-width:760px){.mc .me{font-size:40px}.mc b{font-size:16px}.mc small{font-size:11.5px}.mc .ms{font-size:18px}}
+  #missoes #mFechar.zebra{display:block;width:min(420px,100%);height:62px;margin:20px auto 0;padding:0;border:0;border-radius:0;cursor:pointer;position:relative;isolation:isolate;
+    background:repeating-linear-gradient(-45deg,#ffc400 0 10px,#111 10px 20px);clip-path:polygon(16px 0,calc(100% - 16px) 0,100% 50%,calc(100% - 16px) 100%,16px 100%,0 50%);
+    font:900 italic 30px/62px "Exo 2",system-ui,sans-serif;color:#1a1300;filter:drop-shadow(0 4px 6px #0008)}
+  #missoes #mFechar.zebra::before{content:"";position:absolute;inset:5px 60px;z-index:-1;background:linear-gradient(180deg,#ffe066,#e6a800);clip-path:polygon(12px 0,calc(100% - 12px) 0,100% 50%,calc(100% - 12px) 100%,12px 100%,0 50%)}
+  #missoes #mFechar.zebra:hover{filter:brightness(1.1)}
+  #mBrief{max-width:680px;margin:0 auto}
+  #mBrief h2{font:900 italic 34px/1.1 "Exo 2",system-ui,sans-serif}
+  #mBrief .mo{background:#0d1013cc;border-color:#6a727b66}
+  #mBrief button#mVai{background:linear-gradient(180deg,#ffe066,#e6a800);color:#1a1300;font:900 italic 24px "Exo 2",system-ui,sans-serif;border-radius:0;clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 50%,calc(100% - 14px) 100%,14px 100%,0 50%)}
+  #mBrief button#mVolta{background:#ffffff14;border:2px solid #9aa3ad66;color:#fff;border-radius:0;clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 50%,calc(100% - 14px) 100%,14px 100%,0 50%)}
   .md{font-size:14px;opacity:.8}
   .fe{font-size:40px;margin:4px 0 10px}.fl{text-align:left;display:inline-block;font-size:15px;line-height:1.8}.fl i{opacity:.6;font-style:normal}
   .ff{font-style:italic;opacity:.9}
@@ -340,7 +380,7 @@
 
 <div id="missoes" style="display:none">
   <div class="card">
-    <div id="mLista"><small class="mk">OPERAÇÃO ARQUIPÉLAGO</small><h2>🎖️ Missões</h2><div id="mGrade"></div><button id="mFechar" class="sec">VOLTAR</button></div>
+    <div id="mLista"><div class="mRadar" aria-hidden="true"></div><small class="mk">OPERAÇÃO ARQUIPÉLAGO</small><h2 class="mTit">MISSÕES</h2><div id="mGrade"></div><button id="mFechar" class="zebra">VOLTAR</button></div>
     <div id="mBrief" style="display:none"></div>
   </div>
 </div>
