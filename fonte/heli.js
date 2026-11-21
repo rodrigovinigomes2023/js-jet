@@ -3,7 +3,7 @@
 // Objetivos: destruir radares e estações SAM, afundar lanchas, resgatar pilotos com o guincho e levar p/ a base. Combustível acaba!
 const HELI={on:false,vel:new V3(),vs:0,yaw:0,agl:32,comb:100,blind:100,vidas:3,bordo:0,salvos:0,tTiro:0,misAnt:false,tMorte:0,coisas:[],fogos:[],pausa:false,brief:false,mapa:null,pilotos:[],caixas:[],alvos:[],tGuincho:0,fim:false,idN:-5000,rotor:null,cauda:null};
 const _hC1=new V3(),_hC2=new V3(),_hY=new V3(0,1,0),_hP=new V3(),_hT=new V3(),_hX=new V3(1,0,0),_hQ2=new QT();
-const HELI_CASA=4, HELI_VMAX=72, HELI_CAP=8, HELI_CAM=new V3(-95,165,95);   // base de origem, ~260 km/h, pilotos a bordo, câmera isométrica
+const HELI_CASA=4, HELI_VMAX=72, HELI_CAP=8, HELI_CAM=new V3(-72,124,72);   /* (20/11) mais perto: tudo em escala real */   // base de origem, ~260 km/h, pilotos a bordo, câmera isométrica
 
 // ---------- modelo: helicóptero de ataque (cabine em tandem, asinhas com casulos, rotor de 4 pás), frente = +x, ~17 m
 function criarHeliSimples(cor='#4d5a3c'){const g=new THREE.Group(),ve=M(cor,0.7),ve2=M('#3c4730',0.7),esc_=M('#22282b',0.6),vid=M('#1a2733',0.15),pre=M('#2b2f33',0.5);
@@ -25,7 +25,7 @@ function criarHeliSimples(cor='#4d5a3c'){const g=new THREE.Group(),ve=M(cor,0.7)
   for(let i=0;i<4;i++){const b=new THREE.Mesh(new THREE.BoxGeometry(7.2,0.08,0.45),pa);b.position.x=3.6;const h=new THREE.Group();h.rotation.y=i*Math.PI/2;h.add(b);rotor.add(h);}
   const disco=new THREE.Mesh(new THREE.CircleGeometry(7.3,32),new THREE.MeshBasicMaterial({color:0x222222,transparent:true,opacity:0.12,depthWrite:false,side:THREE.DoubleSide}));disco.rotation.x=-Math.PI/2;rotor.add(disco);
   const cauda=new THREE.Group();cauda.position.set(-11.3,3.6,0.35);g.add(cauda);for(let i=0;i<2;i++){const b=new THREE.Mesh(new THREE.BoxGeometry(0.15,2.6,0.2),pa);b.rotation.x=i*Math.PI/2;cauda.add(b);}
-  g.userData.rotor=rotor;g.userData.cauda=cauda;g.scale.setScalar(1.5);cena.add(g);return g;}   /* 1,5x: aparece melhor de cima */
+  g.userData.rotor=rotor;g.userData.cauda=cauda;g.scale.setScalar(1.04);cena.add(g);return g;}   /* (20/11) escala real: ~21,6 m como o Mi-35 */
 
 // ---------- (19/11) AH-2 Sabre (Mi-35M da FAB): modelo 3D de 42manako (Sketchfab, CC-BY-4.0), convertido por scripts/mi35/converter.py -> mi35.js (carrega sob demanda)
 const SABRE_INV={value:new THREE.Matrix4()};let SABRE_GEO=null,SABRE_CARREGANDO=false;
@@ -61,7 +61,7 @@ function criarHeli(){const G_=sabreGeo();if(!G_){carregaSabre();const g=criarHel
   for(const z of[-1,1]){const c=new THREE.Group();[['#1e8a3c',0.6],['#f2c230',0.43],['#1f4fa8',0.27],['#ffffff',0.09]].forEach(([k,r],i)=>{const dd=new THREE.Mesh(new THREE.CircleGeometry(r,24),M(k,0.6));dd.position.z=i*0.006;c.add(dd);});cola(-4.6,2.6,z,c);
     const f=new THREE.Group();box(0.5,0.9,0.01,M('#1e8a3c',0.6),-0.25,0,0,f);box(0.5,0.9,0.01,M('#f2c230',0.6),0.25,0,0,f);cola(-12.2,4.2,z,f);}
   const tor=new THREE.Group();tor.position.set(7.2,0.9,0);g.add(tor);   // ponto do canhão do nariz (a torre gira invisível: o tiro sai dela)
-  g.userData.rotor=rotor;g.userData.cauda=cauda;g.userData.torre=tor;g.scale.setScalar(1.4);cena.add(g);return g;}   /* 1,4x: aparece melhor de cima */
+  g.userData.rotor=rotor;g.userData.cauda=cauda;g.userData.torre=tor;g.scale.setScalar(0.89);cena.add(g);return g;}   /* (20/11) escala real: Mi-35M = 21,6 m c/ rotor (antes 1,4x = 34 m) */
 
 // ---------- objetos do mapa
 // (19/11) piloto abatido em escala real (1,8 m × 1,4 = mesma escala do Sabre): macacão de voo verde, colete, capacete, acenando com os 2 braços
@@ -73,19 +73,33 @@ function heliMilitar(){const h=new THREE.Group(),mac=M('#5b6b45',0.9),col=M('#3b
   cil(0.05,0.06,0.08,pele,0,1.49,0,h,8);esf(0.105,pele,0,1.6,0,h);esf(0.125,cap,-0.01,1.64,0,h,1,0.95,1);box(0.04,0.07,0.17,vis,0.11,1.63,0,h);   // pescoço, cabeça, capacete, viseira
   const bracos=[];for(const z of[-1,1]){const o=new THREE.Group();o.position.set(0,1.42,z*0.23);h.add(o);cil(0.055,0.05,0.3,mac,0,-0.15,0,o,8);
     const c=new THREE.Group();c.position.y=-0.3;o.add(c);cil(0.05,0.045,0.28,mac,0,-0.14,0,c,8);esf(0.05,luv,0,-0.3,0,c);bracos.push({o,c,z});}
-  h.userData.bracos=bracos;h.scale.setScalar(1.4);return h;}
+  h.userData.bracos=bracos;return h;}   /* (20/11) 1,75 m, tamanho real */
 function heliPiloto(){const g=new THREE.Group();const mil=heliMilitar();g.add(mil);g.userData.mil=mil;
   const pan=box(2.6,0.04,0.9,M('#ff6a1a',0.8),3.2,0.03,1.6,g);pan.rotation.y=0.6;box(0.32,0.5,0.32,M('#3b4630',0.8),1.4,0.25,-1.2,g);   // painel de sinalização + mochila de sobrevivência
   g.userData.lata=new V3(-1.6,0.2,1.2);const lata=cil(0.07,0.07,0.3,M('#e06a20',0.6),-1.6,0.15,1.2,g,8);lata.rotation.z=1.4;   // lata de fumaça
   const raio=new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.6,60,8,1,true),new THREE.MeshBasicMaterial({color:0xffb030,transparent:true,opacity:0.35,depthWrite:false,side:THREE.DoubleSide}));raio.position.set(-1.6,30,1.2);g.add(raio);   /* facho sai da lata de fumaça, não do militar */
   const fum=new THREE.Mesh(new THREE.RingGeometry(4,5,24),new THREE.MeshBasicMaterial({color:0xffb030,transparent:true,opacity:0.7,side:THREE.DoubleSide}));fum.rotation.x=-Math.PI/2;fum.position.y=0.3;g.add(fum);
   const anel=g.children[g.children.length-1];g.userData.anel=anel;g.userData.raio=raio;raio.material.opacity=0.22;cena.add(g);return g;}
-function heliCaixa(tipo){const g=new THREE.Group();
-  if(tipo==='comb'){cil(1.1,1.1,2.4,M('#c0392b',0.5),0,1.2,0,g,12);cil(1.12,1.12,0.2,M('#e8e8e8',0.5),0,1.8,0,g,12);}
-  else if(tipo==='mun'){box(3,1.6,2,M('#556b2f',0.8),0,0.8,0,g);box(3.05,0.3,2.05,M('#c9b037',0.6),0,1.2,0,g);}
-  else{box(2.4,2.4,2.4,M('#f0f0f0',0.6),0,1.2,0,g);box(1.6,0.5,2.45,M('#d32f2f',0.6),0,1.2,0,g);box(0.5,1.6,2.45,M('#d32f2f',0.6),0,1.2,0,g);}
-  const anel=new THREE.Mesh(new THREE.RingGeometry(5,5.8,24),new THREE.MeshBasicMaterial({color:tipo==='comb'?0xff5040:tipo==='mun'?0xd8c040:0xffffff,transparent:true,opacity:0.6,side:THREE.DoubleSide}));anel.rotation.x=-Math.PI/2;anel.position.y=0.3;g.add(anel);
+function heliCaixa(tipo){const g=new THREE.Group(),pal=M('#8a6a45',0.9);   /* (20/11) tamanho real: palete 1,4 m */
+  box(1.4,0.15,1.4,pal,0,0.075,0,g);
+  if(tipo==='comb'){for(const [x,z] of[[-0.33,-0.33],[0.33,-0.33],[-0.33,0.33],[0.33,0.33]]){cil(0.29,0.29,0.88,M('#c0392b',0.5),x,0.59,z,g,12);cil(0.3,0.3,0.05,M('#e8e8e8',0.5),x,0.8,z,g,12);}}
+  else if(tipo==='mun'){for(let k=0;k<2;k++){box(1.3,0.45,0.9,M('#556b2f',0.8),0,0.38+k*0.47,0,g);box(1.32,0.08,0.92,M('#c9b037',0.6),0,0.5+k*0.47,0,g);}}
+  else{box(1.2,1.2,1.2,M('#f0f0f0',0.6),0,0.75,0,g);box(0.8,0.25,1.22,M('#d32f2f',0.6),0,0.75,0,g);box(0.25,0.8,1.22,M('#d32f2f',0.6),0,0.75,0,g);}
+  const anel=new THREE.Mesh(new THREE.RingGeometry(3,3.5,24),new THREE.MeshBasicMaterial({color:tipo==='comb'?0xff5040:tipo==='mun'?0xd8c040:0xffffff,transparent:true,opacity:0.6,side:THREE.DoubleSide}));anel.rotation.x=-Math.PI/2;anel.position.y=0.3;g.add(anel);
   cena.add(g);return g;}
+/* (20/11) lancha de patrulha ~12 m (antes era o navio B encolhido = 36 m): casco em V, cabine c/ para-brisa, .50 na proa, 2 motores de popa, 2 tripulantes, esteira */
+function heliLancha(){const g=new THREE.Group(),cas=M('#d9dcd8',0.55),fun=M('#3a3f44',0.7),cab=M('#e9ebe8',0.5),vid=M('#1d2a33',0.15),pr=M('#22262a',0.6),fx=M('#e8443a',0.6),bor=M('#2b2f33',0.85);
+  casco(12,3.4,0.6,4,fun,g,-0.35);casco(12,3.4,0.9,4,cas,g,0.25);casco(11.6,3.3,0.12,3.8,bor,g,1.1);   // fundo escuro, costado claro, borda de borracha
+  box(10.4,0.06,3.0,M('#a8aca6',0.85),-0.4,1.17,0,g);                                                  // convés
+  box(3.0,1.5,2.4,cab,-0.6,1.95,0,g);const pb=box(0.08,0.9,2.3,vid,0.95,2.15,0,g);pb.rotation.z=0.35;   // cabine + para-brisa inclinado
+  box(2.6,0.08,2.6,cab,-0.9,2.74,0,g);cil(0.05,0.05,1.4,pr,-1.6,3.45,0,g,6);box(0.5,0.12,0.5,pr,-1.6,4.1,0,g);   // teto, mastro c/ radar
+  box(0.15,0.2,3.1,fx,-0.4,0.95,0,g);                                                                 // faixa vermelha
+  const ar=new THREE.Group();ar.position.set(3.7,1.2,0);g.add(ar);cil(0.08,0.1,0.9,pr,0,0.45,0,ar,6);const cano=cil(0.05,0.05,1.6,pr,0.75,0.95,0,ar,6);cano.rotation.z=Math.PI/2;box(0.5,0.25,0.25,pr,0.1,0.95,0,ar);   // .50 na proa
+  for(const z of[-0.6,0.6]){box(0.5,0.7,0.4,M('#1c1c1c',0.5),-6.25,1.25,z,g);box(0.15,0.9,0.12,pr,-6.3,0.5,z,g);}   // 2 motores de popa
+  for(const [x,z] of[[2.9,0],[-2.6,0.7]]){const t=heliMilitar();t.position.set(x,1.2,z);t.rotation.y=Math.PI/2;g.add(t);}   // atirador e piloto
+  const eg=new THREE.BufferGeometry();eg.setAttribute('position',new THREE.Float32BufferAttribute([0,0,-1.5, 0,0,1.5, -26,0,-6, -26,0,6],3));eg.setAttribute('color',new THREE.Float32BufferAttribute([1,1,1, 1,1,1, 0,0,0, 0,0,0],3));eg.setIndex([0,2,1,1,2,3]);
+  const es=new THREE.Mesh(eg,new THREE.MeshBasicMaterial({color:0xe8f0f4,vertexColors:true,transparent:true,opacity:0.32,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));es.position.set(-6.2,0.15,0);g.add(es);g.userData.esteira=es;   // esteira
+  return g;}
 function heliAA(){const g=new THREE.Group(),o=M('#5d6b4a',0.8),e=M('#2f363c',0.6);cil(2.2,2.6,1.6,o,0,0.8,0,g,10);const t=new THREE.Group();t.position.y=2;g.add(t);
   box(2.2,1.4,2.4,o,0,0.4,0,t);for(const z of[-0.5,0.5]){const c=cil(0.15,0.15,3.6,e,1.6,1,z,t,6);c.rotation.z=Math.PI/2-0.5;}g.userData.torre=t;cena.add(g);return g;}
 
@@ -119,7 +133,7 @@ function heliIniciar(){const rng=rnd(4242);HELI.on=true;HELI.fim=false;HELI.vida
   for(let i=0;i<3;i++){const p=heliPonto(1500,5200,true,rng);heliAlvo(`📡 Radar ${i+1}`,'#ff7f2a',(i%2?radarB:radarA)('#ff7f2a'),p,60,'radar');}
   for(let i=0;i<2;i++){const p=heliPonto(2000,5500,true,rng);const o=heliAlvo(`🚀 SAM ${i+1}`,'#ff3b30',radarC('#ff3b30'),p,80,'sam');o.tSam=4+i*2;}
   for(let i=0;i<6;i++){const p=heliPonto(800,6000,true,rng);const g=heliAA();const o=heliAlvo(`🔫 Antiaérea ${i+1}`,'#e8443a',g,p,40,'aa');}
-  for(let i=0;i<2;i++){const p=heliPonto(1500,4500,false,rng);const o=heliAlvo(`🚤 Lancha ${i+1}`,'#e8443a',navioB('#8a96a8'),p,120,'lancha');o.g.scale.setScalar(0.45);o.c=p.clone();o.ang=rng()*6;}
+  for(let i=0;i<2;i++){const p=heliPonto(1500,4500,false,rng);const o=heliAlvo(`🚤 Lancha ${i+1}`,'#e8443a',heliLancha(),p,120,'lancha');o.c=p.clone();o.ang=rng()*6;}
   for(const o of HELI.alvos)cena.add(o.g);
   for(let i=0;i<4;i++){const p=heliPontoResgate(rng);const g=heliPiloto();g.position.copy(p);g.rotation.y=rng()*6.28;g.updateMatrixWorld();
     for(const c of g.children){if(c===g.userData.raio)continue;c.getWorldPosition(_v1);const ch=chaoMalha(_v1.x,_v1.z);c.position.y+=ch-p.y;}   /* tudo em cima do chão (encosta) */
@@ -219,7 +233,7 @@ function heliPasso(dt){if(!HELI.on||HELI.pausa)return;const agora=performance.no
   if((TEC.KeyX||BT.flare)&&agora>flarePronto)treinoFlare();
   // inimigos
   for(const o of HELI.alvos){if(!o.vivo)continue;o.tRec=agora;o.alvoP.copy(o.pos);const d=o.pos.distanceTo(EU.pos);
-    if(o.tipo==='lancha'){o.ang+=dt*0.04;o.pos.set(o.c.x+Math.cos(o.ang)*350,0,o.c.z+Math.sin(o.ang)*350);if(relevo(o.pos.x,o.pos.z)>0.5)o.ang-=dt*0.08;o.g.position.copy(o.pos);
+    if(o.tipo==='lancha'){o.ang+=dt*0.06;o.pos.set(o.c.x+Math.cos(o.ang)*350,0,o.c.z+Math.sin(o.ang)*350);if(relevo(o.pos.x,o.pos.z)>0.5)o.ang-=dt*0.08;o.g.position.copy(o.pos);
       o.q.setFromAxisAngle(_v1.set(0,1,0),-o.ang-Math.PI/2);o.alvoQ.copy(o.q);o.g.quaternion.copy(o.q);}
     if((o.tipo==='aa'||o.tipo==='lancha')&&d<900&&visada(_v1.copy(o.pos).setY(o.pos.y+4),EU.pos)){o.t-=dt;
       if(o.tipo==='aa'){const t=o.g.userData.torre;t.rotation.y=Math.atan2(-(EU.pos.z-o.pos.z),EU.pos.x-o.pos.x);}
@@ -273,17 +287,17 @@ function heliEscada(dt,alvo){const esc=HELI.esc;if(!esc||!JATO)return;
   for(const p of HELI.pilotos){if(p.ok||p.aBordo)continue;const mil=p.g.userData.mil;if(!p.mil0)p.mil0=mil.position.clone();
     const meta=p===alvo?Math.max(0,Math.min(1,(HELI.tGuincho/1.6-0.25)/0.75)):0;p.sobe=(p.sobe||0)+(meta-(p.sobe||0))*Math.min(1,6*dt);
     if(p.sobe<0.005&&meta===0){if(p.subindo){mil.position.copy(p.mil0);p.subindo=false;}continue;}p.subindo=true;
-    _eL.set(-_eF.z,0,_eF.x).normalize();_eA.set(_eT.x,chao+p.sobe*Math.max(0,Lmax-2.4),_eT.z).addScaledVector(_eL,0.35);   /* encostado na escada */
+    _eL.set(-_eF.z,0,_eF.x).normalize();_eA.set(_eT.x,chao+p.sobe*Math.max(0,Lmax-1.75),_eT.z).addScaledVector(_eL,0.35);   /* encostado na escada */
     p.g.worldToLocal(_eA);const w=Math.min(1,p.sobe*5);mil.position.set(p.mil0.x+(_eA.x-p.mil0.x)*w,p.mil0.y+(_eA.y-p.mil0.y)*Math.min(1,p.sobe*1.2),p.mil0.z+(_eA.z-p.mil0.z)*w);
     mil.rotation.y=Math.atan2(_eF.x,_eF.z)-p.g.rotation.y+Math.PI/2;const c=Math.sin(performance.now()/90);
     for(const B of mil.userData.bracos){B.o.rotation.x=-B.z*(2.7+B.z*c*0.35);B.c.rotation.x=-B.z*0.6;}}}
 function heliGancho(dt,c){const cabo=HELI.cabo,gan=HELI.gan;if(!cabo||!JATO)return;
   _eT.set(1.2,0.4,0);JATO.localToWorld(_eT);_eF.set(1,0,0).applyQuaternion(EU.q);   /* barriga */
-  const chao=c?c.p.y+3.2:Math.max(0,relevo(_eT.x,_eT.z))+3,fundo=Math.max(0,_eT.y-chao),t=HELI.tGancho;
+  const chao=c?c.p.y+2.1:Math.max(0,relevo(_eT.x,_eT.z))+3,fundo=Math.max(0,_eT.y-chao),t=HELI.tGancho;
   const alvo=c?(t<0.45?t/0.45:1-(t-0.45)/0.65):0;HELI.ganL=c?alvo:Math.max(0,HELI.ganL-dt*2.5);
   const L=Math.max(0,HELI.ganL*fundo);cabo.visible=gan.visible=L>0.2;
   cabo.scale.y=Math.max(0.01,L);cabo.position.set(_eT.x,_eT.y-L/2,_eT.z);gan.position.set(_eT.x,_eT.y-L-0.3,_eT.z);gan.rotation.y=Math.atan2(-_eF.z,_eF.x);
-  for(const k of HELI.caixas){if(k.ok)continue;if(k===c&&t>=0.45){k.g.position.set(_eT.x,_eT.y-L-3.6,_eT.z);}else if(k.g.position.distanceToSquared(k.p)>0.01)k.g.position.lerp(k.p,Math.min(1,dt*4));}}
+  for(const k of HELI.caixas){if(k.ok)continue;if(k===c&&t>=0.45){k.g.position.set(_eT.x,_eT.y-L-2.1,_eT.z);}else if(k.g.position.distanceToSquared(k.p)>0.01)k.g.position.lerp(k.p,Math.min(1,dt*4));}}
 /* (19/11) painel de objetivo (tarefa atual + próxima), rádio do Cel. Moraes e zonas das antiaéreas */
 const HOBJ=[{k:'radar',tit:'Cegue o inimigo',det:'Destrua os radares 📡',prox:'Próximo: baterias SAM 🚀'},{k:'sam',tit:'Abra o espaço aéreo',det:'Destrua as baterias SAM 🚀',prox:'Próximo: resgatar os pilotos 🪂'},
   {k:'pil',tit:'Ninguém fica pra trás',det:'Leve os pilotos à base 🪂',prox:''},{k:'fim',tit:'Missão cumprida',det:'Defesas neutralizadas',prox:''}];
@@ -342,7 +356,7 @@ function iniciaHeli(){SALA='heli';SOM.ini();$('#erro').textContent='';
 $('#bHeli').addEventListener('click',iniciaHeli);
 
 // ---------- (19/11) DRAMA: destroços pegando fogo, lancha afundando devagar, poeira/spray do rotor
-const FOGO_ALT={radar:8,sam:4,aa:3,lancha:5},FOGO_TAM={radar:1.4,sam:1.2,aa:0.8,lancha:1};
+const FOGO_ALT={radar:8,sam:4,aa:3,lancha:2.2},FOGO_TAM={radar:1.4,sam:1.2,aa:0.8,lancha:0.55};
 function heliCarboniza(o){   // escurece, tomba e "amassa" o que foi destruído (fica no mapa queimando)
   o.g.traverse(m=>{if(!m.isMesh)return;m.onBeforeRender=()=>{};const mt=m.material.clone();if(mt.color)mt.color.multiplyScalar(0.16);if(mt.emissive)mt.emissive.setRGB(0,0,0);m.material=mt;});
   o.g.scale.y*=o.tipo==='radar'?0.45:0.7;o.g.rotation.z+=(Math.random()-0.5)*0.25;o.g.rotation.x+=(Math.random()-0.5)*0.25;}
@@ -357,12 +371,12 @@ function heliFogos(dt){if(FX.length>700)return;
 function heliAfunda(dt){   // lancha: perde velocidade, aderna, explosões secundárias, proa sobe e vai p/ o fundo (~16 s)
   for(const o of HELI.alvos){const A=o.afunda;if(!A||A.fim)continue;A.t+=dt;const u=A.t;
     A.v=Math.max(0,A.v-dt*1.4);o.ang+=dt*A.v/350;o.pos.set(o.c.x+Math.cos(o.ang)*350,0,o.c.z+Math.sin(o.ang)*350);o.q.setFromAxisAngle(_v1.set(0,1,0),-o.ang-Math.PI/2);
-    const y=-Math.pow(Math.max(0,u-3)/12,2)*18;
+    const y=-Math.pow(Math.max(0,u-3)/12,2)*7;if(o.g.userData.esteira)o.g.userData.esteira.material.opacity=0.32*Math.max(0,1-u/3);
     o.g.position.set(o.pos.x,y,o.pos.z);o.g.quaternion.copy(o.q).multiply(_v4q.setFromEuler(_hE2.set(A.lado*Math.min(0.5,u*0.045),0,Math.min(0.38,Math.max(0,u-5)*0.045))));
-    A.F.p.set(o.pos.x,y+5,o.pos.z);if(y<-7&&!A.F.vapor){A.F.vapor=true;A.F.p.y=0.5;}
-    A.ex-=dt;if(A.ex<=0&&u<11){A.ex=1+Math.random()*1.8;const p=_v3.copy(o.pos).add(_v2.set((Math.random()-0.5)*24,4,(Math.random()-0.5)*24));
-      for(let i=0;i<5;i++)fx(_v1.copy(p).add(_v2.set((Math.random()-0.5)*8,Math.random()*6,(Math.random()-0.5)*8)),0xffa030,8+Math.random()*8,0.5,2.5);SOM.boom(o.pos.distanceTo(EU.pos)<1200);}
-    if(u>3&&Math.random()<dt*14){const a=Math.random()*6.28;fx(_v1.set(o.pos.x+Math.cos(a)*14,0.6,o.pos.z+Math.sin(a)*14),0xe8f0f4,4+Math.random()*3,1.3,2,false,1.5);}   // borbulha e espuma em volta
+    A.F.p.set(o.pos.x,y+2.2,o.pos.z);if(y<-3&&!A.F.vapor){A.F.vapor=true;A.F.p.y=0.5;}
+    A.ex-=dt;if(A.ex<=0&&u<11){A.ex=1+Math.random()*1.8;const p=_v3.copy(o.pos).add(_v2.set((Math.random()-0.5)*8,1.5,(Math.random()-0.5)*3));
+      for(let i=0;i<5;i++)fx(_v1.copy(p).add(_v2.set((Math.random()-0.5)*3,Math.random()*2.5,(Math.random()-0.5)*3)),0xffa030,3+Math.random()*3,0.5,2.5);SOM.boom(o.pos.distanceTo(EU.pos)<1200);}
+    if(u>3&&Math.random()<dt*14){const a=Math.random()*6.28;fx(_v1.set(o.pos.x+Math.cos(a)*6,0.4,o.pos.z+Math.sin(a)*6),0xe8f0f4,2+Math.random()*1.5,1.3,2,false,1.5);}   // borbulha e espuma em volta
     if(u>16){A.fim=true;o.g.visible=false;heliMsg('🌊 A lancha foi pro fundo!',2200);
       const mancha=new THREE.Mesh(new THREE.CircleGeometry(26,24),new THREE.MeshBasicMaterial({color:0x101418,transparent:true,opacity:0.45,depthWrite:false}));mancha.rotation.x=-Math.PI/2;mancha.position.set(o.pos.x,0.25,o.pos.z);cena.add(mancha);HELI.coisas.push(mancha);}}}
 function heliPoeira(dt){   // rotor perto do chão/água levanta poeira ou spray (suba com E / 🔥 p/ evitar)

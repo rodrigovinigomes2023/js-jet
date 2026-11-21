@@ -72,6 +72,8 @@ function hIlha(I,x,z){const p=TER.passo,fx=(x-I.x0)/p,fz=(z-I.z0)/p,i=Math.max(0
 function visada(a,b){const dx=b.x-a.x,dz=b.z-a.z,n=Math.max(2,Math.ceil(Math.hypot(dx,dz)/60));
   for(let i=1;i<n;i++){const t=i/n,y=a.y+(b.y-a.y)*t;if(y>820)continue;if(relevo(a.x+dx*t,a.z+dz*t)>y)return false;}return true;}
 // (10/11) bases da sala sem bots: as mesmas do servidor (anel de 18,6 km — arena 4x maior, 4 no máximo), cada uma numa ilha plana com pista apontada p/ o centro
+/* (20/11) escala real: Gripen E = 15,2 m (antes 1,25 = 21,7 m) */
+const ESC_JATO=0.875,ALT_TREM=1.9*0.875/1.25;
 const BASE_R=18600,BASE_H=18,BASE_PLANO=760,BASE_ILHA=1050,PISTA=1300;
 // (11/11) + 4 bases da sala com bots (deathmatch) a 5,8 km, no mar livre (iguais ao servidor); 4 baterias cada
 const BASE_R_BOTS=5800,LANC_PVP=[[-320,-120],[320,-120],[0,-190]],LANC_BOTS=[...LANC_PVP,[380,160]];
@@ -309,7 +311,7 @@ function criarGripen(cor){const J=new THREE.Group();
     pv.userData.y0=y;pernas.push(pv);}
   J.userData.pernas=pernas;J.userData.tremK=-1;
   J.userData.cab=[partes[0],partes[2]];   // na visão da cabine some o corpo (o painel é desenhado por cima)
-  J.scale.setScalar(1.25);cena.add(J);return J;}
+  J.scale.setScalar(ESC_JATO);cena.add(J);return J;}
 function poeTrem(J,k){if(!J||!J.userData.pernas||J.userData.tremK===k)return;J.userData.tremK=k;   // k: 1 = baixado, 0 = recolhido
   for(const pv of J.userData.pernas){pv.rotation.z=(1-k)*Math.PI/2;pv.position.y=pv.userData.y0+(1-k)*0.22;pv.visible=k>0.02;}}
 function criarJato(cor){if(GRIPEN)return criarGripen(cor);const J0=criarJatoAntigo(cor);J0.userData.antigo=true;J0.userData.cor=cor;return J0;}
@@ -331,7 +333,7 @@ function criarJatoAntigo(cor){const J=new THREE.Group(),mG=new THREE.MeshStandar
   J.userData.cab.push(esf(0.17,M('#f2f2f2',0.4),3.55,0.82,0,J),esf(0.13,M('#1a1a1e',0.1),3.69,0.8,0,J,0.9,0.75,1));   // capacete (some na visão da cabine)
   _mCo=_mCo||new THREE.MeshStandardMaterial({map:texCocar(),transparent:true,roughness:0.6,polygonOffset:true,polygonOffsetFactor:-2});
   for(const s of[-1,1]){const c=new THREE.Mesh(G('pCo',()=>new THREE.PlaneGeometry(1.5,1.5)),_mCo);c.rotation.x=-Math.PI/2;c.position.set(-4.0,-0.13,s*3.0);J.add(c);}
-  J.scale.setScalar(1.25);cena.add(J);return J;}
+  J.scale.setScalar(ESC_JATO);cena.add(J);return J;}
 
 // ------------------------------------------------ som (Web Audio, tudo sintetizado)
 const SOM=(()=>{let ctx=null,mestre,branco,mot=null;
@@ -472,7 +474,7 @@ function rastroAsa(chave,g,pos,q,vel,vivo,esc,dt){let T=TRILHAS.get(chave);if(!T
   const up=_v4.set(0,1,0).applyQuaternion(q);
   T.f.forEach((F,lado)=>{const P=F.m.geometry.attributes.position.array,A=F.m.geometry.attributes.alfa.array;
     P.copyWithin(6,0,(N_TR-1)*6);F.a.copyWithin(1,0,N_TR-1);
-    _v1.copy(PONTA[lado]).multiplyScalar(1.25*esc).applyQuaternion(q).add(pos);
+    _v1.copy(PONTA[lado]).multiplyScalar(ESC_JATO*esc).applyQuaternion(q).add(pos);
     if(!F.cheia){for(let i=0;i<N_TR;i++){P.set([_v1.x,_v1.y,_v1.z,_v1.x,_v1.y,_v1.z],i*6);}F.cheia=true;}
     const w=0.18*esc;P.set([_v1.x+up.x*w,_v1.y+up.y*w,_v1.z+up.z*w,_v1.x-up.x*w,_v1.y-up.y*w,_v1.z-up.z*w],0);F.a[0]=T.k*0.55;
     for(let i=0;i<N_TR;i++){const a=F.a[i]*(1-i/N_TR);A[i*2]=A[i*2+1]=a;}
@@ -512,8 +514,8 @@ function sombraEm(i,pos,q,esc,tex){const S=SOMBRA;let m=S.pool[i];
   m.visible=true;m.material.map=tex||S.t;m.position.set(x,h+0.9,z);   // pista fica em BASE_H+0.5
   S.n.set(relevo(x-4,z)-relevo(x+4,z),8,relevo(x,z-4)-relevo(x,z+4)).normalize();const f=frente(q,S.f);
   S.qy.setFromAxisAngle(S.Y,Math.atan2(-f.z,f.x));m.quaternion.setFromUnitVectors(S.Y,S.n).multiply(S.qy);
-  const e=20*(esc||1)*(1+alt/700);m.scale.set(e,1,e);m.material.opacity=0.5*(1-alt/450);}
-function sombras(){let i=0;if(JATO&&JATO.visible&&EU.vivo)SALA==='heli'?sombraEm(i++,EU.pos,EU.q,1.6,texSombraHeli()):sombraEm(i++,EU.pos,EU.q,1);
+  const e=14*(esc||1)*(1+alt/700);m.scale.set(e,1,e);m.material.opacity=0.5*(1-alt/450);}
+function sombras(){let i=0;if(JATO&&JATO.visible&&EU.vivo)SALA==='heli'?sombraEm(i++,EU.pos,EU.q,1.5,texSombraHeli()):sombraEm(i++,EU.pos,EU.q,1);
   for(const o of OUT.values())if(o.vivo&&!o.navio&&o.q&&o.pos.distanceToSquared(cam.position)<2500*2500)sombraEm(i++,o.pos,o.q,o.esc);
   for(;i<SOMBRA.pool.length;i++)SOMBRA.pool[i].visible=false;}
 const OUT=new Map();   // id -> {g,pos,vel,q,alvoP,alvoQ,tRec,vida,vivo,nome,cor,bot,rot}
@@ -577,7 +579,7 @@ function rolar(dt,I){
   EU.arf+=(alvoArf-EU.arf)*Math.min(1,dt*2.5);
   EU.q.setFromAxisAngle(_v1.set(0,1,0),EU.yawSolo).multiply(_dq.setFromAxisAngle(_v2.set(0,0,1),EU.arf));
   const fw=frente(EU.q);EU.pos.addScaledVector(fw,EU.vel*dt);
-  const h=relevo(EU.pos.x,EU.pos.z),chao=h+1.9;
+  const h=relevo(EU.pos.x,EU.pos.z),chao=h+ALT_TREM;
   if(EU.pos.y<chao-0.5&&EU.pos.y<chao-3){morrer(null,true);return;}   // bateu num morro
   if(EU.pos.y<chao)EU.pos.y=chao;
   if(EU.pos.y<chao+0.6&&h<0.5){morrer(null,true);return;}   // rolou p/ dentro do mar
@@ -601,7 +603,7 @@ function reabastecido(){EU.vida=100;MUN=2;BOMBAS=4;if(BALAS_N>=0)BALAS_N=500;EU.
 // toque no chão vindo do ar: com trem baixado, no pátio/pista, descendo devagar, asas niveladas e até ~340 km/h = pouso; senão, acidente
 function tocou(fw,up){const vy=fw.y*EU.vel;
   if(EU.trem>0.98&&emPlano(EU.pos.x,EU.pos.z)&&vy>-12&&up.y>0.75&&fw.y>-0.22&&fw.y<0.45&&EU.vel<115){   // (10/11) tolerante: arcade
-    EU.solo=true;EU.yawSolo=Math.atan2(-fw.z,fw.x);EU.q.setFromAxisAngle(_v1.set(0,1,0),EU.yawSolo);EU.arf=Math.max(0,Math.asin(fw.y));EU.pos.y=relevo(EU.pos.x,EU.pos.z)+1.9;EU.acel=0;EU.stall=0;EU.tParado=0;
+    EU.solo=true;EU.yawSolo=Math.atan2(-fw.z,fw.x);EU.q.setFromAxisAngle(_v1.set(0,1,0),EU.yawSolo);EU.arf=Math.max(0,Math.asin(fw.y));EU.pos.y=relevo(EU.pos.x,EU.pos.z)+ALT_TREM;EU.acel=0;EU.stall=0;EU.tParado=0;
     SOM.dor();fx(_v1.copy(EU.pos).setY(EU.pos.y-1.5),0xdddddd,10,1.2,3,false,2);
     const div=document.createElement('div');div.innerHTML=`🛬 pouso! descendo a ${(-vy).toFixed(1)} m/s ${-vy<2.5?'— manteiga 🧈':''}`;$('#feed').prepend(div);setTimeout(()=>div.remove(),3000);return true;}
   return false;}
@@ -625,7 +627,7 @@ function voar(dt){const I=entrada();ULT_I=I;
     if(hP<15&&emPlano(EU.pos.x,EU.pos.z)){const k=1-hP/15,fyA=-(1.5+hP*0.45)/Math.max(EU.vel,40);   // desce cada vez mais devagar: ~1,5 m/s no toque
       if(fw.y<fyA)EU.q.multiply(_dq.setFromAxisAngle(_v2.set(0,0,1),Math.min(1.2*dt,fyA-fw.y)));
       if(Math.abs(dir.y)>0.02)EU.q.multiply(_dq.setFromAxisAngle(_v2.set(1,0,0),dir.y*2.5*k*dt));EU.q.normalize();frente(EU.q,fw);up.set(0,1,0).applyQuaternion(EU.q);}}
-  if(EU.pos.y<relevo(EU.pos.x,EU.pos.z)+(EU.trem>0.98?1.9:3)){if(tocou(fw,up))return;morrer(null,true);return;}
+  if(EU.pos.y<relevo(EU.pos.x,EU.pos.z)+(EU.trem>0.98?ALT_TREM:2.2)){if(tocou(fw,up))return;morrer(null,true);return;}
   const rh=Math.hypot(EU.pos.x,EU.pos.z);EU.fora=rh>LIMITE||EU.pos.y>4500?EU.fora+dt:0;
   const hSolo=EU.pos.y-relevo(EU.pos.x,EU.pos.z),tremAv=EU.tremAlvo===0&&hSolo<120&&EU.vel<100&&fw.y<0&&emPlano(EU.pos.x,EU.pos.z);
   let aviso=EU.stall>0?'⚠️ STALL! Abaixe o nariz e acelere':tremAv?'⚠️ TREM RECOLHIDO! Aperte G / 🛞':EU.fora>0?'⚠️ Volte para a área de combate!':'';
@@ -644,7 +646,7 @@ function voar(dt){const I=entrada();ULT_I=I;
   bombAnt=I.bomba&&!TOQUE_B;TOQUE_B=false;
   SOM.motor(EU.vel,turbo,true);}
 function atirar(fw){ladoArma=-ladoArma;
-  const boca=_v2.set(3,-0.2,ladoArma*1.1).multiplyScalar(1.25).applyQuaternion(EU.q).add(EU.pos);
+  const boca=_v2.set(3,-0.2,ladoArma*1.1).multiplyScalar(ESC_JATO).applyQuaternion(EU.q).add(EU.pos);
   // (11/11) sem mira assistida: a rajada sai reta do nariz — quem compensa é o piloto, com a mira de compensação (◇)
   const dir=_v3.copy(fw);
   const v=_v1.copy(dir).multiplyScalar(VEL_BALA).addScaledVector(fw,EU.vel);
@@ -668,7 +670,7 @@ const mMis=new THREE.MeshStandardMaterial({color:0xeeeeee,roughness:0.5}),mMisP=
 function criarMissil(){const g=new THREE.Group();const c=cil(0.22,0.22,3.4,mMis,0,0,0,g,8);c.rotation.z=Math.PI/2;const n=cil(0,0.22,0.6,mMisP,2.0,0,0,g,8);n.rotation.z=-Math.PI/2;
   for(let i=0;i<4;i++){const a=box(0.6,0.04,0.9,mMis,-1.4,0,0,g);a.rotation.x=i*Math.PI/4;}
   const b=new THREE.Sprite(new THREE.SpriteMaterial({map:texBrilho(),color:0xffc060,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));b.position.x=-2.2;b.scale.setScalar(4.5);g.add(b);
-  g.scale.setScalar(1.3);cena.add(g);return g;}
+  g.scale.setScalar(0.75);   /* (20/11) 3 m (antes 5,2 m) */cena.add(g);return g;}
 function recebeMisseis(lista){const agora=performance.now(),vistos=new Set();
   for(const [id,x,y,z,vx,vy,vz,alvo] of lista){vistos.add(id);let m=MISV.get(id);
     if(!m){m={g:criarMissil(),pos:new V3(x,y,z),alvoP:new V3(),vel:new V3(),tFumo:0};MISV.set(id,m);}
@@ -692,7 +694,7 @@ function flares(id){const o=id===EU.id?{pos:EU.pos,q:EU.q}:OUT.get(id);if(!o)ret
 const G_BOMBA=14,ARRASTO_BOMBA=0.04,BOMBV=new Map();
 const mBomba=M('#4b5320',0.6);
 function criarBomba(){const g=new THREE.Group();const c=cil(0.45,0.45,2.6,mBomba,0,0,0,g,10);c.rotation.z=Math.PI/2;const n=esf(0.45,mBomba,1.3,0,0,g,1.5,1,1);
-  for(let i=0;i<4;i++){const a=box(0.7,0.05,1.3,M('#3a3f1a',0.6),-1.3,0,0,g);a.rotation.x=i*Math.PI/4;}g.scale.setScalar(1.3);cena.add(g);return g;}
+  for(let i=0;i<4;i++){const a=box(0.7,0.05,1.3,M('#3a3f1a',0.6),-1.3,0,0,g);a.rotation.x=i*Math.PI/4;}g.scale.setScalar(0.65);cena.add(g);return g;}   /* (20/11) ~2,3 m (Mk-82) */
 function soltaBomba(id,p,v,minha){const b={g:criarBomba(),p:new V3().copy(p),v:new V3().copy(v),minha,tU:performance.now()};BOMBV.set(id,b);if(p.distanceTo(EU.pos)<600)SOM.flare();}
 function passoBomba(p,v,dt){v.y-=G_BOMBA*dt;const k=1-ARRASTO_BOMBA*dt;v.x*=k;v.z*=k;p.addScaledVector(v,dt);}
 function bombas(){const agora=performance.now();for(const [id,b] of BOMBV){let tr=Math.min(2,(agora-b.tU)/1000);b.tU=agora;   // relógio real (igual ao servidor), mesmo com o celular lento
@@ -731,7 +733,7 @@ function nascer(){KC=null;MEU_DESTROCO=null;document.body.classList.remove('mort
   else if(SALA==='treino'&&TREINO.passo>=2){const B=BASES[0];   // tutorial: depois da decolagem, volta já no ar, perto da base
     EU.pos.set(B.x+B.dx*1800,900,B.z+B.dz*1800);EU.q.setFromAxisAngle(_v1.set(0,1,0),B.yaw);}
   else if((SALA==='pvp'||SALA==='treino'||SALA==='bots')&&MINHA_BASE!==null){const B=BASES[MINHA_BASE];   // (10/11) salas com base: sempre na cabeceira da pista da minha base
-    EU.pos.set(B.x-B.dx*(PISTA/2-50),BASE_H+1.9,B.z-B.dz*(PISTA/2-50));EU.q.setFromAxisAngle(_v1.set(0,1,0),B.yaw);EU.vel=0;EU.solo=true;EU.yawSolo=B.yaw;EU.trem=EU.tremAlvo=1;$('#dicaDec').style.display=SALA==='treino'?'none':'block';}
+    EU.pos.set(B.x-B.dx*(PISTA/2-50),BASE_H+ALT_TREM,B.z-B.dz*(PISTA/2-50));EU.q.setFromAxisAngle(_v1.set(0,1,0),B.yaw);EU.vel=0;EU.solo=true;EU.yawSolo=B.yaw;EU.trem=EU.tremAlvo=1;$('#dicaDec').style.display=SALA==='treino'?'none':'block';}
   else{const a=Math.random()*Math.PI*2,r=2200+Math.random()*1200;EU.pos.set(Math.cos(a)*r,700+Math.random()*400,Math.sin(a)*r);
     const yaw=Math.atan2(EU.pos.z,-EU.pos.x);EU.q.setFromAxisAngle(_v1.set(0,1,0),yaw);}   // nariz (+x) apontando pro centro
   EU.vida=100;EU.turbo=1;MUN=2;BALAS_N=SALA==='bots'?500:-1;TRAVA.id=0;TRAVA.t=0;EU.vivo=true;EU.fora=0;JATO.visible=true;$('#morte').style.display='none';
@@ -779,7 +781,7 @@ function recebePlacar(l){PLACAR=l;const ids=new Set(l.map(x=>x.id));corBandeiras
     if(!o){o={g:x.navio?(x.tipo==='radar'?criarRadar(x.cor,x.id):criarNavio(x.cor,x.id)):x.tipo==='carga'?(()=>{const c=criarCargueiro(x.cor);cena.add(c);return c;})():criarJato(x.cor),navio:!!x.navio,pos:new V3(),vel:new V3(),q:new QT(),alvoP:new V3(),alvoQ:new QT(),tRec:0,vida:100,vivo:false,novo:true};
       o.rot=document.createElement('div');o.rot.className='rot';o.rot.innerHTML='<span></span><b><i></i></b>';$('#rotulos').appendChild(o.rot);o.g.visible=false;OUT.set(x.id,o);}
     if(o.cor&&o.cor!==x.cor&&!o.navio&&x.tipo!=='carga'){const j=criarJato(x.cor);j.visible=o.g.visible;cena.remove(o.g);o.g=j;}   // (10/11) live: seguiu = vira dourado
-    o.nome=(x.time&&x.time===MEU_TIME?'🟦 ':'')+x.nome;o.cor=x.cor;o.bot=x.bot;o.aliado=!!(x.time&&x.time===MEU_TIME);o.esc=x.esc||1;o.vidaMax=x.vm&&x.vm!==100?x.vm:o.esc>1?400:100;o.g.scale.setScalar(o.navio||x.tipo==='carga'?1:1.25*o.esc);o.carga=x.tipo==='carga';if(o.navio&&!o.anel&&x.tipo!=='radar'){o.anel=anelNavio(x.time===MEU_TIME);}
+    o.nome=(x.time&&x.time===MEU_TIME?'🟦 ':'')+x.nome;o.cor=x.cor;o.bot=x.bot;o.aliado=!!(x.time&&x.time===MEU_TIME);o.esc=x.esc||1;o.vidaMax=x.vm&&x.vm!==100?x.vm:o.esc>1?400:100;o.g.scale.setScalar(o.navio||x.tipo==='carga'?1:ESC_JATO*o.esc);o.carga=x.tipo==='carga';if(o.navio&&!o.anel&&x.tipo!=='radar'){o.anel=anelNavio(x.time===MEU_TIME);}
     o.rot.firstChild.textContent=o.nome;o.rot.style.color=x.cor;o.kh=x.kh||0;
     if(SALA==='live'&&o.bot&&x.time!==MEU_TIME&&o.avK!==(x.av||x.nome)){o.avK=x.av||x.nome;o.av=x.av;o.rav?.remove();o.rav=document.createElement('span');o.rav.className='rav';o.rav.innerHTML=avHTML(x.av,x.nome);o.rot.insertBefore(o.rav,o.rot.lastChild);}}
   for(const [id,o] of OUT)if(!ids.has(id)){cena.remove(o.g);if(o.anel)cena.remove(o.anel);o.rot.remove();o.aq?.remove();OUT.delete(id);}
@@ -1003,12 +1005,12 @@ function outros(dt){const agora=performance.now(),k=1-Math.exp(-10*dt);
 const camP=new V3(0,800,0),camUp=new V3(0,1,0);let camAng=0;
 // (09/11) visão da cabine: câmera na cabeça do piloto, gira junto com o caça (V ou 👁️ troca)
 let CABINE=false;try{CABINE=localStorage.getItem('jsjet-cab')==='1';}catch(e){}
-const _cabQ=new QT().setFromAxisAngle(new V3(0,1,0),-Math.PI/2),_cabOff=new V3(3.15,1.0,0).multiplyScalar(1.25);   // olho do piloto
+const _cabQ=new QT().setFromAxisAngle(new V3(0,1,0),-Math.PI/2),_cabOff=new V3(3.15,1.0,0).multiplyScalar(ESC_JATO);   // olho do piloto
 function trocaVisao(){CABINE=!CABINE;try{localStorage.setItem('jsjet-cab',CABINE?'1':'0');}catch(e){}camP.copy(cam.position);}
 function camera(dt){if(EU.vivo&&CABINE){cam.position.copy(_cabOff).applyQuaternion(EU.q).add(EU.pos);cam.quaternion.copy(EU.q).multiply(_cabQ);if(SPRAY_K>0){const a=SPRAY_K*0.004;cam.rotateX((Math.random()-0.5)*a);cam.rotateY((Math.random()-0.5)*a);}camUp.set(0,1,0).applyQuaternion(EU.q);
     const fov=(innerWidth<innerHeight?82:70)+(EU.vel-135)*0.08;if(Math.abs(cam.fov-fov)>0.2){cam.fov+=(fov-cam.fov)*Math.min(1,dt*3);cam.updateProjectionMatrix();}return;}
   if(EU.vivo){const fw=frente(EU.q),up=_u.set(0,1,0).applyQuaternion(EU.q);
-    _v1.copy(EU.pos).addScaledVector(fw,-30).addScaledVector(up,7.5);camP.lerp(_v1,1-Math.exp(-9*dt));cam.position.copy(camP);
+    _v1.copy(EU.pos).addScaledVector(fw,-22).addScaledVector(up,5.5);camP.lerp(_v1,1-Math.exp(-9*dt));cam.position.copy(camP);
     camUp.lerp(_v2.copy(up).lerp(_v3.set(0,1,0),0.45).normalize(),1-Math.exp(-6*dt));cam.up.copy(camUp);
     cam.lookAt(_v1.copy(EU.pos).addScaledVector(fw,60));if(SPRAY_K>0){const a=SPRAY_K*0.006;cam.rotateX((Math.random()-0.5)*a);cam.rotateY((Math.random()-0.5)*a);}   // (18/11) tremida no rasante
     const fov=(innerWidth<innerHeight?78:62)+(EU.vel-135)*0.08;if(Math.abs(cam.fov-fov)>0.2){cam.fov+=(fov-cam.fov)*Math.min(1,dt*3);cam.updateProjectionMatrix();}}
