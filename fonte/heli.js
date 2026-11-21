@@ -210,8 +210,9 @@ function heliPasso(dt){if(!HELI.on||HELI.pausa)return;const agora=performance.no
   if(!EU.vivo){if(!HELI.fim&&agora-HELI.tMorte>3500){if(HELI.vidas>0)heliNascer();else{HELI.fim=true;heliFim(false);}}return;}
   // controle relativo à tela (câmera isométrica): frente = p/ onde a câmera olha, no chão
   /* (21/11) COMANDOS NOVOS: W/S sobe/desce · A/D de lado · ↑/↓ frente/trás · ←/→ gira no eixo. Celular: analógico esq. = WASD, dir. = setas */
-  const ent={sobe:((TEC.KeyW||TEC.KeyE||BT.turbo)?1:0)-((TEC.KeyS||TEC.KeyC||BT.freio)?1:0)-(JOY.y||0),lado:((TEC.KeyD)?1:0)-((TEC.KeyA)?1:0)+(JOY.x||0),
-    frente:((TEC.ArrowUp)?1:0)-((TEC.ArrowDown)?1:0)-(JOY2.y||0),gira:((TEC.ArrowRight)?1:0)-((TEC.ArrowLeft)?1:0)+(JOY2.x||0)};
+  /* (21/11 v2) eixos verticais trocados: W/S e analógico esq. = frente/trás; ↑/↓ e analógico dir. = sobe/desce */
+  const ent={sobe:((TEC.ArrowUp||TEC.KeyE||BT.turbo)?1:0)-((TEC.ArrowDown||TEC.KeyC||BT.freio)?1:0)-(JOY2.y||0),lado:((TEC.KeyD)?1:0)-((TEC.KeyA)?1:0)+(JOY.x||0),
+    frente:((TEC.KeyW)?1:0)-((TEC.KeyS)?1:0)-(JOY.y||0),gira:((TEC.ArrowRight)?1:0)-((TEC.ArrowLeft)?1:0)+(JOY2.x||0)};
   for(const k in ent)ent[k]=Math.max(-1,Math.min(1,ent[k]));
   _hF.set(Math.cos(HELI.yaw),0,-Math.sin(HELI.yaw));_hR.set(-_hF.z,0,_hF.x);   // frente/lado do próprio heli
   const ix=ent.lado,iy=ent.frente;
