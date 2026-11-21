@@ -220,8 +220,8 @@ function heliPasso(dt){if(!HELI.on||HELI.pausa)return;const agora=performance.no
   // (19/11) ALTITUDE MANTIDA (não segue mais o relevo): E/🔥 sobe, C/🪂 desce, solto = segura a altura.
   // Subir pede potência: devagar (13 m/s), tira velocidade e gasta mais combustível; descer é a 9 m/s. O morro é obstáculo: bate e machuca.
   const agl=EU.pos.y-Math.max(0,relevo(EU.pos.x,EU.pos.z));   /* (19/11) mais rápido p/ jogabilidade: sobe 20, desce 15; perto do chão (<25 m) a descida amacia p/ 6 m/s */
-  const vsAlvo=!pronto?0:(TEC.KeyE||BT.turbo)?20:(TEC.KeyC||BT.freio)?(agl<25?-6:-15):0;HELI.vs+=(vsAlvo-HELI.vs)*Math.min(1,(vsAlvo>HELI.vs?2.2:3)*dt);
-  const subindo=Math.max(0,HELI.vs)/20,k=1-Math.exp(-1.8*dt);HELI.vel.lerp(_v1.copy(_hD).multiplyScalar(HELI_VMAX*(1-0.4*subindo)),k);
+  const vsAlvo=!pronto?0:(TEC.KeyE||BT.turbo)?30:(TEC.KeyC||BT.freio)?(agl<25?-6:-25):0;   /* (21/11) sobe 30, desce 25 m/s */HELI.vs+=(vsAlvo-HELI.vs)*Math.min(1,(vsAlvo>HELI.vs?2.2:3)*dt);
+  const subindo=Math.max(0,HELI.vs)/30,k=1-Math.exp(-1.8*dt);HELI.vel.lerp(_v1.copy(_hD).multiplyScalar(HELI_VMAX*(1-0.4*subindo)),k);
   const vh0=Math.hypot(HELI.vel.x,HELI.vel.z),nx=EU.pos.x+HELI.vel.x*dt,nz=EU.pos.z+HELI.vel.z*dt;
   const chN=Math.max(0,relevo(nx,nz),vh0>1?relevo(nx+HELI.vel.x/vh0*10,nz+HELI.vel.z/vh0*10)-2:0)+2;   // chão sob o helicóptero e sob o disco do rotor à frente
   if(chN>EU.pos.y+0.5&&vh0>3){   // encosta na frente mais alta que o helicóptero: bate
