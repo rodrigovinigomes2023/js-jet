@@ -1,0 +1,12 @@
+// (21/11) objetos em encosta: platô embaixo (nada enterrado/flutuando)
+const {chromium}=require('/home/gomes/Área de Trabalho/tnb/node_modules/playwright-core');
+(async()=>{const b=await chromium.launch({executablePath:process.env.HOME+'/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome',args:['--use-gl=swiftshader','--enable-unsafe-swiftshader','--mute-audio']});
+  const pg=await b.newPage({viewport:{width:1000,height:600}});pg.setDefaultTimeout(150000);const erros=[];pg.on('pageerror',e=>erros.push(e.message));
+  await pg.goto('http://localhost:8791/'+(process.argv[2]||''));await pg.waitForFunction(()=>window.JJ,null,{timeout:150000});await pg.click('#bConvidado');await pg.evaluate(()=>document.querySelector('#bHeli').click());
+  await pg.waitForFunction(()=>HELI.brief);await pg.evaluate(()=>{heliMapaFecha();HELI.pausa=true;window.heliCamera=()=>{};document.getElementById('heliMapa').style.display='none';});
+  const r=await pg.evaluate(()=>{const out=[];for(const o of HELI.alvos){if(o.tipo==='lancha')continue;const P=o.pos;let mx=0;for(let i=0;i<12;i++){const a=i/12*6.283;for(const rr of[3,6,9]){const d=Math.abs(chaoMalha(P.x+Math.cos(a)*rr,P.z+Math.sin(a)*rr)-P.y);mx=Math.max(mx,d);}}let ori=0;for(let i=0;i<8;i++){const a=i/8*6.283;ori=Math.max(ori,Math.abs(relevo0(P.x+Math.cos(a)*14,P.z+Math.sin(a)*14)-relevo0(P.x,P.z)));}out.push(o.tipo+' encosta '+ori.toFixed(0)+'m→desnível '+mx.toFixed(1));}
+    for(const c of HELI.caixas){let mx=0;for(let i=0;i<8;i++){const a=i/8*6.283;mx=Math.max(mx,Math.abs(chaoMalha(c.p.x+Math.cos(a)*2,c.p.z+Math.sin(a)*2)-c.p.y));}out.push(c.tipo+' '+mx.toFixed(1));}
+    return out.join(' | ')+' | platôs '+PLATOS.length;});console.log(r);
+  for(const [i,n] of[[1,'radargira'],[7,'aa_pior'],['c0','caixa'],['p0','piloto']]){await pg.evaluate(i=>{const P=typeof i==='number'?HELI.alvos[i].pos:i[0]==='c'?HELI.caixas[+i[1]].p:HELI.pilotos[+i[1]].p;const d=typeof i==='number'?(i===1?55:30):12;cam.position.set(P.x+d,P.y+d*0.45,P.z+d);cam.lookAt(P.x,P.y+2,P.z);},i);await pg.waitForTimeout(1500);await pg.screenshot({path:__dirname+'/f_plato_'+n+'.png'});}
+  for(const [i,n] of[[0,'radar'],[3,'sam'],[5,'aa']]){await pg.evaluate(i=>{const o=HELI.alvos[i],P=o.pos;cam.position.set(P.x+60,P.y+28,P.z+60);cam.lookAt(P.x,P.y+5,P.z);},i);await pg.waitForTimeout(1500);await pg.screenshot({path:__dirname+'/f_plato_'+n+'.png'});}
+  console.log('erros:',erros.join(' | ')||'nenhum');await b.close();})();

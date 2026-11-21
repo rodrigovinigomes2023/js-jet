@@ -6,7 +6,7 @@ const {chromium}=require('/home/gomes/Área de Trabalho/tnb/node_modules/playwri
   console.log(await pg.evaluate(()=>{let n=0,a=0;for(const l of OBST.values())for(const o of l){n++;}return 'refs na grade '+n+' zoom '+HELI_ZOOM;}));
   await pg.screenshot({path:__dirname+'/f_heli_zoom.png'});
   const voa=async(nome,alvo)=>{await pg.evaluate(a=>{HELI.motor=1;HELI.part=true;const [tx,tz,ty]=a;JJ.EU.pos.set(tx+55,ty,tz+10);const h=JJ.EU.pos;
-      HCAM.az=Math.atan2(h.z-tz,h.x-tx);heliCamAplica();HCAM.tMan=performance.now()+1e6;EU.vida=100;},alvo);
+      HELI.yaw=Math.atan2(-(tz-h.z),tx-h.x);HCAM.az=Math.atan2(h.z-tz,h.x-tx);heliCamAplica();HCAM.tMan=performance.now()+1e6;EU.vida=100;},alvo);
     await pg.evaluate(()=>{TEC.KeyW=true;let mn=1e9;for(let i=0;i<240;i++){heliPasso(1/30);}TEC.KeyW=false;for(let i=0;i<10;i++)heliPasso(1/30);});await pg.waitForTimeout(800);
     console.log(nome,await pg.evaluate(a=>`dist ${Math.hypot(EU.pos.x-a[0],EU.pos.z-a[1]).toFixed(1)} vida ${Math.round(EU.vida)} msg "${$('#heliMsg').textContent}"`,alvo));
     await pg.screenshot({path:__dirname+`/f_heli_bate_${nome}.png`});};

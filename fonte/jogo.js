@@ -4,7 +4,9 @@
 const $=s=>document.querySelector(s);
 const V3=THREE.Vector3,QT=THREE.Quaternion;
 const Q=new URLSearchParams(location.search);
-const MODOK=typeof MOD!=='undefined'&&!Q.has('classico');   /* (21/11) modelos realistas (modelos.js); ?classico volta aos antigos */
+const MODOK=typeof MOD!=='undefined'&&!Q.has('classico');
+/* (21/11 prévia ?praia2) REMODELA A BEIRA: abaixa a faixa de 0 a 18 m da costa (curva suave), a praia fica larga e o fundo raso se estende. Sem ?praia2 = terreno de sempre */
+const PRAIA_B=18;function praiaH(h){if(!!Q.has('praiaantiga'))return h;if(h<0)return h>=-8?h*0.6:h+3.2;   /* fundo raso mais extenso */return h<PRAIA_B?PRAIA_B*Math.pow(h/PRAIA_B,2.2):h;}   /* (21/11) modelos realistas (modelos.js); ?classico volta aos antigos */
 const TOQUE=('ontouchstart' in window)||navigator.maxTouchPoints>0||Q.has('toque');
 if(TOQUE)document.body.classList.add('toque');
 
@@ -96,24 +98,73 @@ const BASE_R=18600,BASE_H=18,BASE_PLANO=760,BASE_ILHA=1050,PISTA=1300;
 const BASE_R_BOTS=5800,LANC_PVP=[[-320,-120],[320,-120],[0,-190]],LANC_BOTS=[...LANC_PVP,[380,160]];
 const BASES=[...[45,135,225,315].map(g=>[g,BASE_R,'pvp']),...[75,165,255,345].map(g=>[g,BASE_R_BOTS,'bots'])].map(([g,R,sala],i)=>{const a=g*Math.PI/180,x=Math.cos(a)*R,z=Math.sin(a)*R;
   return{i,x,z,sala,rsam:sala==='bots'?2500:3000,lpos:sala==='bots'?LANC_BOTS:LANC_PVP,dx:-Math.cos(a),dz:-Math.sin(a),yaw:Math.atan2(z,-x)};});
+/* (21/11 ?fob) modo heli sem as 8 ilhas-base: some o visual, a física e as colisões delas (volta ao sair do heli) */
+function basesVisiveis(on){BASES.ocultas=!on;for(const B of BASES){if(B.g)B.g.visible=on;for(const m of B.ilhaM||[])m.visible=on;if(B.anel&&!on)B.anel.visible=false;}
+  for(const o of[BASES.rasa,BASES.luzes,...(BASES.arvC||[])])if(o)o.visible=on&&!(BASES.flor&&BASES.arvC&&BASES.arvC.includes(o));
+  if(BASES.flor)for(const m of[BASES.flor.iC,BASES.flor.iF,BASES.flor.iL])m.visible=on;}
 const salaBases=()=>SALA==='treino'?'pvp':SALA;   // treino usa as bases da sala sem bots
 let SALA='bots',MINHA_BASE=null,ZONA=15200,R_SAM=3000,LIMITE=5200;
 function alturaBase(d){return d<BASE_PLANO?BASE_H:d<BASE_ILHA?BASE_H*(0.5+0.5*Math.cos(Math.PI*(d-BASE_PLANO)/(BASE_ILHA-BASE_PLANO))):0;}
-function relevo(x,z){let h=0;for(const I of TER.ilhas)if(x>=I.x0&&x<=I.x1&&z>=I.z0&&z<=I.z1)h=Math.max(h,hIlha(I,x,z));
-  for(const B of BASES){const d=Math.hypot(x-B.x,z-B.z);if(d<BASE_ILHA)h=Math.max(h,alturaBase(d));}return h;}
+/* (21/11) PLATÔS: terraplenagem embaixo de objetos postos em encosta (não ficam enterrados nem flutuando).
+   Cada platô: chão plano até r0 e transição suave até r1. Vale p/ a física (relevo) e p/ a malha das ilhas. */
+const PLATOS=[],_cTerra=new THREE.Color('#6b6446').convertSRGBToLinear(),_cMato=new THREE.Color('#3f5a2c').convertSRGBToLinear();
+function aplainar(x,z,r0,extra=0){r0=Math.max(r0,TER.passo*(TOQUE?2:1)*1.6);   /* cobre ao menos 1 célula inteira da malha em volta */const r1=r0+Math.max(30,TER.passo*(TOQUE?2:1)*1.6);const k=Math.round(x)+','+Math.round(z);
+  const ja=PLATOS.find(P=>P.k===k);if(ja)return ja.h+0.8;
+  let s=relevo(x,z),n=1;for(let i=0;i<8;i++){const a=i/8*Math.PI*2;s+=relevo(x+Math.cos(a)*r0*0.7,z+Math.sin(a)*r0*0.7);n++;}const h=Math.max(1.5,s/n+extra);
+  let hh=h;for(const Q of PLATOS)if(Math.hypot(Q.x-x,Q.z-z)<Q.r1+r1&&Math.abs(Q.h-h)<4){hh=Q.h;break;}   // vizinho: mesma altura (senão um platô entorta o outro)
+  const P={k,x,z,h:hh,r0,r1};PLATOS.push(P);
+  if(typeof MOD!=='undefined'&&MODOK)MOD.tiraArvores(x,z,r1);   // sem árvore no meio do pátio
+  for(const [kc,l] of OBST){const n=l.filter(o=>!(o.tag==='arv'&&Math.hypot(o.x-x,o.z-z)<r1));if(n.length!==l.length){if(n.length)OBST.set(kc,n);else OBST.delete(kc);}}
+  for(const mi of cena.children){if(!mi.userData.ilha)continue;const pos=mi.geometry.attributes.position,cor=mi.geometry.attributes.color;let mudou=false;   // ajusta a malha da ilha
+    for(let i=0;i<pos.count;i++){const vx=pos.getX(i),vz=pos.getZ(i);if(Math.abs(vx-x)>r1||Math.abs(vz-z)>r1)continue;const d=Math.hypot(vx-x,vz-z);if(d>r1)continue;
+      pos.setY(i,relevo(vx,vz)+0.8);mudou=true;
+      if(cor){const t=d<=r0?1:1-(d-r0)/(r1-r0),w=t*t*(3-2*t),alvo=d<=r0*0.75?_cTerra:_cMato;cor.setXYZ(i,cor.getX(i)+(alvo.r-cor.getX(i))*w,cor.getY(i)+(alvo.g-cor.getY(i))*w,cor.getZ(i)+(alvo.b-cor.getZ(i))*w);}}   /* (21/11) repinta: terra batida no pátio, mato na rampa (antes ficava a cor de rocha da encosta) */
+    if(mudou){pos.needsUpdate=true;if(cor)cor.needsUpdate=true;mi.geometry.computeVertexNormals();mi.geometry.computeBoundingSphere();}}
+  return hh+0.8;}   // a malha das ilhas fica 0,8 m acima do relevo: o objeto assenta na malha
+/* (21/11) TEXTURA DO TERRENO: as cores de hoje continuam (vértices), e por cima entra o detalhe de texturas CC0 (ambientCG)
+   escolhidas pela inclinação e altura: capim no plano, rocha na encosta, areia/terra na beira. Coordenada = posição no mundo (sem UV).
+   PC: 2 escalas (perto e longe, sem repetição aparente). Celular: 1 escala. */
+function texTerreno(m){const L=new THREE.TextureLoader(),T=n=>{const t=L.load('tex/'+n+'_c.jpg');t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=8;t.encoding=THREE.sRGBEncoding;return t;};
+  const U={tG:{value:T('grama')},tR:{value:T('rocha')},tC:{value:T('chao')}};
+  m.onBeforeCompile=sh=>{Object.assign(sh.uniforms,U);
+    sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vWP;varying vec3 vWN;').replace('#include <begin_vertex>','#include <begin_vertex>\nvWP=(modelMatrix*vec4(position,1.0)).xyz;vWN=normalize(mat3(modelMatrix)*normal);');
+    sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vWP;varying vec3 vWN;uniform sampler2D tG,tR,tC;\n'+(!Q.has('praiaantiga')?'#define PRAIA2_R max(smoothstep(0.22,0.42,inc),smoothstep(0.1,0.2,inc)*(1.0-smoothstep(14.0,18.0,vWP.y)))\n#define PRAIA2_C 9.0,14.0,vWP.y\n':'#define PRAIA2_R smoothstep(0.22,0.42,inc)\n#define PRAIA2_C 4.0,9.0,vWP.y\n')+
+      'vec3 amostra(sampler2D t,vec2 p){vec3 a=pow(texture2D(t,p/9.0).rgb,vec3(2.2));'+(TOQUE?'return a;}':'vec3 b=pow(texture2D(t,p/47.0).rgb,vec3(2.2));float d=smoothstep(60.0,400.0,length(vWP-cameraPosition));return mix(a*0.7+b*0.3,b,d);}'))   // textura em sRGB -> linear
+     .replace('#include <color_fragment>',`#include <color_fragment>
+{vec2 p=vWP.xz;float inc=1.0-clamp(vWN.y,0.0,1.0);
+ float wR=PRAIA2_R,wC=(1.0-smoothstep(PRAIA2_C))*(1.0-wR);float wG=max(0.0,1.0-wR-wC);
+ vec3 bw=pow(abs(vWN),vec3(4.0));bw/=bw.x+bw.y+bw.z;   // rocha em 3 planos (sem esticar nos paredões)
+ /* (21/11) sem "if" nas leituras: com desvio o mipmap quebra e a rocha chiava/granulava de longe */
+ vec3 gG=amostra(tG,p),gC=amostra(tC,p),gR=pow(texture2D(tR,vWP.zy/36.0).rgb,vec3(2.2))*bw.x+pow(texture2D(tR,p/36.0).rgb,vec3(2.2))*bw.y+pow(texture2D(tR,vWP.xy/36.0).rgb,vec3(2.2))*bw.z;
+ vec3 dG=gG/pow(vec3(0.378,0.426,0.19),vec3(2.2)),dR=mix(vec3(1.0),gR/pow(vec3(0.311,0.301,0.272),vec3(2.2)),0.55),dC=gC/pow(vec3(0.61,0.543,0.431),vec3(2.2));
+ vec3 det=dG*wG+dR*wR+dC*wC;det=max(vec3(0.0),vec3(1.0)+(det-vec3(1.0))*1.2);   // detalhe forte sobre a cor de hoje
+ float neve=smoothstep(0.82,0.9,min(diffuseColor.r,min(diffuseColor.g,diffuseColor.b)));
+ vec3 cru=(gG*wG*1.1+mix(gR,vec3(dot(gR,vec3(0.33))),0.3)*wR*1.3+gC*wC);   // cor real da textura
+ vec3 c=mix(diffuseColor.rgb*det,cru,0.4);c=mix(c,diffuseColor.rgb*mix(vec3(1.0),dR,0.35),neve);
+ diffuseColor.rgb=c;}`);};
+  return m;}
+function relevo(x,z){const h0=relevo0(x,z);if(!PLATOS.length)return h0;let h=h0;   /* (21/11) vale também na beira d'água: o platô vira aterro */
+  for(const P of PLATOS){const dx=x-P.x,dz=z-P.z;if(dx>P.r1||dx<-P.r1||dz>P.r1||dz<-P.r1)continue;const d=Math.hypot(dx,dz);if(d>=P.r1)continue;
+    const t=d<=P.r0?1:1-(d-P.r0)/(P.r1-P.r0),w=t*t*(3-2*t);h=h+(P.h-h)*w;}
+  return h;}
+function relevo0(x,z){let h=0;for(const I of TER.ilhas)if(x>=I.x0&&x<=I.x1&&z>=I.z0&&z<=I.z1)h=Math.max(h,praiaH(hIlha(I,x,z)));
+  if(!BASES.ocultas)for(const B of BASES){const d=Math.hypot(x-B.x,z-B.z);if(d<BASE_ILHA)h=Math.max(h,alturaBase(d));}return h;}
 {const cMa=new THREE.Color('#24502a'),cCa=new THREE.Color('#7f9a4a'),cA=new THREE.Color('#d9c48f'),cV=new THREE.Color('#3f8a3c'),cE=new THREE.Color('#2c5e2c'),cP=new THREE.Color('#7a7466');
   // (18/11) ilhas-montanha: uma malha por ilha (PC: grade de 20 m; celular: 40 m). Cor por altura e inclinação: praia, mata, capim, rocha e neve no alto
   {const st=TOQUE?2:1,p=TER.passo,cl=(r,g,b)=>new THREE.Color(r,g,b).convertSRGBToLinear();
-   const CN=cl(0.93,0.95,0.99),CRa=cl(0.5,0.52,0.56),CR=cl(0.33,0.34,0.37),CB=cl(0.62,0.57,0.47),CMt=cl(0.15,0.3,0.15),CCa=cl(0.4,0.43,0.35),CF=cl(0.24,0.36,0.36);
-   const mI=new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.95}),ARV=[],PALMA=[],c=new THREE.Color();
+   const PRAIA2=!Q.has('praiaantiga'),CBm=cl(0.44,0.39,0.31),CCo=cl(0.22,0.21,0.2),CN=cl(0.93,0.95,0.99),CRa=cl(0.5,0.52,0.56),CR=cl(0.33,0.34,0.37),CB=cl(0.62,0.57,0.47),CMt=cl(0.15,0.3,0.15),CCa=cl(0.4,0.43,0.35),CF=cl(0.24,0.36,0.36);
+   const mI=texTerreno(new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.95})),ARV=[],PALMA=[],c=new THREE.Color();
    const PR=[],CR4=[],IR=[];   // água rasa + espuma (só nas células da beira)
    for(const I of TER.ilhas){const nx=Math.floor((I.nx-1)/st)+1,nz=Math.floor((I.nz-1)/st)+1,P=new Float32Array(nx*nz*3),C=new Float32Array(nx*nz*3),ix=[],HH=new Float32Array(nx*nz);
-     const H=(i,j)=>TER.a[I.of+Math.max(0,Math.min(I.nz-1,j))*I.nx+Math.max(0,Math.min(I.nx-1,i))]*0.25;
+     const H=(i,j)=>praiaH(TER.a[I.of+Math.max(0,Math.min(I.nz-1,j))*I.nx+Math.max(0,Math.min(I.nx-1,i))]*0.25);
+     const a0=ARV.length,pa0=PALMA.length;
      for(let j=0;j<nz;j++)for(let i=0;i<nx;i++){const gi=i*st,gj=j*st,h=H(gi,gj),x=I.x0+gi*p,z=I.z0+gj*p,k=(j*nx+i)*3;P[k]=x;P[k+1]=h<0?h*1.4-3:h+0.8;P[k+2]=z;HH[j*nx+i]=h;   // (18/11) afasta a beira do nível do mar: de longe não briga com a água (quadradinhos)
 
        const dx=(H(gi+1,gj)-H(gi-1,gj))/(2*p),dz=(H(gi,gj+1)-H(gi,gj-1))/(2*p),sl=1-1/Math.sqrt(1+dx*dx+dz*dz);
        const rn=Math.abs(Math.sin(gi*12.9898+gj*78.233+I.of)*43758.5453)%1,nv=I.hmax*0.6+70*Math.sin(x*0.006+z*0.002)*Math.sin(z*0.007-x*0.003);
-       if(h<-1)c.copy(CF);else if(h<6&&sl<0.45){c.copy(CB);if(MODOK&&h>1.4&&h<5&&sl<0.2&&rn<(TOQUE?0.02:0.05)){const t=9+rn*60;PALMA.push([x+(rn-0.5)*p,h,z,t,rn*90]);obstAdd({x,z,hx:1.2,hz:1.2,bot:h,top:h+t,tag:'arv'});}}else if(I.hmax>420&&h>nv&&sl<0.62)c.copy(CN);else if(sl>0.34)c.copy(h>nv-60?CRa:CR);
+       if(PRAIA2&&h>=-1&&h<16&&!(h<12&&sl<0.12)&&sl>=0.12)c.copy(CCo);   /* (21/11 prévia ?praia2) costão: pedra escura onde a beira é íngreme */
+       else if(PRAIA2&&h>=-1&&h<1.8&&sl<0.3)c.copy(CBm);   // areia molhada
+       else if(h<-1)c.copy(CF);else if(PRAIA2?(h<12&&sl<0.12):(h<6&&sl<0.45)){c.copy(CB);if(MODOK&&h>1.4&&h<(PRAIA2?10:5)&&sl<(PRAIA2?0.08:0.2)&&rn<(TOQUE?0.02:0.05)){const t=9+rn*60;PALMA.push([x+(rn-0.5)*p,h,z,t,rn*90]);obstAdd({x,z,hx:1.2,hz:1.2,bot:h,top:h+t,tag:'arv'});}}else if(I.hmax>420&&h>nv&&sl<0.62)c.copy(CN);else if(sl>0.34)c.copy(h>nv-60?CRa:CR);
        else if(h<Math.max(200,I.hmax*0.32)){c.copy(CMt);if(h>8&&sl<0.22&&rn<(TOQUE?0.07:0.16))ARV.push(x+(rn-0.5)*p,h,z+(rn*7%1-0.5)*p,rn);}else c.copy(CCa);
        const gr=0.9+rn*0.2;C[k]=c.r*gr;C[k+1]=c.g*gr;C[k+2]=c.b*gr;}
      // (18/11) sombra das montanhas: de cada ponto anda na direção do sol; se o morro passa por cima do raio, escurece (borda suave)
@@ -121,7 +172,37 @@ function relevo(x,z){let h=0;for(const I of TER.ilhas)if(x>=I.x0&&x<=I.x1&&z>=I.
       for(let v=0;v<nx*nz;v++){const h=HH[v];if(h<-1)continue;const k=v*3;let x=P[k],z=P[k+2],y=h+2,oc=0;
         while(y<I.hmax){x+=ux*p;z+=uz*p;y+=sobe;if(x<I.x0||x>I.x1||z<I.z0||z>I.z1)break;const d=hIlha(I,x,z)-y;if(d>0){oc=Math.max(oc,Math.min(1,d/25));if(oc>=1)break;}}
         if(oc>0){const f=1-0.5*oc;C[k]*=f;C[k+1]*=f;C[k+2]*=f*1.04;}}}
-     for(let j=0;j<nz-1;j++)for(let i=0;i<nx-1;i++){const a=j*nx+i;ix.push(a,a+nx,a+1,a+1,a+nx,a+nx+1);}
+     {const q=p*st,Y=(i,j)=>P[(j*nx+i)*3+1],surf=(x,z)=>{const fx=(x-I.x0)/q,fz=(z-I.z0)/q,i=Math.max(0,Math.min(nx-2,Math.floor(fx))),j=Math.max(0,Math.min(nz-2,Math.floor(fz))),u=fx-i,v=fz-j;
+        return u+v<=1?Y(i,j)+(Y(i+1,j)-Y(i,j))*u+(Y(i,j+1)-Y(i,j))*v:Y(i+1,j+1)+(Y(i,j+1)-Y(i+1,j+1))*(1-u)+(Y(i+1,j)-Y(i+1,j+1))*(1-v);};
+      for(let k=a0;k<ARV.length;k+=4)ARV[k+1]=surf(ARV[k],ARV[k+2])+1;   /* (21/11) árvore na altura da malha desenhada no ponto exato (antes usava o vértice vizinho: flutuava/afundava) */
+      for(let k=pa0;k<PALMA.length;k++)PALMA[k][1]=surf(PALMA[k][0],PALMA[k][2]);}
+     /* (21/11 prévia ?praia2, só PC) MALHA FINA NA COSTA: células que tocam a beira viram sub-malha de 5 m (linha d'água curva, beira remodelada fiel, contorno com ruído leve).
+        Na divisa com a malha grossa a borda segue a reta da célula vizinha (sem frestas). */
+     const FINA=PRAIA2&&!TOQUE,costa=new Uint8Array(nx*nz);
+     if(FINA)for(let j=0;j<nz-1;j++)for(let i=0;i<nx-1;i++){const a=j*nx+i,hs=[HH[a],HH[a+1],HH[a+nx],HH[a+nx+1]];if(Math.min(...hs)<1.5&&Math.max(...hs)>-1.5&&Math.max(...hs)<40)costa[a]=1;   /* só células cortadas pela linha d'água */}
+     for(let j=0;j<nz-1;j++)for(let i=0;i<nx-1;i++){const a=j*nx+i;if(costa[a])continue;ix.push(a,a+nx,a+1,a+1,a+nx,a+nx+1);}
+     if(FINA){const N=2,q=p*st,FP=[],FC=[],FI=[],raw=(x,z)=>hIlha(I,x,z),rnd2=(x,z)=>{const s=Math.sin(x*12.9898+z*78.233)*43758.5453;return s-Math.floor(s);},
+        ruido=(x,z)=>{const fx=x/23,fz=z/23,i0=Math.floor(fx),j0=Math.floor(fz),u=fx-i0,v=fz-j0,su=u*u*(3-2*u),sv=v*v*(3-2*v);
+          return (rnd2(i0,j0)*(1-su)+rnd2(i0+1,j0)*su)*(1-sv)+(rnd2(i0,j0+1)*(1-su)+rnd2(i0+1,j0+1)*su)*sv-0.5;},
+        alvoH=(x,z)=>{const h=praiaH(raw(x,z));const amp=h>-4&&h<10?1.6*(1-Math.abs(h-3)/7):0;return h+ruido(x,z)*Math.max(0,amp);},
+        rend=h=>h<0?h*1.4-3:h+0.8,cc=new THREE.Color();
+      for(let j=0;j<nz-1;j++)for(let i=0;i<nx-1;i++){const a=j*nx+i;if(!costa[a])continue;const base=FP.length/3;
+        const viz=[i>0&&costa[a-1],i<nx-2&&costa[a+1],j>0&&costa[a-nx],j<nz-2&&costa[a+nx]];   // esquerda, direita, cima, baixo também finas?
+        const Yc=(ii,jj)=>P[((j+jj)*nx+(i+ii))*3+1],Cc=(ii,jj,k)=>C[((j+jj)*nx+(i+ii))*3+k];
+        for(let b=0;b<=N;b++)for(let c=0;c<=N;c++){const u=c/N,v=b/N,x=I.x0+(i*st+u*st)*p,z=I.z0+(j*st+v*st)*p;
+          const hb=u+v<=1?Yc(0,0)+(Yc(1,0)-Yc(0,0))*u+(Yc(0,1)-Yc(0,0))*v:Yc(1,1)+(Yc(0,1)-Yc(1,1))*(1-u)+(Yc(1,0)-Yc(1,1))*(1-v);
+          let dm=9;const gx=i+u,gz=j+v;for(let cj=j-1;cj<=j+1;cj++)for(let ci=i-1;ci<=i+1;ci++){if(ci<0||cj<0||ci>nx-2||cj>nz-2||costa[cj*nx+ci])continue;
+            const dx=Math.max(ci-gx,0,gx-(ci+1)),dz=Math.max(cj-gz,0,gz-(cj+1));dm=Math.min(dm,Math.hypot(dx,dz));}
+          const w=Math.min(1,dm*4);   // perto de célula grossa: segue a superfície dela (sem frestas, igual dos dois lados)
+          const hf=alvoH(x,z),y=hb+(rend(hf)-hb)*w;FP.push(x,y,z);
+          // cor: mesma regra da praia nova, pela altura fina; fora da faixa, a cor interpolada da célula
+          cc.setRGB(Cc(0,0,0)*(1-u)*(1-v)+Cc(1,0,0)*u*(1-v)+Cc(0,1,0)*(1-u)*v+Cc(1,1,0)*u*v,Cc(0,0,1)*(1-u)*(1-v)+Cc(1,0,1)*u*(1-v)+Cc(0,1,1)*(1-u)*v+Cc(1,1,1)*u*v,Cc(0,0,2)*(1-u)*(1-v)+Cc(1,0,2)*u*(1-v)+Cc(0,1,2)*(1-u)*v+Cc(1,1,2)*u*v);
+          const sl=Math.min(1,Math.abs(alvoH(x+3,z)-alvoH(x-3,z))/6+Math.abs(alvoH(x,z+3)-alvoH(x,z-3))/6)*0.5;
+          if(w>0.5){if(hf<-1)cc.copy(CF);else if(hf<1.8&&sl<0.3)cc.copy(CBm);else if(hf<12&&sl<0.14)cc.copy(CB);else if(hf<16&&sl>0.3)cc.copy(CCo);}
+          FC.push(cc.r,cc.g,cc.b);}
+        for(let b=0;b<N;b++)for(let c=0;c<N;c++){const k=base+b*(N+1)+c;FI.push(k,k+N+1,k+1,k+1,k+N+1,k+N+2);}}
+      if(FP.length){const gf=new THREE.BufferGeometry();gf.setAttribute('position',new THREE.Float32BufferAttribute(FP,3));gf.setAttribute('color',new THREE.Float32BufferAttribute(FC,3));gf.setIndex(FI);gf.computeVertexNormals();
+        const mf=new THREE.Mesh(gf,mI);mf.userData.ilha=true;mf.userData.fina=true;cena.add(mf);}}
      const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(P,3));g.setAttribute('color',new THREE.BufferAttribute(C,3));g.setIndex(ix);g.computeVertexNormals();
      {const mi=new THREE.Mesh(g,mI);mi.userData.ilha=true;cena.add(mi);}   /* (19/11) marcada: o modo heli mede o chão pela malha */
      // água rasa: células com algum canto entre -14 m e +1 m
@@ -138,7 +219,7 @@ function relevo(x,z){let h=0;for(const I of TER.ilhas)if(x>=I.x0&&x<=I.x1&&z>=I.
    // árvores (cones) na mata das encostas
    const nA=ARV.length/4,gA=new THREE.ConeGeometry(1,1,6);gA.translate(0,0.5,0);const iA=new THREE.InstancedMesh(gA,new THREE.MeshStandardMaterial({color:cl(0.12,0.26,0.12),roughness:1}),nA);
    const mA=new THREE.Matrix4(),qA=new THREE.Quaternion(),sA=new V3(),pA=new V3();for(let i=0;i<nA;i++){const t=12+ARV[i*4+3]*14;sA.set(t*0.38,t,t*0.38);pA.set(ARV[i*4],ARV[i*4+1]-1,ARV[i*4+2]);mA.compose(pA,qA,sA);iA.setMatrixAt(i,mA);obstAdd({x:pA.x,z:pA.z,hx:t*0.2,hz:t*0.2,bot:pA.y,top:pA.y+t*0.9,tag:'arv'});}
-   if(MODOK){iA.visible=false;const mata=[],arau=[];for(let i=0;i<nA;i++){const t=12+ARV[i*4+3]*14,y=ARV[i*4+1];(y>110&&ARV[i*4+3]>0.25?arau:mata).push([ARV[i*4],y,ARV[i*4+2],y>110?t*1.15:t,ARV[i*4+3]*40]);}
+   if(MODOK){iA.visible=false;const mata=[],arau=[];for(let i=0;i<nA;i++){const t=12+ARV[i*4+3]*14,y=ARV[i*4+1];(y>110&&ARV[i*4+3]>0.25?arau:mata).push([ARV[i*4],y-0.6,ARV[i*4+2],y>110?t*1.15:t,ARV[i*4+3]*40]);}
      MOD.floresta(mata,'mata');MOD.floresta(arau,'arauc');if(PALMA.length)MOD.floresta(PALMA,'coco');}   /* (21/11) mata atlântica, araucária no alto e coqueiro na praia */
    else cena.add(iA);}
   // ilhas planas das bases
@@ -147,7 +228,7 @@ function relevo(x,z){let h=0;for(const I of TER.ilhas)if(x>=I.x0&&x<=I.x1&&z>=I.
   const mBa=new THREE.MeshStandardMaterial({color:new THREE.Color('#d9c48f').convertSRGBToLinear(),roughness:0.95,flatShading:true});
   for(const B of BASES){const pts=[];for(let k=0;k<=14;k++){const d=BASE_ILHA*1.03*(1-k/14);pts.push(new THREE.Vector2(d,Math.max(-4,alturaBase(d)-(d>BASE_ILHA?4:0))));}
     const praia=new THREE.Mesh(new THREE.LatheGeometry(pts,48),mBa);praia.position.set(B.x,0,B.z);cena.add(praia);
-    const topo=new THREE.Mesh(new THREE.CircleGeometry(BASE_PLANO+20,48),mB);topo.rotation.x=-Math.PI/2;topo.position.set(B.x,BASE_H+0.05,B.z);cena.add(topo);}
+    const topo=new THREE.Mesh(new THREE.CircleGeometry(BASE_PLANO+20,48),mB);topo.rotation.x=-Math.PI/2;topo.position.set(B.x,BASE_H+0.05,B.z);cena.add(topo);B.ilhaM=[praia,topo];}
   // (11/11) água rasa turquesa + espuma na beira de cada ilha: tudo numa malha só (1 desenho)
   const P=[],C=[],ix=[],anelP=(x,z,r0,r1,a0,a1,cor,y,seg)=>{const b=P.length/3;for(let k=0;k<=seg;k++){const a=k/seg*Math.PI*2,ca=Math.cos(a),sa=Math.sin(a);
       P.push(x+ca*r0,y,z+sa*r0,x+ca*r1,y,z+sa*r1);C.push(cor.r,cor.g,cor.b,a0,cor.r,cor.g,cor.b,a1);if(k<seg){const i=b+k*2;ix.push(i,i+2,i+1,i+1,i+2,i+3);}}};
@@ -156,7 +237,7 @@ function relevo(x,z){let h=0;for(const I of TER.ilhas)if(x>=I.x0&&x<=I.x1&&z>=I.
     anelP(x,z,r*0.97,r*1.04,0.55,0.45,tq,0.5,48);anelP(x,z,r*1.04,r*1.32,0.45,0,tq,0.5,48);
     anelP(x,z,r*0.985,r*1.005,0.0,0.85,es,1.0,48);anelP(x,z,r*1.005,r*1.045,0.85,0,es,1.0,48);}
   const gR=new THREE.BufferGeometry();gR.setAttribute('position',new THREE.Float32BufferAttribute(P,3));gR.setAttribute('color',new THREE.Float32BufferAttribute(C,4));gR.setIndex(ix);
-  const rasa=new THREE.Mesh(gR,new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-16}));rasa.renderOrder=1;cena.add(rasa);}
+  const rasa=new THREE.Mesh(gR,new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-16}));rasa.renderOrder=1;cena.add(rasa);BASES.rasa=rasa;}
 // (18/11) nuvens 3D: cada nuvem é um cacho de bolhas (base reta, topo branco, base cinza-azulada), tudo numa malha só.
 // Antes eram sprites que viravam de frente p/ câmera e giravam junto com ela (looping ficava estranho).
 {const r=rnd(77),det=TOQUE?0:1,base=new THREE.IcosahedronGeometry(1,det),bp=base.attributes.position,nv=bp.count;
@@ -252,12 +333,12 @@ function texGramaC(){const S=256,c=cv(S,S),g=c.getContext('2d'),r=rnd(55);g.fill
   {const ga=new THREE.ConeGeometry(4,11,6);ga.translate(0,7.5,0);const tr=new THREE.CylinderGeometry(0.5,0.6,2.5,5);tr.translate(0,1.25,0);
    const mA=new THREE.InstancedMesh(ga,new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.9,flatShading:true}),ARV.length),mT=new THREE.InstancedMesh(tr,M('#5a4030',0.9),ARV.length);
    const m4=new THREE.Matrix4(),q=new THREE.Quaternion(),sc=new V3(),p=new V3(),cA=new THREE.Color(),r=rnd(5);
-   if(MODOK){mA.visible=mT.visible=false;MOD.floresta(ARV.map(([x,y,z,e],i)=>[x,y,z,13*e,i*2.399]),'mata');}
-   ARV.forEach(([x,y,z,e],i)=>{q.setFromAxisAngle(p.set(0,1,0),r()*6);sc.set(e,e*(0.8+r()*0.5),e);m4.compose(p.set(x,y,z),q,sc);mA.setMatrixAt(i,m4);mT.setMatrixAt(i,m4);obstAdd({x,z,hx:2.6*e,hz:2.6*e,bot:y,top:y+12*sc.y,tag:'arv'});
+   if(MODOK){mA.visible=mT.visible=false;BASES.flor=MOD.floresta(ARV.map(([x,y,z,e],i)=>[x,y,z,13*e,i*2.399]),'mata');}BASES.arvC=[mA,mT];
+   ARV.forEach(([x,y,z,e],i)=>{q.setFromAxisAngle(p.set(0,1,0),r()*6);sc.set(e,e*(0.8+r()*0.5),e);m4.compose(p.set(x,y,z),q,sc);mA.setMatrixAt(i,m4);mT.setMatrixAt(i,m4);obstAdd({x,z,hx:2.6*e,hz:2.6*e,bot:y,top:y+12*sc.y,tag:'arv',base:true});
      mA.setColorAt(i,cA.set(['#2f5d2a','#3a6b30','#254d24','#4a7a36'][i%4]).convertSRGBToLinear());});
    mA.instanceColor.needsUpdate=true;cena.add(mA,mT);
    const mL=new THREE.InstancedMesh(new THREE.BoxGeometry(0.9,0.7,0.9),new THREE.MeshBasicMaterial({color:0xffffff,toneMapped:false}),LUZ.length);
-   LUZ.forEach(([x,y,z,cor],i)=>{m4.makeTranslation(x,y,z);mL.setMatrixAt(i,m4);mL.setColorAt(i,cA.set(cor));});mL.instanceColor.needsUpdate=true;cena.add(mL);}
+   LUZ.forEach(([x,y,z,cor],i)=>{m4.makeTranslation(x,y,z);mL.setMatrixAt(i,m4);mL.setColorAt(i,cA.set(cor));});mL.instanceColor.needsUpdate=true;cena.add(mL);BASES.luzes=mL;}
   // anéis no mar: zona de combate (amarelo) e alcance dos SAM de cada base (vermelho; o da minha base fica verde)
   const anel=(r,cor,x,z)=>{const m=new THREE.Mesh(new THREE.RingGeometry(r-14,r+14,160),new THREE.MeshBasicMaterial({color:cor,transparent:true,opacity:0.45,depthWrite:false,side:THREE.DoubleSide}));
     m.rotation.x=-Math.PI/2;m.position.set(x,1.5,z);m.visible=false;cena.add(m);return m;};
@@ -685,7 +766,7 @@ function balas(dt){for(const b of BALAS){if(!b.ativa)continue;b.t+=dt;b.ant.copy
   if(b.t>VIDA_BALA){b.ativa=false;b.m.visible=false;continue;}
   if(b.p.y<relevo(b.p.x,b.p.z)){b.ativa=false;b.m.visible=false;if(b.minha&&b.p.distanceTo(EU.pos)<900)fx(b.p,0xffffff,6,0.4,2,false);continue;}
   if(!b.minha)continue;
-  for(const [id,o] of OUT){if(!o.vivo||o.aliado)continue;if(distSeg(o.navio?_v4.copy(o.pos).setY(o.pos.y+8):o.pos,b.ant,b.p)<(o.navio?24:10*(o.esc||1))){b.ativa=false;b.m.visible=false;if(id<0)(SALA==='heli'?heliAcerto:treinoAcerto)(id,o);else envia({t:'acerto',alvo:id});
+  for(const [id,o] of OUT){if(!o.vivo||o.aliado)continue;if(distSeg(o.navio?_v4.copy(o.pos).setY(o.pos.y+(o.alt??8)):o.pos,b.ant,b.p)<(o.navio?(o.raio??24):10*(o.esc||1))){b.ativa=false;b.m.visible=false;if(id<0)(SALA==='heli'?heliAcerto:treinoAcerto)(id,o);else envia({t:'acerto',alvo:id});
     fx(b.p,0xffd070,7,0.25,2);SOM.acerto();tAcerto=0.15;break;}}}}
 function distSeg(c,a,b){_v1.subVectors(b,a);const l2=_v1.lengthSq()||1;let t=_v2.subVectors(c,a).dot(_v1)/l2;t=Math.max(0,Math.min(1,t));return _v2.copy(a).addScaledVector(_v1,t).distanceTo(c);}
 const arr=(v,d)=>{const k=10**d;return[Math.round(v.x*k)/k,Math.round(v.y*k)/k,Math.round(v.z*k)/k];};
@@ -866,7 +947,7 @@ function casco(comp,larg,alt,proa,mat,pai,y=0){   // casco com proa em ponta (vi
   s.quadraticCurveTo(c-proa*0.3,-l*0.7,c-proa,-l);s.lineTo(-c+2,-l);s.closePath();
   const g=new THREE.ExtrudeGeometry(s,{depth:alt,bevelEnabled:false});g.rotateX(-Math.PI/2);
   const m=new THREE.Mesh(g,mat);m.position.y=y;pai.add(m);return m;}
-function gira(obj,vel){const m=obj.isMesh?obj:obj.children.find(c=>c.isMesh);if(m)m.onBeforeRender=()=>{obj.rotation.y+=vel;};}
+function gira(obj,vel){const m=obj.isMesh?obj:obj.children.find(c=>c.isMesh);let t0=0;if(m)m.onBeforeRender=()=>{const t=performance.now(),dt=t0?Math.min(0.1,(t-t0)/1000):0;t0=t;obj.rotation.y+=vel*60*dt;};}   /* (21/11) pelo relógio: mesma velocidade com 20 ou 60 fps */
 function torreCanhao(mat,matC,x,y,pai,cano=12,esc=1){const t=new THREE.Group();t.position.set(x,y,0);t.scale.setScalar(esc);pai.add(t);
   cil(3.4,4,2.6,mat,0,1.3,0,t,12);box(5,2.4,5.4,mat,0.6,3.4,0,t);const c=cil(0.5,0.6,cano,matC,cano/2+2.5,3.6,0,t,8);c.rotation.z=Math.PI/2-0.08;return t;}
 function bandeira(cor,x,y,pai){box(0.3,7,0.3,M('#3a3f44',0.6),x,y+3.5,0,pai);box(0.2,2.6,4,M(cor,0.7),x,y+5.6,2.1,pai);}

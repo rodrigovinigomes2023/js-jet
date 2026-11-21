@@ -100,6 +100,13 @@ def _terreno():
 TER, TER_A = _terreno()
 
 
+def praia_h(h):
+    """(21/11) beira remodelada (igual ao cliente, praiaH em jogo.js): faixa 0-18 m suavizada, fundo raso mais extenso."""
+    if h < 0:
+        return h * 0.6 if h >= -8 else h + 3.2
+    return 18 * (h / 18) ** 2.2 if h < 18 else h
+
+
 def relevo_bruto(x, z):
     """Altura do terreno das ilhas (m); fora delas, o fundo do mar."""
     h, p = TER['fundo'], TER['passo']
@@ -109,7 +116,7 @@ def relevo_bruto(x, z):
             i, j = max(0, min(I['nx'] - 2, int(fx))), max(0, min(I['nz'] - 2, int(fz)))
             u, v, o, n = fx - i, fz - j, I['of'] + j * I['nx'] + i, I['nx']
             hi = ((TER_A[o] * (1 - u) + TER_A[o + 1] * u) * (1 - v) + (TER_A[o + n] * (1 - u) + TER_A[o + n + 1] * u) * v) * 0.25
-            h = max(h, hi)
+            h = max(h, praia_h(hi))
     return h
 
 

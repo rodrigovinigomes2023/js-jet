@@ -3,7 +3,7 @@
    Cada modelo é montado com peças, as caixas de colisão das peças grandes ficam em userData.caixas e depois as malhas
    são FUNDIDAS por material (poucas chamadas de desenho). Celular (LEVE): só textura de cor, sem balaústres e detalhes finos. */
 const MOD=(()=>{const V3=THREE.Vector3,PI=Math.PI,LEVE=('ontouchstart' in window)||navigator.maxTouchPoints>0||new URLSearchParams(location.search).has('toque');
-function giraM(o,v){o.userData.vivo=true;if(typeof gira==='function')gira(o,v);}
+function giraM(o,v){o.userData.vivo=true;o.userData.giro=v;}   // (21/11) o giro é ligado depois da fusão (antes ficava preso numa malha que a fusão apagava)
 // ---------- PROPOSTA: materiais PBR com UV em metros ----------
 const TL=new THREE.TextureLoader(),TX={};
 function tex(nome,tile){const k=nome+'@'+tile;if(TX[k])return TX[k];
@@ -432,7 +432,7 @@ function navioANovo(cor){const g=agua(new THREE.Group());const L=80,cz=NAV('#8a9
   // superestrutura
   bx(18,5,10.5,cz2,-5,D+2.5,0,g);bx(11,4,9,cz2,-1.5,D+7,0,g);const pv=bx(0.12,1.4,8.4,VIDRO,4.03,D+7.6,0,g);
   bx(11.4,0.3,9.6,S('#3b4145',0.7),-1.5,D+9.15,0,g);for(const s of[-1,1])bx(3,0.3,2,cz2,1.2,D+6,s*5.3,g);   // asas da ponte
-  const mt=mastroTrelica(g,-3,D+9.3,13,S('#5a6268',0.6,0.3));const rad=new THREE.Group();rad.position.set(-3,D+22.5,0);g.add(rad);bx(1.2,0.9,7,S('#d5dadc',0.5),0,0,0,rad);bx(0.3,0.3,0.3,esc,0,-0.6,0,rad);gira(rad,0.04);
+  const mt=mastroTrelica(g,-3,D+9.3,13,S('#5a6268',0.6,0.3));const rad=new THREE.Group();rad.position.set(-3,D+22.5,0);g.add(rad);bx(1.2,0.9,7,S('#d5dadc',0.5),0,0,0,rad);bx(0.3,0.3,0.3,esc,0,-0.6,0,rad);giraM(rad,0.04);
   for(const y of[D+15,D+18.5])bx(0.15,0.15,4.4,esc,-3,y,0,g);const ld=new THREE.Mesh(new THREE.SphereGeometry(1.1,16,12),S('#eef0ef',0.4));ld.position.set(-3,D+20.3,0);g.add(ld);
   // chaminé
   const ch=tronco(6,5.5,5.5,0.82,cz,-10,D+7.75,0,g,0.85);bx(4.2,0.6,4.4,S(cor,0.55),-10,D+10.7,0,g);for(const z of[-0.8,0.8])cl(0.45,0.45,1.2,S('#1b1d1f',0.6),-10.6,D+11.3,z,g,12);   // chaminé em cima da casa
@@ -448,7 +448,7 @@ function navioBNovo(cor){const g=agua(new THREE.Group());const L=82,cz=NAV('#737
   // mastro integrado com 4 painéis de radar
   const MX=1.5;   /* mastro centrado em cima da ponte (antes em -3: metade ficava no ar, atrás da ponte) */
   tronco(7,10,7,0.5,cz,MX,D+16,0,g,0.5);for(const [nx,nz] of[[1,0],[-1,0],[0,1],[0,-1]]){const n=new V3(nx*10,1.75,nz*10).normalize(),ctr=new V3(MX+nx*2.73,D+15.5,nz*2.73);const p=new THREE.Mesh(new THREE.PlaneGeometry(2.6,2.6),new THREE.MeshStandardMaterial({map:TEX_FASE,color:0x6f777c,roughness:0.5}));p.position.copy(ctr).addScaledVector(n,0.04);p.lookAt(ctr.clone().add(n));g.add(p);}   // 4 painéis do radar no mastro integrado
-  cl(0.2,0.2,5,esc,MX,D+23.5,0,g,8);const d=new THREE.Group();d.position.set(MX,D+26,0);g.add(d);bx(0.5,0.5,4.5,S('#c9cfd2',0.5),0,0,0,d);gira(d,0.06);
+  cl(0.2,0.2,5,esc,MX,D+23.5,0,g,8);const d=new THREE.Group();d.position.set(MX,D+26,0);g.add(d);bx(0.5,0.5,4.5,S('#c9cfd2',0.5),0,0,0,d);giraM(d,0.06);
   tronco(7,4,6,0.6,esc,-14.5,D+8.5,0,g);tronco(4.75,0.6,4.1,0.93,S(cor,0.55),-14.5,D+10.0,0,g,0.93);   /* chaminé inteira em cima da casa (antes sobrava 2 m p/ fora) */   /* faixa do time no topo da chaminé (a da lateral ficava solta) */
   const t=new THREE.Group();t.position.set(25,convesY(c,25)-0.06,0);g.add(t);tronco(6,2.6,5.4,0.55,cz,0,1.3,0,t);bx(0.9,0.9,1.3,cz,2.1,1.6,0,t).rotation.z=-0.5;   /* mantelete: liga o cano à torre */
   const ca=cl(0.17,0.22,7,S('#5e676d',0.5,0.5),5.5,2.05,0,t,14);ca.rotation.z=PI/2+0.1;   /* cano saindo da torre, levemente p/ cima (antes apontava p/ o convés e ficava solto) */
@@ -459,7 +459,7 @@ function navioCNovo(cor){const g=agua(new THREE.Group());const L=76,cz=NAV('#8f9
   const c=cascoNavio(L,12.4,7,3.8,{cor:'#8b949a',conves:'#7a5f42'});g.add(c);const D=7;balaustrada(g,c,1,36);numeroCasco(g,c,30,'V 32');
   bx(13,5,9,br,-2,D+2.5,0,g);bx(7,4,8,br,-0.5,D+7,0,g);bx(0.12,1.3,7.4,VIDRO,3.03,D+7.4,0,g);bx(7.4,0.3,8.4,S('#3b4145',0.7),-0.5,D+9.15,0,g);
   for(const x of[-12,-18.5]){cl(1.6,1.9,8,cz,x,D+4,0,g,20);cl(1.62,1.62,1.2,S(cor,0.55),x,D+7.4,0,g,20);cl(1.64,1.64,0.8,S('#1c1d1e',0.6),x,D+8.4,0,g,20);}
-  mastroTrelica(g,1,D+9.3,12,S('#5a6268',0.6,0.3));const rad=new THREE.Group();rad.position.set(1,D+21.5,0);g.add(rad);bx(0.9,0.7,5,S('#d5dadc',0.5),0,0,0,rad);gira(rad,0.04);
+  mastroTrelica(g,1,D+9.3,12,S('#5a6268',0.6,0.3));const rad=new THREE.Group();rad.position.set(1,D+21.5,0);g.add(rad);bx(0.9,0.7,5,S('#d5dadc',0.5),0,0,0,rad);giraM(rad,0.04);
   canhao127(g,br,21,convesY(c,21)-0.06,0.85);canhao127(g,br,-28,convesY(c,-28)-0.06,0.75).rotation.y=PI;
   for(const s of[-1,1]){bote(g,-15.2,D+0.75,s*4.6,'#ece6d6');for(const x of[-17.4,-13])bx(0.4,0.6,1.6,esc,x,D+0.3,s*4.6,g);for(const x of[-18.2,-12.2]){haste(new V3(x,D,s*5.7),new V3(x,D+3.2,s*5.7),0.08,esc,g);haste(new V3(x,D+3.2,s*5.7),new V3(x,D+3.2,s*4.6),0.07,esc,g);}}
   bandeiraPopa(g,cor,-37.6,D+0.2);return g;}
@@ -473,7 +473,7 @@ function lanchaNovo(){const g=agua(new THREE.Group());const c=cascoNavio(12,3.5,
   for(const s of[-1,1])bx(1.8,0.65,0.05,VIDRO,-0.2,1.15,s*1.26,cab);bx(3.6,0.1,2.8,pin,-0.3,1.66,0,cab);
   // arco do radar
   for(const s of[-1,1])haste(new V3(-1.8,1.66,s*1.2),new V3(-2.1,2.9,s*0.9),0.06,S('#d8dcda',0.3,0.7),cab);haste(new V3(-2.1,2.9,-0.9),new V3(-2.1,2.9,0.9),0.06,S('#d8dcda',0.3,0.7),cab);
-  const rr=new THREE.Group();rr.position.set(-2.1,3.05,0);cab.add(rr);bx(0.3,0.1,1.2,S('#f4f4f0',0.4),0,0,0,rr);gira(rr,0.15);haste(new V3(-2.1,2.9,0.5),new V3(-2.1,4.2,0.5),0.02,S('#222',0.4),cab);
+  const rr=new THREE.Group();rr.position.set(-2.1,3.05,0);cab.add(rr);bx(0.3,0.1,1.2,S('#f4f4f0',0.4),0,0,0,rr);giraM(rr,0.15);haste(new V3(-2.1,2.9,0.5),new V3(-2.1,4.2,0.5),0.02,S('#222',0.4),cab);
   for(const [s,cc] of[[1,0x18e04a],[-1,0xff2a1a]]){const l=new THREE.Mesh(new THREE.BoxGeometry(0.12,0.1,0.06),EMIS(cc,1.5));l.position.set(1.0,1.5,s*1.27);cab.add(l);}
   // metralhadora .50 com escudo, no aro da proa
   const ar=new THREE.Group();ar.position.set(3.4,D,0);g.add(ar);cl(0.12,0.16,0.9,S('#2a2d2a',0.5,0.5),0,0.45,0,ar,10);const gun=new THREE.Group();gun.position.y=1.0;ar.add(gun);
@@ -637,7 +637,7 @@ const _n=t=>t?(t._nome||t.uuid):'-';
 function chaveAss(m){return ['A',_n(m.map),_n(m.normalMap),_n(m.roughnessMap),m.side,m.flatShading,m.roughness<0.65?0:1,m.metalness<0.3?0:1,m.polygonOffset].join('|');}   // 2 faixas de aspereza e de metal
 function chaveMat(m){return [m.type,m.color&&m.color.getHexString(),m.emissive&&m.emissive.getHexString(),m.emissiveIntensity,_u(m.map),_u(m.normalMap),_u(m.roughnessMap),_u(m.alphaMap),m.roughness,m.metalness,m.transparent,m.opacity,m.side,m.vertexColors,m.flatShading,m.alphaTest,m.polygonOffset].join('|');}
 function fundir(root,minH=1.5){root.updateMatrixWorld(true);
-  {const vivos=[];const busca=o=>{for(const c of o.children){if(c.userData.vivo){if(!c.isMesh)vivos.push(c);}else busca(c);}};busca(root);for(const v of vivos)fundir(v,minH);}   // grupos que giram/somem: funde por dentro
+  {const vivos=[];const busca=o=>{for(const c of o.children){if(c.userData.vivo){if(!c.isMesh)vivos.push(c);}else busca(c);}};busca(root);for(const v of vivos){fundir(v,minH);if(v.userData.giro&&typeof gira==='function')gira(v,v.userData.giro);}}   // grupos que giram/somem: funde por dentro
 _mi.copy(root.matrixWorld).invert();const grupos=new Map(),caixas=[],tirar=[];
   root.traverse(m=>{if(!m.isMesh||m.isInstancedMesh)return;let p=m;while(p&&p!==root){if(p.userData.vivo)return;p=p.parent;}
     const rel=new THREE.Matrix4().multiplyMatrices(_mi,m.matrixWorld);
@@ -709,7 +709,9 @@ let _tFl=0;
 function passo(dt,camPos){_tFl-=dt;if(_tFl<=0&&camPos){_tFl=0.4;for(const F of FLORESTAS)atualizaFloresta(F,camPos.x,camPos.z,false);}
   if(!LEVE)tremula(performance.now()/1000);}
 const comFund=(fn,w,d)=>(...a)=>{const g=fn(...a);if(w)fundacao(g,w,d);return fundir(g);};
-return{LEVE,fundir,passo,floresta,
+function tiraArvores(x,z,r){const r2=r*r;for(const F of FLORESTAS){const ok=[];for(let i=0;i<F.n;i++){const dx=F.mats[i*16+12]-x,dz=F.mats[i*16+14]-z;if(dx*dx+dz*dz>r2)ok.push(i);}
+    if(ok.length===F.n)continue;const m=new Float32Array(ok.length*16);ok.forEach((i,k)=>m.set(F.mats.subarray(i*16,i*16+16),k*16));F.mats=m;F.n=ok.length;F.lista=ok.map(i=>F.lista[i]);atualizaFloresta(F,0,0,true);_tFl=0;}}   // (21/11) limpa a mata do platô
+return{LEVE,fundir,passo,floresta,tiraArvores,
   sam:comFund(samNovo,42,42),radome:comFund(radomeNovo,36,36),radarGira:comFund(radarGiraNovo,32,32),
   aa:(cor)=>{const g=aaNovo(cor);fundacao(g,16,16,'#8f8670');let tor=null;g.traverse(o=>{if(!tor&&o.isGroup&&Math.abs(o.position.y-1.05)<0.01)tor=o;});if(tor)tor.userData.vivo=true;fundir(g);g.userData.torre=tor;return g;},
   torre:comFund(torreNovo),has:comFund(hasNovo),tanques:comFund(tanquesNovo),esquadrao:(w,d,h,c)=>fundir(esquadrao(w,d,h,c)),deposito:(w,d,h)=>fundir(deposito(w,d,h)),alojamento:(w,d)=>fundir(alojamento(w,d)),
