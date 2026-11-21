@@ -35,6 +35,20 @@ function G(k,f){return geos[k]||(geos[k]=f());}
 function box(w,h,d,mat,x,y,z,pai){const m=new THREE.Mesh(G('b'+w+','+h+','+d,()=>new THREE.BoxGeometry(w,h,d)),mat);m.position.set(x,y,z);pai.add(m);return m;}
 function esf(r,mat,x,y,z,pai,sx=1,sy=1,sz=1){const m=new THREE.Mesh(G('s'+r,()=>new THREE.SphereGeometry(r,14,10)),mat);m.position.set(x,y,z);m.scale.set(sx,sy,sz);pai.add(m);return m;}
 function cil(rt,rb,h,mat,x,y,z,pai,seg=10){const m=new THREE.Mesh(G('c'+rt+','+rb+','+h+','+seg,()=>new THREE.CylinderGeometry(rt,rb,h,seg)),mat);m.position.set(x,y,z);pai.add(m);return m;}
+/* (21/11) OBSTÁCULOS p/ colisão do helicóptero: caixas giradas (x,z,a=yaw,hx,hz,bot,top) numa grade de 64 m
+   (cada obstáculo entra em todas as células que encosta + 12 m de folga, então basta olhar a célula do heli) */
+const OBST=new Map(),OB_C=64;
+function obstAdd(o){o.a=o.a||0;o.c=Math.cos(o.a);o.s=Math.sin(o.a);const ex=Math.hypot(o.hx,o.hz)+12;
+  for(let i=Math.floor((o.x-ex)/OB_C);i<=Math.floor((o.x+ex)/OB_C);i++)for(let j=Math.floor((o.z-ex)/OB_C);j<=Math.floor((o.z+ex)/OB_C);j++){const k=i*100003+j;let l=OBST.get(k);if(!l)OBST.set(k,l=[]);l.push(o);}return o;}
+function obstTira(tag){for(const [k,l] of OBST){const n=l.filter(o=>o.tag!==tag);if(n.length)OBST.set(k,n);else OBST.delete(k);}}
+const _obVazio=[];function obstCelula(x,z){return OBST.get(Math.floor(x/OB_C)*100003+Math.floor(z/OB_C))||_obVazio;}
+function obstLocal(o,x,z){const dx=x-o.x,dz=z-o.z;return[dx*o.c-dz*o.s,dx*o.s+dz*o.c];}   // posição no referencial do obstáculo
+/* malhas de um grupo (sem giro) viram obstáculos; pula o que é chato (pista, faixas) */
+function obstDoGrupo(g,tag,minH=1.5){const p0=g.position.clone(),a=g.rotation.y;g.position.set(0,0,0);g.rotation.y=0;g.updateMatrixWorld(true);const bb=new THREE.Box3();
+  for(const ch of g.children){if(!ch.visible)continue;bb.setFromObject(ch);if(bb.isEmpty()||bb.max.y-bb.min.y<minH)continue;
+    const cx=(bb.min.x+bb.max.x)/2,cz=(bb.min.z+bb.max.z)/2;
+    obstAdd({x:p0.x+cx*Math.cos(a)+cz*Math.sin(a),z:p0.z-cx*Math.sin(a)+cz*Math.cos(a),a,hx:(bb.max.x-bb.min.x)/2,hz:(bb.max.z-bb.min.z)/2,bot:p0.y+bb.min.y,top:p0.y+bb.max.y,tag});}
+  g.position.copy(p0);g.rotation.y=a;g.updateMatrixWorld(true);}
 function cv(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;return c;}
 function tex(c){const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;t.anisotropy=4;return t;}
 function rnd(s){return()=>(s=(s*16807)%2147483647)/2147483647;}
@@ -120,7 +134,7 @@ function relevo(x,z){let h=0;for(const I of TER.ilhas)if(x>=I.x0&&x<=I.x1&&z>=I.
    const rI=new THREE.Mesh(gR,mRI);rI.renderOrder=1;cena.add(rI);
    // árvores (cones) na mata das encostas
    const nA=ARV.length/4,gA=new THREE.ConeGeometry(1,1,6);gA.translate(0,0.5,0);const iA=new THREE.InstancedMesh(gA,new THREE.MeshStandardMaterial({color:cl(0.12,0.26,0.12),roughness:1}),nA);
-   const mA=new THREE.Matrix4(),qA=new THREE.Quaternion(),sA=new V3(),pA=new V3();for(let i=0;i<nA;i++){const t=12+ARV[i*4+3]*14;sA.set(t*0.38,t,t*0.38);pA.set(ARV[i*4],ARV[i*4+1]-1,ARV[i*4+2]);mA.compose(pA,qA,sA);iA.setMatrixAt(i,mA);}
+   const mA=new THREE.Matrix4(),qA=new THREE.Quaternion(),sA=new V3(),pA=new V3();for(let i=0;i<nA;i++){const t=12+ARV[i*4+3]*14;sA.set(t*0.38,t,t*0.38);pA.set(ARV[i*4],ARV[i*4+1]-1,ARV[i*4+2]);mA.compose(pA,qA,sA);iA.setMatrixAt(i,mA);obstAdd({x:pA.x,z:pA.z,hx:t*0.2,hz:t*0.2,bot:pA.y,top:pA.y+t*0.9,tag:'arv'});}
    cena.add(iA);}
   // ilhas planas das bases
   const tG=tex(texGramaC());tG.wrapS=tG.wrapT=THREE.RepeatWrapping;tG.repeat.set(40,40);tG.anisotropy=4;   // (11/11) grama com textura (repete a cada ~40 m)
@@ -220,11 +234,12 @@ function texGramaC(){const S=256,c=cv(S,S),g=c.getContext('2d'),r=rnd(55);g.fill
     B.lanc=[];B.samOn=true;   // (10/11) 3 lançadores SAM: bomba destrói (volta em 90 s); sem nenhum de pé, a base fica sem defesa
     for(const [x,z] of B.lpos){const L=new THREE.Group();L.position.set(x,0,z);L.rotation.y=Math.atan2(x,z)+Math.PI;g.add(L);L.add(radarC('#ff7f2a'));   /* (19/11) estação SAM nova (radar + 2 lançadores p/ fora) */
       const q=new THREE.Mesh(G('queim',()=>new THREE.CircleGeometry(16,16)),po(M('#1d1d1d',1)));q.rotation.x=-Math.PI/2;q.position.set(x,0.3,z);q.visible=false;g.add(q);
-      B.lanc.push({L,q,vivo:true});}}
+      B.lanc.push({L,q,vivo:true});}
+    obstDoGrupo(g,'base');}
   {const ga=new THREE.ConeGeometry(4,11,6);ga.translate(0,7.5,0);const tr=new THREE.CylinderGeometry(0.5,0.6,2.5,5);tr.translate(0,1.25,0);
    const mA=new THREE.InstancedMesh(ga,new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.9,flatShading:true}),ARV.length),mT=new THREE.InstancedMesh(tr,M('#5a4030',0.9),ARV.length);
    const m4=new THREE.Matrix4(),q=new THREE.Quaternion(),sc=new V3(),p=new V3(),cA=new THREE.Color(),r=rnd(5);
-   ARV.forEach(([x,y,z,e],i)=>{q.setFromAxisAngle(p.set(0,1,0),r()*6);sc.set(e,e*(0.8+r()*0.5),e);m4.compose(p.set(x,y,z),q,sc);mA.setMatrixAt(i,m4);mT.setMatrixAt(i,m4);
+   ARV.forEach(([x,y,z,e],i)=>{q.setFromAxisAngle(p.set(0,1,0),r()*6);sc.set(e,e*(0.8+r()*0.5),e);m4.compose(p.set(x,y,z),q,sc);mA.setMatrixAt(i,m4);mT.setMatrixAt(i,m4);obstAdd({x,z,hx:2.6*e,hz:2.6*e,bot:y,top:y+12*sc.y,tag:'arv'});
      mA.setColorAt(i,cA.set(['#2f5d2a','#3a6b30','#254d24','#4a7a36'][i%4]).convertSRGBToLinear());});
    mA.instanceColor.needsUpdate=true;cena.add(mA,mT);
    const mL=new THREE.InstancedMesh(new THREE.BoxGeometry(0.9,0.7,0.9),new THREE.MeshBasicMaterial({color:0xffffff,toneMapped:false}),LUZ.length);
