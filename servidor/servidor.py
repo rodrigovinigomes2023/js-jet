@@ -1899,7 +1899,7 @@ def main():
         app.router.add_route('*', '/api/live/ponte', api_ponte)
     app.router.add_get('/api/ping', lambda r: web.json_response({'ok': True}))
     app.router.add_get('/', arquivo)
-    app.router.add_get('/{arq}', arquivo)
+    app.router.add_get('/{arq:.+}', arquivo)   # (21/11) subpastas (tex/) também
     app.on_startup.append(iniciar)
     asyncio.run(rodar(app))
 

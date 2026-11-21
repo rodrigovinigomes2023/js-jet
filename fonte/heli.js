@@ -71,7 +71,9 @@ function criarHeli(){const G_=sabreGeo();if(!G_){carregaSabre();const g=criarHel
 // ---------- objetos do mapa
 // (19/11) piloto abatido em escala real (1,8 m × 1,4 = mesma escala do Sabre): macacão de voo verde, colete, capacete, acenando com os 2 braços
 // por cima da cabeça; painel de sinalização laranja no chão e fumaça laranja (o facho e o anel continuam p/ achar de longe)
-function heliMilitar(){const h=new THREE.Group(),mac=M('#5b6b45',0.9),col=M('#3b4630',0.85),bot=M('#1c1c1a',0.8),pele=M('#c99470',0.8),cap=M('#c3c7c0',0.5),vis=M('#1d2a33',0.2),luv=M('#2b2b26',0.9);
+function heliMilitar(){if(MODOK)return MOD.soldado();   /* (21/11) soldado CC-BY */
+  return heliMilitarAntigo();}
+function heliMilitarAntigo(){const h=new THREE.Group(),mac=M('#5b6b45',0.9),col=M('#3b4630',0.85),bot=M('#1c1c1a',0.8),pele=M('#c99470',0.8),cap=M('#c3c7c0',0.5),vis=M('#1d2a33',0.2),luv=M('#2b2b26',0.9);
   for(const z of[-0.1,0.1]){box(0.27,0.11,0.12,bot,0.04,0.055,z,h);cil(0.07,0.065,0.42,mac,0,0.32,z,h,8);cil(0.08,0.07,0.42,mac,0,0.74,z,h,8);}   // botas, canelas, coxas
   box(0.2,0.12,0.36,col,0,0.98,0,h);box(0.22,0.5,0.38,mac,0,1.2,0,h);box(0.25,0.32,0.4,col,0.01,1.24,0,h);   // quadril, tronco, colete
   box(0.05,0.12,0.14,M('#d8c040',0.6),0.14,1.3,0.08,h);box(0.04,0.06,0.18,M('#2f5f9f',0.7),0.13,1.4,-0.1,h);   // rádio + bandeirinha
@@ -79,13 +81,14 @@ function heliMilitar(){const h=new THREE.Group(),mac=M('#5b6b45',0.9),col=M('#3b
   const bracos=[];for(const z of[-1,1]){const o=new THREE.Group();o.position.set(0,1.42,z*0.23);h.add(o);cil(0.055,0.05,0.3,mac,0,-0.15,0,o,8);
     const c=new THREE.Group();c.position.y=-0.3;o.add(c);cil(0.05,0.045,0.28,mac,0,-0.14,0,c,8);esf(0.05,luv,0,-0.3,0,c);bracos.push({o,c,z});}
   h.userData.bracos=bracos;return h;}   /* (20/11) 1,75 m, tamanho real */
-function heliPiloto(){const g=new THREE.Group();const mil=heliMilitar();g.add(mil);g.userData.mil=mil;
+function heliPiloto(){const g=new THREE.Group();const mil=MODOK?MOD.piloto():heliMilitar();g.add(mil);g.userData.mil=mil;if(MODOK){const pq=MOD.paraquedas();pq.position.set(-2.8,0,-0.3);g.add(pq);}   /* (21/11) piloto acenando + paraquedas caído */
   const pan=box(2.6,0.04,0.9,M('#ff6a1a',0.8),3.2,0.03,1.6,g);pan.rotation.y=0.6;box(0.32,0.5,0.32,M('#3b4630',0.8),1.4,0.25,-1.2,g);   // painel de sinalização + mochila de sobrevivência
   g.userData.lata=new V3(-1.6,0.2,1.2);const lata=cil(0.07,0.07,0.3,M('#e06a20',0.6),-1.6,0.15,1.2,g,8);lata.rotation.z=1.4;   // lata de fumaça
   const raio=new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.6,60,8,1,true),new THREE.MeshBasicMaterial({color:0xffb030,transparent:true,opacity:0.35,depthWrite:false,side:THREE.DoubleSide}));raio.position.set(-1.6,30,1.2);g.add(raio);   /* facho sai da lata de fumaça, não do militar */
   const fum=new THREE.Mesh(new THREE.RingGeometry(4,5,24),new THREE.MeshBasicMaterial({color:0xffb030,transparent:true,opacity:0.7,side:THREE.DoubleSide}));fum.rotation.x=-Math.PI/2;fum.position.y=0.3;g.add(fum);
   const anel=g.children[g.children.length-1];g.userData.anel=anel;g.userData.raio=raio;raio.material.opacity=0.22;cena.add(g);return g;}
-function heliCaixa(tipo){const g=new THREE.Group(),pal=M('#8a6a45',0.9);   /* (20/11) tamanho real: palete 1,4 m */
+function heliCaixa(tipo){if(MODOK){const g=MOD.caixa(tipo);const anel=new THREE.Mesh(new THREE.RingGeometry(3,3.5,24),new THREE.MeshBasicMaterial({color:tipo==='comb'?0xff5040:tipo==='mun'?0xd8c040:0xffffff,transparent:true,opacity:0.6,side:THREE.DoubleSide}));anel.rotation.x=-Math.PI/2;anel.position.y=0.3;g.add(anel);cena.add(g);return g;}   /* (21/11) palete c/ eslinga */
+  const g=new THREE.Group(),pal=M('#8a6a45',0.9);   /* (20/11) tamanho real: palete 1,4 m */
   box(1.4,0.15,1.4,pal,0,0.075,0,g);
   if(tipo==='comb'){for(const [x,z] of[[-0.33,-0.33],[0.33,-0.33],[-0.33,0.33],[0.33,0.33]]){cil(0.29,0.29,0.88,M('#c0392b',0.5),x,0.59,z,g,12);cil(0.3,0.3,0.05,M('#e8e8e8',0.5),x,0.8,z,g,12);}}
   else if(tipo==='mun'){for(let k=0;k<2;k++){box(1.3,0.45,0.9,M('#556b2f',0.8),0,0.38+k*0.47,0,g);box(1.32,0.08,0.92,M('#c9b037',0.6),0,0.5+k*0.47,0,g);}}
@@ -93,7 +96,8 @@ function heliCaixa(tipo){const g=new THREE.Group(),pal=M('#8a6a45',0.9);   /* (2
   const anel=new THREE.Mesh(new THREE.RingGeometry(3,3.5,24),new THREE.MeshBasicMaterial({color:tipo==='comb'?0xff5040:tipo==='mun'?0xd8c040:0xffffff,transparent:true,opacity:0.6,side:THREE.DoubleSide}));anel.rotation.x=-Math.PI/2;anel.position.y=0.3;g.add(anel);
   cena.add(g);return g;}
 /* (20/11) lancha de patrulha ~12 m (antes era o navio B encolhido = 36 m): casco em V, cabine c/ para-brisa, .50 na proa, 2 motores de popa, 2 tripulantes, esteira */
-function heliLancha(){const g=new THREE.Group(),cas=M('#d9dcd8',0.55),fun=M('#3a3f44',0.7),cab=M('#e9ebe8',0.5),vid=M('#1d2a33',0.15),pr=M('#22262a',0.6),fx=M('#e8443a',0.6),bor=M('#2b2f33',0.85);
+function heliLancha(){if(MODOK){const g=MOD.lancha();for(const [x,z] of[[2.6,0],[-1.2,0.7]]){const t=heliMilitar();t.position.set(x,1.45,z);t.rotation.y=Math.PI/2;g.add(t);}heliEsteira(g);return g;}   /* (21/11) lancha realista */
+  const g=new THREE.Group(),cas=M('#d9dcd8',0.55),fun=M('#3a3f44',0.7),cab=M('#e9ebe8',0.5),vid=M('#1d2a33',0.15),pr=M('#22262a',0.6),fx=M('#e8443a',0.6),bor=M('#2b2f33',0.85);
   casco(12,3.4,0.6,4,fun,g,-0.35);casco(12,3.4,0.9,4,cas,g,0.25);casco(11.6,3.3,0.12,3.8,bor,g,1.1);   // fundo escuro, costado claro, borda de borracha
   box(10.4,0.06,3.0,M('#a8aca6',0.85),-0.4,1.17,0,g);                                                  // convés
   box(3.0,1.5,2.4,cab,-0.6,1.95,0,g);const pb=box(0.08,0.9,2.3,vid,0.95,2.15,0,g);pb.rotation.z=0.35;   // cabine + para-brisa inclinado
@@ -102,10 +106,12 @@ function heliLancha(){const g=new THREE.Group(),cas=M('#d9dcd8',0.55),fun=M('#3a
   const ar=new THREE.Group();ar.position.set(3.7,1.2,0);g.add(ar);cil(0.08,0.1,0.9,pr,0,0.45,0,ar,6);const cano=cil(0.05,0.05,1.6,pr,0.75,0.95,0,ar,6);cano.rotation.z=Math.PI/2;box(0.5,0.25,0.25,pr,0.1,0.95,0,ar);   // .50 na proa
   for(const z of[-0.6,0.6]){box(0.5,0.7,0.4,M('#1c1c1c',0.5),-6.25,1.25,z,g);box(0.15,0.9,0.12,pr,-6.3,0.5,z,g);}   // 2 motores de popa
   for(const [x,z] of[[2.9,0],[-2.6,0.7]]){const t=heliMilitar();t.position.set(x,1.2,z);t.rotation.y=Math.PI/2;g.add(t);}   // atirador e piloto
-  const eg=new THREE.BufferGeometry();eg.setAttribute('position',new THREE.Float32BufferAttribute([0,0,-1.5, 0,0,1.5, -26,0,-6, -26,0,6],3));eg.setAttribute('color',new THREE.Float32BufferAttribute([1,1,1, 1,1,1, 0,0,0, 0,0,0],3));eg.setIndex([0,2,1,1,2,3]);
+  heliEsteira(g);return g;}
+function heliEsteira(g){const eg=new THREE.BufferGeometry();eg.setAttribute('position',new THREE.Float32BufferAttribute([0,0,-1.5, 0,0,1.5, -26,0,-6, -26,0,6],3));eg.setAttribute('color',new THREE.Float32BufferAttribute([1,1,1, 1,1,1, 0,0,0, 0,0,0],3));eg.setIndex([0,2,1,1,2,3]);
   const es=new THREE.Mesh(eg,new THREE.MeshBasicMaterial({color:0xe8f0f4,vertexColors:true,transparent:true,opacity:0.32,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));es.position.set(-6.2,0.15,0);g.add(es);g.userData.esteira=es;   // esteira
   return g;}
-function heliAA(){const g=new THREE.Group(),o=M('#5d6b4a',0.8),e=M('#2f363c',0.6);cil(2.2,2.6,1.6,o,0,0.8,0,g,10);const t=new THREE.Group();t.position.y=2;g.add(t);
+function heliAA(){if(MODOK){const g=MOD.aa('#e8443a');cena.add(g);return g;}   /* (21/11) bitubo 35 mm */
+  const g=new THREE.Group(),o=M('#5d6b4a',0.8),e=M('#2f363c',0.6);cil(2.2,2.6,1.6,o,0,0.8,0,g,10);const t=new THREE.Group();t.position.y=2;g.add(t);
   box(2.2,1.4,2.4,o,0,0.4,0,t);for(const z of[-0.5,0.5]){const c=cil(0.15,0.15,3.6,e,1.6,1,z,t,6);c.rotation.z=Math.PI/2-0.5;}g.userData.torre=t;cena.add(g);return g;}
 
 function heliPonto(r0,r1,terra,rng){for(let i=0;i<300;i++){const a=rng()*Math.PI*2,r=r0+rng()*(r1-r0),x=Math.cos(a)*r,z=Math.sin(a)*r,h=relevo(x,z);
@@ -135,13 +141,13 @@ function heliEquip(){const esc=new THREE.Group(),corda=M('#c9b78a',0.9),mad=M('#
   box(0.5,0.55,0.35,M('#ffc94a',0.5),0,0,0,gan);const cv=new THREE.Mesh(new THREE.TorusGeometry(0.3,0.08,6,14,Math.PI*1.4),M('#b8c0c8',0.3));cv.position.y=-0.55;cv.rotation.z=Math.PI*0.8;gan.add(cv);
   cabo.visible=gan.visible=false;cena.add(cabo,gan);HELI.coisas.push(cabo,gan);HELI.cabo=cabo;HELI.gan=gan;HELI.ganL=0;HELI.tGancho=0;}
 function heliIniciar(){const rng=rnd(4242);HELI.on=true;HELI.fim=false;HELI.vidas=3;HELI.salvos=0;HELI.bordo=0;HELI.alvos=[];HELI.pilotos=[];HELI.caixas=[];HELI.coisas=[];HELI.fogos=[];HELI.mapa=null;HELI.pausa=false;HELI.fase=undefined;HELI.naZona=false;HELI.tZona=0;HELI.avComb=false;
-  for(let i=0;i<3;i++){const p=heliPonto(1500,5200,true,rng);heliAlvo(`📡 Radar ${i+1}`,'#ff7f2a',(i%2?radarB:radarA)('#ff7f2a'),p,60,'radar');}
-  for(let i=0;i<2;i++){const p=heliPonto(2000,5500,true,rng);const o=heliAlvo(`🚀 SAM ${i+1}`,'#ff3b30',radarC('#ff3b30'),p,80,'sam');o.tSam=4+i*2;}
+  for(let i=0;i<3;i++){const p=heliPonto(1500,5200,true,rng);heliAlvo(`📡 Radar ${i+1}`,'#ff7f2a',(MODOK?(i%2?MOD.radarGira:MOD.radome):(i%2?radarB:radarA))('#ff7f2a'),p,60,'radar');}
+  for(let i=0;i<2;i++){const p=heliPonto(2000,5500,true,rng);const o=heliAlvo(`🚀 SAM ${i+1}`,'#ff3b30',(MODOK?MOD.sam:radarC)('#ff3b30'),p,80,'sam');o.tSam=4+i*2;}
   for(let i=0;i<6;i++){const p=heliPonto(800,6000,true,rng);const g=heliAA();const o=heliAlvo(`🔫 Antiaérea ${i+1}`,'#e8443a',g,p,40,'aa');}
   for(let i=0;i<2;i++){const p=heliPonto(1500,4500,false,rng);const o=heliAlvo(`🚤 Lancha ${i+1}`,'#e8443a',heliLancha(),p,120,'lancha');o.c=p.clone();o.ang=rng()*6;}
   for(const o of HELI.alvos)cena.add(o.g);
-  obstTira('heli');{const bb=new THREE.Box3();for(const o of HELI.alvos){if(o.tipo==='lancha')continue;o.g.updateMatrixWorld(true);bb.setFromObject(o.g);   /* (21/11) radar/SAM/antiaérea são sólidos */
-    obstAdd({x:(bb.min.x+bb.max.x)/2,z:(bb.min.z+bb.max.z)/2,hx:(bb.max.x-bb.min.x)/2*0.85,hz:(bb.max.z-bb.min.z)/2*0.85,bot:bb.min.y,top:bb.max.y,tag:'heli'});}}
+  obstTira('heli');{const bb=new THREE.Box3();for(const o of HELI.alvos){if(o.tipo==='lancha')continue;o.g.updateMatrixWorld(true);const cx=[];o.g.traverse(q=>{if(q.userData.caixas)for(const c of q.userData.caixas)cx.push(c.clone().applyMatrix4(q.matrixWorld));});if(!cx.length)cx.push(bb.setFromObject(o.g).clone());   /* (21/11) radar/SAM/antiaérea: uma caixa por peça grande */
+    for(const b of cx)obstAdd({x:(b.min.x+b.max.x)/2,z:(b.min.z+b.max.z)/2,hx:(b.max.x-b.min.x)/2*0.9,hz:(b.max.z-b.min.z)/2*0.9,bot:b.min.y,top:b.max.y,tag:'heli'});}}
   for(let i=0;i<4;i++){const p=heliPontoResgate(rng);const g=heliPiloto();g.position.copy(p);g.rotation.y=rng()*6.28;g.updateMatrixWorld();
     for(const c of g.children){if(c===g.userData.raio)continue;c.getWorldPosition(_v1);const ch=chaoMalha(_v1.x,_v1.z);c.position.y+=ch-p.y;}   /* tudo em cima do chão (encosta) */
     g.userData.lata.y+=chaoMalha(...(()=>{_v1.copy(g.userData.lata).applyAxisAngle(_hY,g.rotation.y).add(p);return[_v1.x,_v1.z];})())-p.y;

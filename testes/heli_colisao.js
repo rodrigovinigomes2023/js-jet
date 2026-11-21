@@ -1,8 +1,8 @@
 // (21/11) heli não atravessa torre / árvore; zoom mais perto
 const {chromium}=require('/home/gomes/Área de Trabalho/tnb/node_modules/playwright-core');
 (async()=>{const b=await chromium.launch({executablePath:process.env.HOME+'/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome',args:['--use-gl=swiftshader','--enable-unsafe-swiftshader','--mute-audio']});
-  const pg=await b.newPage({viewport:{width:1100,height:620}});const erros=[];pg.on('pageerror',e=>erros.push(e.message));
-  await pg.goto('http://localhost:8791/');await pg.waitForFunction(()=>window.JJ,null,{timeout:60000});await pg.click('#bConvidado');await pg.evaluate(()=>document.querySelector('#bHeli').click());await pg.waitForTimeout(2000);await pg.click('#hmOk');
+  const pg=await b.newPage({viewport:{width:1100,height:620}});pg.setDefaultTimeout(150000);const erros=[];pg.on('pageerror',e=>erros.push(e.message));
+  await pg.goto('http://localhost:8791/');await pg.waitForFunction(()=>window.JJ,null,{timeout:60000});await pg.click('#bConvidado');await pg.evaluate(()=>document.querySelector('#bHeli').click());await pg.waitForTimeout(2000);await pg.waitForFunction(()=>HELI.brief);await pg.evaluate(()=>heliMapaFecha());
   console.log(await pg.evaluate(()=>{let n=0,a=0;for(const l of OBST.values())for(const o of l){n++;}return 'refs na grade '+n+' zoom '+HELI_ZOOM;}));
   await pg.screenshot({path:__dirname+'/f_heli_zoom.png'});
   const voa=async(nome,alvo)=>{await pg.evaluate(a=>{HELI.motor=1;HELI.part=true;const [tx,tz,ty]=a;JJ.EU.pos.set(tx+55,ty,tz+10);const h=JJ.EU.pos;

@@ -1,11 +1,21 @@
-// (19/11) modelos novos dentro do jogo: missão 4 (radares) e 6 (navios) — na cena, variados, sem erro.  node testes/modelos_jogo.js
-const {chromium}=require('/home/gomes/Área de Trabalho/tnb/node_modules/playwright-core');
+// (21/11) modelos realistas no jogo: erros, custo de desenho e fotos (base, SAM, navio, floresta)
+const {chromium}=require('/home/gomes/Área de Trabalho/tnb/node_modules/playwright-core');const Q=process.argv[2]||'';
 (async()=>{const b=await chromium.launch({executablePath:process.env.HOME+'/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome',args:['--use-gl=swiftshader','--enable-unsafe-swiftshader','--mute-audio']});
-  const pg=await b.newPage({viewport:{width:1000,height:560}});const erros=[];pg.on('pageerror',e=>erros.push(e.message));
-  await pg.goto('http://localhost:8791/');await pg.waitForFunction(()=>window.JJ,null,{timeout:60000});await pg.click('#bConvidado');
-  for(const n of [4,6]){await pg.evaluate(()=>JJ.abreMissoes());await pg.waitForTimeout(400);await pg.click(`#mGrade .mc[data-n="${n}"]`);await pg.click('#mVai');await pg.waitForTimeout(5000);
-    console.log('missão',n,await pg.evaluate(()=>[...JJ.OUT.values()].filter(o=>o.navio).map(o=>`${o.nome}: ${o.g.children.length} peças, na cena=${!!o.g.parent}, visível=${o.g.visible}`).join(' | ')));
-    for(let i=0;i<10;i++){await pg.evaluate(()=>{const o=[...JJ.OUT.values()].find(o=>o.navio&&o.vivo);const p=o.pos.clone().add(new THREE.Vector3(-260,o.pos.y<5?70:110,-90));
-      JJ.EU.pos.copy(p);JJ.EU.q.setFromUnitVectors(new THREE.Vector3(1,0,0),o.pos.clone().add(new THREE.Vector3(0,10,0)).sub(p).normalize());JJ.EU.vel=60;JJ.EU.vida=100;});await pg.waitForTimeout(150);}
-    await pg.screenshot({path:__dirname+`/f_modelos_m${n}.png`});await pg.keyboard.press('Escape');await pg.waitForTimeout(400);}
-  console.log('erros:',erros.length?erros.join(' | '):'nenhum');await b.close();})();
+  const pg=await b.newPage({viewport:{width:1100,height:640}});pg.setDefaultTimeout(150000);const erros=[];pg.on('pageerror',e=>erros.push(e.message));pg.on('console',m=>{if(m.type()==='error'&&!/404/.test(m.text()))erros.push(m.text());});
+  const t0=Date.now();await pg.goto('http://localhost:8791/'+Q);await pg.waitForFunction(()=>window.JJ,null,{timeout:150000});console.log('carregou em',((Date.now()-t0)/1000).toFixed(1),'s');
+  await pg.click('#bConvidado');await pg.evaluate(()=>document.querySelector('#bHeli').click());await pg.waitForTimeout(2500);await pg.waitForTimeout(1500);await pg.waitForFunction(()=>HELI.brief);await pg.evaluate(()=>heliMapaFecha());await pg.waitForTimeout(500);
+  await pg.evaluate(()=>{HELI.pausa=true;window.heliCamera=()=>{};document.getElementById('heliMapa').style.display='none';document.querySelectorAll('#hud,.hud,#heliRadio,#painelMis').forEach(e=>e.style.visibility='hidden');});
+  const foto=async(n,c,a)=>{await pg.evaluate(([c,a])=>{cam.position.set(...c);cam.lookAt(...a);cam.fov=45;cam.updateProjectionMatrix();},[c,a]);await pg.waitForTimeout(1800);await pg.screenshot({path:__dirname+'/f_mod_'+n+(Q?'_leve':'')+'.png'});
+    return pg.evaluate(()=>`calls ${R.info.render.calls} tris ${R.info.render.triangles}`);};
+  const B=await pg.evaluate(()=>{const B=BASES[HELI_CASA];B.g.updateMatrixWorld(true);const W=(x,z)=>{const v=B.g.localToWorld(new THREE.Vector3(x,0,z));return[v.x,v.z];};return{t:W(166,-86),h:W(-70,197),k:W(-271,236),s:W(320,-120),p:W(260,200),y:BASE_H};});
+  console.log('base',await foto('base',[B.t[0]+260,160,B.t[1]+260],[B.t[0]-60,B.y,B.t[1]-40]));
+  console.log('torre',await foto('torre',[B.t[0]+70,B.y+40,B.t[1]+60],[B.t[0],B.y+15,B.t[1]]));
+  console.log('has',await foto('has',[B.h[0]+90,B.y+45,B.h[1]+90],[B.h[0],B.y+5,B.h[1]]));
+  console.log('sam',await foto('sam',[B.s[0]+55,B.y+30,B.s[1]+50],[B.s[0],B.y+3,B.s[1]]));
+  const alvo=await pg.evaluate(()=>{const o=HELI.alvos.find(o=>o.tipo==='lancha');const a=HELI.alvos.find(o=>o.tipo==='aa');return{l:o.pos.toArray(),a:a.pos.toArray()};});
+  console.log('lancha',await foto('lancha',[alvo.l[0]+20,10,alvo.l[2]+16],alvo.l));
+  console.log('aa',await foto('aa',[alvo.a[0]+16,alvo.a[1]+9,alvo.a[2]+14],[alvo.a[0],alvo.a[1]+2,alvo.a[2]]));
+  const ar=await pg.evaluate(()=>{for(const l of OBST.values())for(const o of l)if(o.tag==='arv'&&o.bot>60)return[o.x,o.bot,o.z];});
+  console.log('mata',await foto('mata',[ar[0]+70,ar[1]+40,ar[2]+70],[ar[0],ar[1]+5,ar[2]]));
+  console.log('longe',await foto('longe',[ar[0]+1600,ar[1]+700,ar[2]+1600],[ar[0],ar[1],ar[2]]));
+  console.log('erros:',erros.length?[...new Set(erros)].slice(0,5).join(' | '):'nenhum');await b.close();})();
