@@ -119,6 +119,13 @@
   #toque{display:none}
   body.toque #toque{display:block}
   #zonaJoy{position:fixed;left:0;top:0;bottom:0;width:50%}
+  /* (21/11) heli no celular: analógico esq. (sobe/desce + de lado) e dir. (frente/trás + gira); 🎯 🚀 ✨ em volta do direito; 🔥/🪂 saem */
+  #zonaJoy2{display:none;position:fixed;right:0;top:0;bottom:0;width:50%}
+  body.heli #zonaJoy2{display:block}
+  #joy2{position:fixed;width:130px;height:130px;margin:-65px 0 0 -65px;border-radius:50%;border:2px solid #fff5;background:#fff1;display:none;pointer-events:none;z-index:5}
+  #joyK2{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px;border-radius:50%;background:#fff6}
+  body.heli #bTurbo,body.heli #bFreio{display:none!important}
+  body.heli #bFogo{z-index:6}body.heli #bMissil{z-index:6}body.heli #bFlare{z-index:6;right:max(30px,env(safe-area-inset-right));bottom:220px}
   #joy{position:fixed;width:130px;height:130px;margin:-65px 0 0 -65px;border-radius:50%;border:2px solid #fff5;background:#fff1;display:none;pointer-events:none}
   #joyK{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px;border-radius:50%;background:#fff6}
   .bt{position:fixed;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;background:#ffffff22;border:2px solid #fff6}
@@ -331,6 +338,7 @@
 <div id="treino" class="hud"></div>
 <div id="toque">
   <div id="zonaJoy"></div>
+  <div id="zonaJoy2"></div><div id="joy2" class="joyX"><div id="joyK2" class="joyKX"></div></div>
   <div id="joy"><div id="joyK"></div></div>
   <div class="bt" id="bTurbo">🔥</div>
   <div class="bt" id="bFogo">🎯</div>

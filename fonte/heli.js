@@ -209,8 +209,12 @@ function heliPasso(dt){if(!HELI.on||HELI.pausa)return;const agora=performance.no
   misseisTreino(dt);
   if(!EU.vivo){if(!HELI.fim&&agora-HELI.tMorte>3500){if(HELI.vidas>0)heliNascer();else{HELI.fim=true;heliFim(false);}}return;}
   // controle relativo à tela (câmera isométrica): frente = p/ onde a câmera olha, no chão
-  _hF.copy(HELI_CAM).negate().setY(0).normalize();_hR.set(-_hF.z,0,_hF.x);
-  const ix=((TEC.KeyD||TEC.ArrowRight)?1:0)-((TEC.KeyA||TEC.ArrowLeft)?1:0)+(JOY.x||0),iy=((TEC.KeyW||TEC.ArrowUp)?1:0)-((TEC.KeyS||TEC.ArrowDown)?1:0)-(JOY.y||0);
+  /* (21/11) COMANDOS NOVOS: W/S sobe/desce · A/D de lado · ↑/↓ frente/trás · ←/→ gira no eixo. Celular: analógico esq. = WASD, dir. = setas */
+  const ent={sobe:((TEC.KeyW||TEC.KeyE||BT.turbo)?1:0)-((TEC.KeyS||TEC.KeyC||BT.freio)?1:0)-(JOY.y||0),lado:((TEC.KeyD)?1:0)-((TEC.KeyA)?1:0)+(JOY.x||0),
+    frente:((TEC.ArrowUp)?1:0)-((TEC.ArrowDown)?1:0)-(JOY2.y||0),gira:((TEC.ArrowRight)?1:0)-((TEC.ArrowLeft)?1:0)+(JOY2.x||0)};
+  for(const k in ent)ent[k]=Math.max(-1,Math.min(1,ent[k]));
+  _hF.set(Math.cos(HELI.yaw),0,-Math.sin(HELI.yaw));_hR.set(-_hF.z,0,_hF.x);   // frente/lado do próprio heli
+  const ix=ent.lado,iy=ent.frente;
   /* (20/11) nasce desligado: mexer o joystick / W / E dá a partida; ~5 s até o rotor pegar o giro, só então decola */
   if(HELI.motor<1){if(!HELI.part&&(Math.abs(ix)>0.2||Math.abs(iy)>0.2||TEC.KeyE||BT.turbo)){HELI.part=true;heliMsg('🔑 Dando partida… o rotor leva uns 5 s p/ pegar o giro',3500);}
     else if(!HELI.part&&Math.floor(agora/700)%2)heliMsg('🔑 Motor desligado: mexa o joystick ou aperte 🔥 / E p/ dar a partida',800);
@@ -220,7 +224,7 @@ function heliPasso(dt){if(!HELI.on||HELI.pausa)return;const agora=performance.no
   // (19/11) ALTITUDE MANTIDA (não segue mais o relevo): E/🔥 sobe, C/🪂 desce, solto = segura a altura.
   // Subir pede potência: devagar (13 m/s), tira velocidade e gasta mais combustível; descer é a 9 m/s. O morro é obstáculo: bate e machuca.
   const agl=EU.pos.y-Math.max(0,relevo(EU.pos.x,EU.pos.z));   /* (19/11) mais rápido p/ jogabilidade: sobe 20, desce 15; perto do chão (<25 m) a descida amacia p/ 6 m/s */
-  const vsAlvo=!pronto?0:(TEC.KeyE||BT.turbo)?30:(TEC.KeyC||BT.freio)?(agl<25?-6:-25):0;   /* (21/11) sobe 30, desce 25 m/s */HELI.vs+=(vsAlvo-HELI.vs)*Math.min(1,(vsAlvo>HELI.vs?2.2:3)*dt);
+  const vsAlvo=!pronto?0:ent.sobe>0.05?30*ent.sobe:ent.sobe<-0.05?(agl<25?-6:-25)*-ent.sobe:0;   /* (21/11) sobe 30, desce 25 m/s */HELI.vs+=(vsAlvo-HELI.vs)*Math.min(1,(vsAlvo>HELI.vs?2.2:3)*dt);
   const subindo=Math.max(0,HELI.vs)/30,k=1-Math.exp(-1.8*dt);HELI.vel.lerp(_v1.copy(_hD).multiplyScalar(HELI_VMAX*(1-0.4*subindo)),k);
   const vh0=Math.hypot(HELI.vel.x,HELI.vel.z),nx=EU.pos.x+HELI.vel.x*dt,nz=EU.pos.z+HELI.vel.z*dt;
   const chN=Math.max(0,relevo(nx,nz),vh0>1?relevo(nx+HELI.vel.x/vh0*10,nz+HELI.vel.z/vh0*10)-2:0)+2;   // chão sob o helicóptero e sob o disco do rotor à frente
@@ -242,10 +246,9 @@ function heliPasso(dt){if(!HELI.on||HELI.pausa)return;const agora=performance.no
   const sp=Math.hypot(HELI.vel.x,HELI.vel.z);EU.vel=sp;
   // nariz vira p/ onde está indo (ou p/ o alvo travado quando parado)
   const ot=TRAVA.id&&OUT.get(TRAVA.id);let yawAlvo=HELI.yaw;
-  if(sp>6)yawAlvo=Math.atan2(-HELI.vel.z,HELI.vel.x);else if(ot)yawAlvo=Math.atan2(-(ot.pos.z-EU.pos.z),ot.pos.x-EU.pos.x);
-  let dy=((yawAlvo-HELI.yaw+Math.PI*3)%(Math.PI*2))-Math.PI;HELI.yaw+=dy*Math.min(1,3*dt);
+  HELI.gv=(HELI.gv||0)+((pronto?ent.gira:0)*1.5-(HELI.gv||0))*Math.min(1,4*dt);const dy=-HELI.gv*dt;HELI.yaw+=dy;   /* gira no próprio eixo (~85°/s) */
   /* (19/11) câmera trava atrás do nariz quando anda p/ frente (W / joystick p/ cima); arrastar a tela solta por 2 s */
-  if(iy>0.2&&sp>10&&!_arr&&agora-(HCAM.tMan||0)>2000){const az=Math.PI-HELI.yaw,da=((az-HCAM.az+Math.PI*3)%(Math.PI*2))-Math.PI;HCAM.az+=da*Math.min(1,1.6*dt);heliCamAplica();}
+  if(!_arr&&agora-(HCAM.tMan||0)>2000){   /* câmera sempre volta p/ trás do nariz */const az=Math.PI-HELI.yaw,da=((az-HCAM.az+Math.PI*3)%(Math.PI*2))-Math.PI;HCAM.az+=da*Math.min(1,1.6*dt);heliCamAplica();}
   // inclina na direção do movimento (pitch p/ frente, roll na curva)
   const fwdV=HELI.vel.x*Math.cos(HELI.yaw)-HELI.vel.z*Math.sin(HELI.yaw);_hE.set(0,HELI.yaw,0);_hQ.setFromEuler(_hE);
   EU.q.copy(_hQ).multiply(_v4q.setFromEuler(_hE2.set(-dy*0.5,0,-fwdV/HELI_VMAX*0.28)));
@@ -364,7 +367,7 @@ function heliZonas(agora){let dentro=false;const pul=0.5+0.5*Math.sin(agora/180)
 let HELI_ZOOM=0.5;function heliZoom(f){HELI_ZOOM=Math.min(3,Math.max(0.16,HELI_ZOOM*f));}   /* (21/11) começa 2x mais perto e aproxima até ~25 m */
 addEventListener('wheel',e=>{if(SALA==='heli'&&HELI.on){heliZoom(e.deltaY>0?1.12:1/1.12);e.preventDefault();}},{passive:false});
 addEventListener('keydown',e=>{if(SALA!=='heli'||!HELI.on)return;if(e.code==='Equal'||e.code==='NumpadAdd')heliZoom(1/1.15);else if(e.code==='Minus'||e.code==='NumpadSubtract')heliZoom(1.15);});
-let _pinca=0;addEventListener('touchmove',e=>{if(SALA!=='heli'||!HELI.on||e.touches.length!==2){_pinca=0;return;}
+let _pinca=0;addEventListener('touchmove',e=>{if(SALA!=='heli'||!HELI.on||e.touches.length!==2||JOY.id!==null||JOY2.id!==null){_pinca=0;return;}
   const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);if(_pinca)heliZoom(_pinca/d);_pinca=d;},{passive:true});
 addEventListener('touchend',()=>{_pinca=0;});
 for(const[id,f]of[['#bZoomMais',1/1.25],['#bZoomMenos',1.25]]){const b=$(id);if(b)b.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();heliZoom(f);});}
@@ -373,7 +376,7 @@ const HCAM_MIN=0.26,HCAM0={az:Math.atan2(HELI_CAM.z,HELI_CAM.x),el:HCAM_MIN,R:HE
 function heliCamAplica(){const c=Math.cos(HCAM.el)*HCAM0.R;HELI_CAM.set(c*Math.cos(HCAM.az),Math.sin(HCAM.el)*HCAM0.R,c*Math.sin(HCAM.az));}
 function heliCamPadrao(){HCAM.az=HELI.on&&HELI.yaw!==undefined?Math.PI-HELI.yaw:HCAM0.az;HCAM.el=HCAM0.el;heliCamAplica();}
 let _arr=null;
-addEventListener('pointerdown',e=>{if(SALA!=='heli'||!HELI.on||HELI.pausa||e.target.closest('button,#zonaJoy,#heliMapa,#fimMis,#menu'))return;_arr={id:e.pointerId,x:e.clientX,y:e.clientY};});
+addEventListener('pointerdown',e=>{if(SALA!=='heli'||!HELI.on||HELI.pausa||e.target.closest('button,#zonaJoy,#zonaJoy2,.bt,#heliMapa,#fimMis,#menu')||e.pointerType==='touch')return;_arr={id:e.pointerId,x:e.clientX,y:e.clientY};});
 addEventListener('pointermove',e=>{if(!_arr||e.pointerId!==_arr.id||_pinca)return;const dx=e.clientX-_arr.x,dy=e.clientY-_arr.y;_arr.x=e.clientX;_arr.y=e.clientY;
   HCAM.tMan=performance.now();HCAM.az+=dx*0.006;HCAM.el=Math.min(1.45,Math.max(HCAM_MIN,HCAM.el+dy*0.005));heliCamAplica();});
 addEventListener('pointerup',e=>{if(_arr&&e.pointerId===_arr.id)_arr=null;});addEventListener('pointercancel',()=>{_arr=null;});
@@ -461,3 +464,10 @@ function heliMapaFecha(){$('#heliMapa').style.display='none';HELI.pausa=false;fo
 $('#hmOk').addEventListener('click',heliMapaFecha);
 $('#bMapa').addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();HELI.pausa?heliMapaFecha():heliMapaAbre(false);});
 addEventListener('keydown',e=>{if(SALA!=='heli'||!HELI.on||e.code!=='KeyM'||e.repeat)return;HELI.pausa?heliMapaFecha():heliMapaAbre(false);});
+
+/* (21/11) analógico DIREITO do heli (celular): frente/trás e girar — mesma ideia das setas */
+const JOY2={id:null,ox:0,oy:0,x:0,y:0};
+{const z=$('#zonaJoy2'),j=$('#joy2'),k=$('#joyK2'),RAIO=60;if(z){
+  z.addEventListener('pointerdown',e=>{if(JOY2.id!==null)return;JOY2.id=e.pointerId;JOY2.ox=e.clientX;JOY2.oy=e.clientY;JOY2.x=JOY2.y=0;j.style.left=e.clientX+'px';j.style.top=e.clientY+'px';j.style.display='block';k.style.transform='';z.setPointerCapture(e.pointerId);});
+  z.addEventListener('pointermove',e=>{if(e.pointerId!==JOY2.id)return;let dx=e.clientX-JOY2.ox,dy=e.clientY-JOY2.oy;const d=Math.hypot(dx,dy);if(d>RAIO){dx*=RAIO/d;dy*=RAIO/d;}JOY2.x=dx/RAIO;JOY2.y=dy/RAIO;k.style.transform=`translate(${dx}px,${dy}px)`;});
+  const solta=e=>{if(e.pointerId!==JOY2.id)return;JOY2.id=null;JOY2.x=JOY2.y=0;j.style.display='none';};z.addEventListener('pointerup',solta);z.addEventListener('pointercancel',solta);}}
