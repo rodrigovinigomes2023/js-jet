@@ -1,0 +1,580 @@
+<meta charset="utf-8">
+<title>Oficina 3D do js-jet</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: oficina/hangar — barra de abas no topo, palco 3D grande, ficha técnica ao lado (embaixo no celular) */
+:root{
+  --chao:#14171a; --painel:#1c2126; --linha:#2c343b; --texto:#e6e9e4; --apagado:#9aa39c;
+  --oliva:#8fa36a; --alerta:#f0b429; --antes:#c96f53; --depois:#6fb38a;
+  --f-titulo:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-texto:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-dado:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--chao);color:var(--texto);font-family:var(--f-texto);font-size:15px;line-height:1.5}
+.casca{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 28px;max-width:1280px;margin:0 auto;display:grid;gap:14px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px}
+h1{font-family:var(--f-titulo);font-weight:700;font-size:clamp(28px,4.4vw,40px);letter-spacing:.02em;margin:0;text-wrap:balance;text-transform:uppercase}
+h1 span{color:var(--oliva)}
+header p{margin:0;color:var(--apagado);max-width:62ch}
+.abas{display:flex;flex-wrap:wrap;gap:8px}
+.abas button,.modo button{font:600 14px/1 var(--f-texto);color:var(--texto);background:var(--painel);border:1px solid var(--linha);border-radius:6px;padding:10px 14px;cursor:pointer}
+.abas button[aria-pressed="true"]{background:var(--oliva);color:#121510;border-color:var(--oliva)}
+.abas button:focus-visible,.modo button:focus-visible{outline:2px solid var(--alerta);outline-offset:2px}
+.grade{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px}
+@media (max-width:880px){.grade{grid-template-columns:minmax(0,1fr)}}
+.palco{position:relative;min-width:0;background:#0d1012;border:1px solid var(--linha);border-radius:8px;overflow:hidden;aspect-ratio:16/10;max-width:100%}
+@media (max-width:600px){.palco{aspect-ratio:4/5}}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+.rotulo{position:absolute;top:10px;font:700 13px/1 var(--f-titulo);letter-spacing:.12em;text-transform:uppercase;padding:6px 9px;border-radius:4px;color:#101312;pointer-events:none}
+.rotulo.a{background:var(--antes)}.rotulo.d{background:var(--depois)}
+.modo{position:absolute;left:10px;bottom:10px;display:flex;gap:6px;flex-wrap:wrap}
+.modo button{padding:8px 11px;font-size:13px;background:rgba(20,23,26,.82)}
+.modo button[aria-pressed="true"]{background:var(--texto);color:#121510}
+.dica{position:absolute;right:10px;bottom:12px;font:12px var(--f-dado);color:var(--apagado);pointer-events:none}
+aside{background:var(--painel);border:1px solid var(--linha);border-radius:8px;padding:16px;display:grid;gap:12px;align-content:start;min-width:0}
+aside h2{font-family:var(--f-titulo);font-size:26px;margin:0;text-transform:uppercase;letter-spacing:.03em}
+aside p{margin:0;color:var(--apagado)}
+dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-family:var(--f-dado);font-size:13px}
+dt{color:var(--apagado)}dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+ul{margin:0;padding-left:18px;display:grid;gap:4px}
+.etq{font:600 11px/1 var(--f-texto);letter-spacing:.14em;text-transform:uppercase;color:var(--oliva)}
+footer{color:var(--apagado);font-size:12px}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+
+<div class="casca">
+  <header>
+    <h1>Oficina 3D <span>· lote 3</span></h1>
+    <p>Árvores, navios, lancha e caixas do gancho: o modelo de hoje ao lado da proposta nova, em tamanho real e com texturas de verdade. Arraste pra girar, pinça ou rodinha pra aproximar.</p>
+  </header>
+  <nav class="abas" id="abas" aria-label="Objeto"></nav>
+  <div class="grade">
+    <div class="palco" id="palco">
+      <canvas id="tela"></canvas>
+      <span class="rotulo a" id="rA">Hoje</span>
+      <span class="rotulo d" id="rD">Proposta</span>
+      <div class="modo" id="modo" aria-label="Comparação">
+        <button id="mLado" aria-pressed="true">Lado a lado</button>
+        <button id="mAntes" aria-pressed="false">Só hoje</button>
+        <button id="mDepois" aria-pressed="false">Só proposta</button>
+        <button id="mGira" aria-pressed="true">Girar sozinho</button>
+      </div>
+      <span class="dica">👤 = pessoa de 1,80 m</span>
+    </div>
+    <aside>
+      <div class="etq">Ficha</div>
+      <h2 id="fNome">—</h2>
+      <p id="fTexto"></p>
+      <dl id="fDados"></dl>
+      <div class="etq">O que mudou</div>
+      <ul id="fLista"></ul>
+    </aside>
+  </div>
+  <footer>Texturas CC0 de ambientCG.com (concreto, metal pintado, metal, casca de árvore, reboco). No celular entra uma versão mais leve: árvores com menos folhagem, navios sem balaustrada e caixas sem eslinga.</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const V3=THREE.Vector3,PI=Math.PI;
+// ---------- utilidades do jogo (modelo de HOJE, copiado do js-jet) ----------
+const mats={},geos={};
+function M(cor,r=0.8){return mats[cor+'/'+r]||(mats[cor+'/'+r]=new THREE.MeshStandardMaterial({color:new THREE.Color(cor).convertSRGBToLinear(),roughness:r}));}
+function G(k,f){return geos[k]||(geos[k]=f());}
+function box(w,h,d,mat,x,y,z,pai){const m=new THREE.Mesh(G('b'+w+','+h+','+d,()=>new THREE.BoxGeometry(w,h,d)),mat);m.position.set(x,y,z);m.castShadow=m.receiveShadow=true;pai.add(m);return m;}
+function esf(r,mat,x,y,z,pai,sx=1,sy=1,sz=1){const m=new THREE.Mesh(G('s'+r,()=>new THREE.SphereGeometry(r,14,10)),mat);m.position.set(x,y,z);m.scale.set(sx,sy,sz);m.castShadow=true;pai.add(m);return m;}
+function cil(rt,rb,h,mat,x,y,z,pai,seg=10){const m=new THREE.Mesh(G('c'+rt+','+rb+','+h+','+seg,()=>new THREE.CylinderGeometry(rt,rb,h,seg)),mat);m.position.set(x,y,z);m.castShadow=m.receiveShadow=true;pai.add(m);return m;}
+function dupla(m){const n=m.clone();n.side=THREE.DoubleSide;return n;}
+const GIR=[];function gira(o,v){GIR.push([o,v]);}
+
+function radarA(cor){const g=new THREE.Group(),con=M('#9aa0a4',0.9),bra=M('#eef1f3',0.35),esc_=M('#4f565c',0.8),fx=M(cor,0.6);
+  box(34,1,34,M('#6f7a62',0.95),0,0.5,0,g);cil(5,6,22,con,0,12,0,g,8);cil(6.6,6.6,1.2,esc_,0,23.5,0,g,16);
+  esf(9,bra,0,31,0,g);box(10,5,7,M('#c9cdc8',0.8),-11,3.5,-10,g);box(10.4,0.6,7.4,fx,-11,6.2,-10,g);
+  for(let i=0;i<16;i++){const a=i/16*PI*2;box(0.4,3,0.4,esc_,Math.cos(a)*16,2,Math.sin(a)*16,g);}
+  esf(0.8,M('#ff3b30',0.3),0,40.4,0,g);return g;}
+function radarB(cor){const g=new THREE.Group(),con=M('#8f969b',0.85),esc_=M('#3f464c',0.7),fx=M(cor,0.6),pai=M('#d6dadc',0.5);
+  box(30,1,30,M('#6f7a62',0.95),0,0.5,0,g);box(12,6,9,M('#c2c6c0',0.8),-8,4,6,g);box(12.4,0.7,9.4,fx,-8,7.3,6,g);box(5,3.5,4,esc_,9,2.8,-8,g);
+  cil(2.5,3.6,12,con,0,7,0,g,8);const cab=new THREE.Group();cab.position.set(0,14,0);g.add(cab);box(4,3,4,esc_,0,0,0,cab);
+  const ant=new THREE.Group();ant.position.set(1.5,6,0);ant.rotation.z=-0.25;cab.add(ant);
+  for(let i=0;i<=6;i++)box(0.4,0.4,22,pai,0,-4.5+i*1.5,0,ant);for(let k=0;k<=8;k++)box(0.4,9.4,0.4,pai,0,0,-11+k*2.75,ant);
+  box(0.3,9,21.6,M('#9ea6ab',0.6),-0.4,0,0,ant);gira(cab,0.025);return g;}
+function radarC(cor){const g=new THREE.Group(),con=M('#8a9196',0.85),esc_=M('#4a5157',0.75),oli=M('#5d6b4a',0.8),are=M('#b9a77e',0.95),bra=M('#e2e6e8',0.4),fx=M(cor,0.6);
+  box(40,1,40,M('#7a7a5e',0.95),0,0.5,0,g);
+  for(let i=0;i<22;i++){const a=i/22*PI*2;box(3.4,1.6,1.8,are,Math.cos(a)*17,1.8,Math.sin(a)*17,g).rotation.y=-a;}
+  box(8,4,6,oli,0,3,0,g);cil(1.2,1.6,8,esc_,0,9,0,g,8);const pr=new THREE.Group();pr.position.set(0,14,0);g.add(pr);
+  const d=new THREE.Mesh(new THREE.SphereGeometry(7,18,8,0,PI*2,0,PI/3),dupla(bra));d.rotation.x=-2.0;pr.add(d);cil(0.3,0.3,5,esc_,0,0,2.5,pr,6).rotation.x=PI/2;
+  esf(0.9,fx,0,1.5,5.4,pr);gira(pr,0.03);
+  for(const [x,z] of[[-10,-8],[10,-8]]){const l=new THREE.Group();l.position.set(x,1,z);l.rotation.y=Math.atan2(x,z);g.add(l);box(6,2,6,oli,0,1,0,l);
+    const tr=new THREE.Group();tr.position.y=2.5;tr.rotation.x=-0.75;l.add(tr);box(5,0.8,9,oli,0,0,0,tr);
+    for(const k of[-1.4,1.4]){cil(0.6,0.6,8,bra,k,1,0.5,tr,8).rotation.x=PI/2;const p=new THREE.Mesh(new THREE.ConeGeometry(0.6,1.6,8),fx);p.rotation.x=PI/2;p.position.set(k,1,5.3);tr.add(p);}}
+  box(6,3,5,oli,9,2.5,9,g);box(6.2,0.5,5.2,fx,9,4.2,9,g);return g;}
+function heliAA(){const g=new THREE.Group(),o=M('#5d6b4a',0.8),e=M('#2f363c',0.6);cil(2.2,2.6,1.6,o,0,0.8,0,g,10);const t=new THREE.Group();t.position.y=2;g.add(t);
+  box(2.2,1.4,2.4,o,0,0.4,0,t);for(const z of[-0.5,0.5]){const c=cil(0.15,0.15,3.6,e,1.6,1,z,t,6);c.rotation.z=PI/2-0.5;}return g;}
+
+// ---------- PROPOSTA: materiais PBR com UV em metros ----------
+const TL=new THREE.TextureLoader(),TX={};
+function tex(nome,tile){const k=nome+'@'+tile;if(TX[k])return TX[k];
+  const mk=(s,srgb)=>{const t=TL.load('tex/'+nome+'_'+s+'.jpg');t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(1/tile,1/tile);t.anisotropy=8;if(srgb)t.encoding=THREE.sRGBEncoding;return t;};
+  return TX[k]={map:mk('c',true),normalMap:mk('n'),roughnessMap:mk('r')};}
+const PM={};
+function P(nome,cor,o={}){const k=nome+cor+JSON.stringify(o);if(PM[k])return PM[k];const t=tex(nome,o.tile||2);
+  return PM[k]=new THREE.MeshStandardMaterial({color:new THREE.Color(cor).convertSRGBToLinear(),...t,roughness:o.r??1,metalness:o.m??0,normalScale:new THREE.Vector2(o.ns??1,o.ns??1),side:o.dupla?THREE.DoubleSide:THREE.FrontSide});}
+function S(cor,r=0.6,m=0){return new THREE.MeshStandardMaterial({color:new THREE.Color(cor).convertSRGBToLinear(),roughness:r,metalness:m});}
+const VIDRO=new THREE.MeshStandardMaterial({color:0x0e1a22,roughness:0.08,metalness:0.7});
+const BORRACHA=S('#1a1b1c',0.92),ACO=()=>P('metal','#8d949a',{tile:1,r:0.55,m:0.6});
+function sombra(m){m.castShadow=m.receiveShadow=true;return m;}
+function bx(w,h,d,mat,x,y,z,pai){const g=new THREE.BoxGeometry(w,h,d),uv=g.attributes.uv,D=[[d,h],[d,h],[w,d],[w,d],[w,h],[w,h]];
+  for(let f=0;f<6;f++)for(let i=0;i<4;i++){const k=f*4+i;uv.setXY(k,uv.getX(k)*D[f][0],uv.getY(k)*D[f][1]);}
+  const m=sombra(new THREE.Mesh(g,mat));m.position.set(x,y,z);pai.add(m);return m;}
+function cl(rt,rb,h,mat,x,y,z,pai,seg=20,aberto=false){const g=new THREE.CylinderGeometry(rt,rb,h,seg,1,aberto),uv=g.attributes.uv,C=2*PI*Math.max(rt,rb);
+  for(let k=0;k<uv.count;k++)uv.setXY(k,uv.getX(k)*C,uv.getY(k)*h);const m=sombra(new THREE.Mesh(g,mat));m.position.set(x,y,z);pai.add(m);return m;}
+function haste(a,b,r,mat,pai,seg=8){const d=new V3().subVectors(b,a),L=d.length(),m=cl(r,r,L,mat,0,0,0,pai,seg);m.position.copy(a).addScaledVector(d,0.5);m.quaternion.setFromUnitVectors(new V3(0,1,0),d.normalize());return m;}
+function roda(r,lg,pai,x,y,z){const g=new THREE.Group();g.position.set(x,y,z);pai.add(g);const p=cl(r,r,lg,BORRACHA,0,0,0,g,18);p.rotation.x=PI/2;
+  const a=cl(r*0.55,r*0.55,lg+0.04,S('#4c5446',0.6,0.3),0,0,0,g,12);a.rotation.x=PI/2;for(let i=0;i<8;i++){const t=bx(0.06,0.08,lg+0.02,BORRACHA,Math.cos(i/8*PI*2)*r,Math.sin(i/8*PI*2)*r,0,g);t.rotation.z=i/8*PI*2;}return g;}
+function canvasTex(w,h,f,srgb=true){const c=document.createElement('canvas');c.width=w;c.height=h;f(c.getContext('2d'),w,h);const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=8;if(srgb)t.encoding=THREE.sRGBEncoding;return t;}
+function rnd(s){return()=>(s=(s*16807)%2147483647)/2147483647;}
+
+// sacos de areia instanciados num anel/arco
+function sacos(pai,R,a0,a1,camadas,cor='#a8956a'){const geo=new THREE.SphereGeometry(1,10,6);const mat=P('reboco',cor,{tile:0.7,r:1,ns:1.6});
+  const L=Math.abs(a1-a0)*R,n=Math.max(3,Math.floor(L/0.62)),inst=new THREE.InstancedMesh(geo,mat,n*camadas),m4=new THREE.Matrix4(),q=new THREE.Quaternion(),r=rnd(7+Math.round(R*13));let i=0;
+  for(let c=0;c<camadas;c++)for(let k=0;k<n;k++){const a=a0+(a1-a0)*(k+(c%2)*0.5)/n,rr=R-c*0.06;q.setFromAxisAngle(new V3(0,1,0),-a+(r()-0.5)*0.12);
+    m4.compose(new V3(Math.cos(a)*rr,0.13+c*0.25,Math.sin(a)*rr),q,new V3(0.24,0.13,0.34+r()*0.03));inst.setMatrixAt(i++,m4);}
+  inst.castShadow=inst.receiveShadow=true;pai.add(inst);return inst;}
+// rede de camuflagem: malha caída com folhas recortadas
+const TEX_REDE=canvasTex(512,512,(g,w,h)=>{const r=rnd(99);g.clearRect(0,0,w,h);for(let i=0;i<2600;i++){const x=r()*w,y=r()*h,s=6+r()*16;g.fillStyle=['#3f4a2c','#56603a','#2f3825','#6b6a45'][i%4];g.beginPath();g.ellipse(x,y,s,s*0.45,r()*PI,0,PI*2);g.fill();}},true);
+function rede(pai,w,d,altura,x,z){const geo=new THREE.PlaneGeometry(w,d,24,18);const p=geo.attributes.position;
+  for(let i=0;i<p.count;i++){const u=p.getX(i)/w*2,v=p.getY(i)/d*2;p.setZ(i,-(1-Math.min(1,Math.max(Math.abs(u),Math.abs(v))))*0+(Math.cos(u*PI*1.5)*Math.cos(v*PI*1.5))*0.35-Math.max(Math.abs(u),Math.abs(v))**2.2*(altura-0.04));}   /* bordas encostam no chão (antes ficavam a 0,5 m) */
+  geo.computeVertexNormals();const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({map:TEX_REDE,alphaTest:0.4,side:THREE.DoubleSide,roughness:1}));m.rotation.x=-PI/2;m.position.set(x,altura,z);m.castShadow=true;pai.add(m);
+  for(const [sx,sz] of[[-0.3,-0.25],[0.3,0.25]])haste(new V3(x+sx*w,0,z+sz*d),new V3(x+sx*w,altura-0.1,z+sz*d),0.05,S('#5b4a33',0.9),pai);return m;}
+// cerca de alambrado
+const TEX_ALAMBRADO=canvasTex(128,128,(g,w,h)=>{g.clearRect(0,0,w,h);g.strokeStyle='#fff';g.lineWidth=5;for(let k=-w;k<w*2;k+=32){g.beginPath();g.moveTo(k,0);g.lineTo(k+h,h);g.stroke();g.beginPath();g.moveTo(k+h,0);g.lineTo(k,h);g.stroke();}},false);
+function cerca(pai,lado,alt=2.4){const mat=new THREE.MeshStandardMaterial({color:0x9aa1a6,alphaMap:TEX_ALAMBRADO,transparent:false,alphaTest:0.5,side:THREE.DoubleSide,metalness:0.6,roughness:0.5});
+  const poste=S('#7d858b',0.5,0.6);for(let s=0;s<4;s++){const a=s*PI/2,geo=new THREE.PlaneGeometry(lado,alt);geo.attributes.uv.array.forEach((v,i,arr)=>{arr[i]=i%2?v*alt/0.5:v*lado/0.5;});
+    const m=new THREE.Mesh(geo,mat);m.position.set(Math.cos(a)*lado/2,alt/2,Math.sin(a)*lado/2);m.rotation.y=-a+PI/2;pai.add(m);
+    for(let k=0;k<=Math.round(lado/3);k++){const t=-lado/2+k*lado/Math.round(lado/3);const px=Math.cos(a)*lado/2-Math.sin(a)*t,pz=Math.sin(a)*lado/2+Math.cos(a)*t;cl(0.05,0.05,alt+0.3,poste,px,(alt+0.3)/2,pz,pai,6);}}}
+// pessoa de 1,80 m p/ escala
+function pessoa(pai,x,z,ry=0){const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=ry;pai.add(g);const f=S('#4a5638',0.9),b=S('#20231e',0.9),p=S('#c99470',0.7);
+  for(const s of[-0.11,0.11])cl(0.075,0.07,0.86,f,0,0.43,s,g,8);bx(0.26,0.6,0.42,f,0,1.17,0,g);for(const s of[-0.27,0.27])cl(0.055,0.05,0.62,f,0,1.15,s,g,8);
+  const c=new THREE.Mesh(new THREE.SphereGeometry(0.11,12,8),p);c.position.y=1.6;g.add(c);const cap=new THREE.Mesh(new THREE.SphereGeometry(0.135,12,8,0,PI*2,0,PI/2),f);cap.position.y=1.63;g.add(cap);
+  bx(0.2,0.08,0.3,b,0.03,0.04,-0.11,g);bx(0.2,0.08,0.3,b,0.03,0.04,0.11,g);return g;}
+
+// ---------- caminhão 8x8 genérico (frente = +x) ----------
+function caminhao(pai,cor,L=11){const g=new THREE.Group();pai.add(g);const pin=P('metalpint',cor,{tile:1.5,r:0.75,ns:0.6}),esc=P('metalpint','#2c3226',{tile:1.5,r:0.8});
+  bx(L,0.5,1.1,esc,0,1.15,0,g);   // longarinas
+  const cab=new THREE.Group();cab.position.set(L/2-1.3,0,0);g.add(cab);bx(2.4,1.7,2.55,pin,0,2.35,0,cab);bx(1.6,0.7,2.55,pin,0.4,1.25,0,cab);
+  const pb=new THREE.Mesh(new THREE.PlaneGeometry(2.3,0.9),VIDRO);pb.position.set(1.21,2.7,0);pb.rotation.y=PI/2;pb.rotation.x=0;pb.rotateX(-0.18);cab.add(pb);
+  for(const s of[-1,1]){const j=new THREE.Mesh(new THREE.PlaneGeometry(1.0,0.7),VIDRO);j.position.set(0.5,2.75,s*1.28);j.rotation.y=s>0?0:PI;cab.add(j);bx(0.08,0.35,0.25,S('#111',0.4),1.25,2.55,s*1.42,cab);}
+  bx(0.3,0.25,2.4,S('#191919',0.6),1.22,1.35,0,cab);   // para-choque
+  for(const s of[-1,1]){bx(0.05,0.18,0.3,S('#f4f1d0',0.2,0.1),1.25,1.62,s*0.95,cab);}
+  const xs=[L/2-1.6,L/2-3.2,-L/2+3.2,-L/2+1.6];for(const x of xs)for(const s of[-1,1]){roda(0.62,0.48,g,x,0.62,s*1.05);bx(1.5,0.12,0.6,esc,x,1.32,s*1.05,g);}
+  for(const s of[-1,1]){cl(0.32,0.32,1.4,ACO(),L/2-4.2,1.0,s*1.0,g,14).rotation.z=PI/2;bx(1.2,0.6,0.5,esc,0.5,1.0,s*1.05,g);}   // tanques e caixas de ferramenta
+  return g;}
+function lancadorTEL(pai,cor,fx,x,z,ry){const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=ry;pai.add(g);caminhao(g,cor);
+  const pin=P('metalpint',cor,{tile:1.5,r:0.75,ns:0.6}),fxm=S(fx,0.55);
+  for(const [px,pz] of[[3.3,1.5],[3.3,-1.5],[-4.6,1.5],[-4.6,-1.5]]){haste(new V3(px,1.2,pz*0.7),new V3(px,0.15,pz),0.09,ACO(),g);cl(0.3,0.34,0.12,S('#2a2e2a',0.8),px,0.06,pz,g,12);}   // sapatas
+  const qua=new THREE.Group();qua.position.set(-5.2,1.8,0);qua.rotation.z=1.05;g.add(qua);   // quadro elevado ~60°
+  bx(8.6,0.35,2.4,pin,4.3,-0.25,0,qua);
+  for(const [cy,cz] of[[0.55,-0.6],[0.55,0.6],[1.55,-0.6],[1.55,0.6]]){const c=cl(0.46,0.46,8.2,pin,4.2,cy,cz,qua,24);c.rotation.z=PI/2;
+    for(let k=0;k<5;k++){const a=new THREE.Mesh(new THREE.TorusGeometry(0.47,0.045,6,24),pin);a.position.set(0.5+k*1.85,cy,cz);a.rotation.y=PI/2;sombra(a);qua.add(a);}
+    const tp=cl(0.47,0.47,0.1,S('#d9d6c8',0.6),8.35,cy,cz,qua,24);tp.rotation.z=PI/2;const fa=cl(0.475,0.475,0.35,fxm,7.6,cy,cz,qua,24);fa.rotation.z=PI/2;}
+  // pistões hidráulicos
+  for(const s of[-0.9,0.9])haste(new V3(-1.2,1.4,s),new V3(-5.2+Math.cos(1.05)*4,1.8+Math.sin(1.05)*4,s),0.14,S('#c9ccc4',0.25,0.8),g);
+  return g;}
+// radar de arranjo em fase num reboque
+const TEX_FASE=canvasTex(256,256,(g,w,h)=>{g.fillStyle='#d8dbd4';g.fillRect(0,0,w,h);g.fillStyle='#b9bdb4';for(let y=0;y<h;y+=16)for(let x=(y/16%2)*8;x<w;x+=16){g.fillRect(x+3,y+3,10,10);}g.strokeStyle='#8f948b';g.lineWidth=2;g.strokeRect(1,1,w-2,h-2);});
+function radarFase(pai,cor,x,z){const g=new THREE.Group();g.position.set(x,0,z);pai.add(g);const pin=P('metalpint',cor,{tile:1.5,r:0.75,ns:0.6});
+  bx(7,0.5,2.3,P('metalpint','#2c3226',{tile:1.5}),0,1.0,0,g);for(const px of[-1.6,-0.4])for(const s of[-1,1])roda(0.55,0.42,g,px,0.55,s*1.0);
+  haste(new V3(3.5,1,0),new V3(5,0.6,0),0.08,ACO(),g);for(const [px,pz] of[[3,1.3],[3,-1.3],[-3.2,1.3],[-3.2,-1.3]])haste(new V3(px,1.0,pz*0.8),new V3(px,0.1,pz),0.08,ACO(),g);
+  const tor=new THREE.Group();tor.position.set(0.5,1.25,0);g.add(tor);cl(0.9,1.0,0.6,pin,0,0.3,0,tor,24);
+  bx(1.3,2.2,1.6,pin,-0.2,1.7,0,tor);const eixo=cl(0.22,0.22,2.0,ACO(),0,2.8,0,tor,16);eixo.rotation.x=PI/2;   // coluna + eixo de inclinação
+  const pan=new THREE.Group();pan.position.set(0.25,2.8,0);pan.rotation.z=0.35;   /* face p/ cima e p/ fora (antes estava virada p/ o chão) */
+  tor.add(pan);bx(0.6,4.2,4.6,pin,-0.3,0,0,pan);
+  const face=new THREE.Mesh(new THREE.PlaneGeometry(4.4,4.0),new THREE.MeshStandardMaterial({map:TEX_FASE,roughness:0.5,metalness:0.2}));face.position.x=0.01;face.rotation.y=PI/2;pan.add(face);
+  bx(0.9,1.4,1.4,pin,-0.95,0.4,0,pan);   // caixa de eletrônica atrás do painel
+  for(const z of[-0.8,0.8])haste(new V3(-0.6,0.6,z),new V3(-0.75,1.6,z),0.09,S('#c9ccc4',0.25,0.8),tor);   // pistões de inclinação
+  gira(tor,0.012);return g;}
+function abrigo(pai,cor,fx,x,z,ry,L=6){const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=ry;pai.add(g);const pin=P('metalpint',cor,{tile:1.5,r:0.75,ns:0.6}),esc=S('#25292a',0.7);
+  bx(L,2.6,2.5,pin,0,1.55,0,g);for(const px of[-L/2+0.6,L/2-0.6])for(const pz of[-1,1])bx(0.3,0.25,0.3,esc,px,0.12,pz,g);
+  bx(0.9,1.9,0.05,S('#3d4436',0.7),-0.8,1.3,1.27,g);bx(0.06,0.06,0.06,S('#ccc',0.3,0.8),-0.45,1.3,1.31,g);   // porta
+  for(const k of[0.7,2.0])bx(0.9,0.6,0.45,S('#b8bcb3',0.6,0.2),k,2.2,1.5,g);   // ar-condicionado
+  bx(L*0.9,0.06,0.3,S(fx,0.55),0,2.83,1.1,g);
+  const m=new V3(-L/2+0.6,2.85,-0.6);haste(m,new V3(m.x,12,m.z),0.07,ACO(),g);for(let i=0;i<3;i++){const a=i/3*PI*2+0.3;haste(new V3(m.x,11.5,m.z),new V3(m.x+Math.cos(a)*5,0,m.z+Math.sin(a)*5),0.012,S('#999',0.4,0.6),g);}
+  bx(0.9,0.06,0.06,ACO(),m.x,11.8,m.z,g);bx(0.06,0.06,0.9,ACO(),m.x,11.6,m.z,g);
+  return g;}
+function gerador(pai,cor,x,z,ry){const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=ry;pai.add(g);const pin=P('metalpint',cor,{tile:1.5,r:0.75,ns:0.6});
+  bx(3.2,1.6,1.8,pin,0,1.4,0,g);for(const s of[-1,1])roda(0.45,0.3,g,-0.3,0.45,s*0.95);haste(new V3(1.6,0.8,0),new V3(2.8,0.4,0),0.06,ACO(),g);
+  for(let k=0;k<6;k++)bx(0.04,0.9,0.12,S('#2b2f2a',0.7),-1.0+k*0.35,1.45,0.91,g);cl(0.09,0.09,0.8,S('#2b2b2b',0.5,0.5),1.2,2.5,0.4,g,8);return g;}
+// berma de terra em ferradura
+function berma(pai,R,ab,x,z,ry){const geo=new THREE.TorusGeometry(R,1.6,8,40,PI*2-ab);const m=sombra(new THREE.Mesh(geo,P('reboco','#7b6a4a',{tile:3,r:1,ns:2.5})));
+  m.rotation.x=-PI/2;m.rotation.z=ry+ab/2;m.scale.set(1,1,0.55);m.position.set(x,0,z);pai.add(m);
+  for(const a of[0,PI*2-ab]){const c=sombra(new THREE.Mesh(new THREE.SphereGeometry(1.6,16,10),m.material));c.position.set(Math.cos(a)*R,Math.sin(a)*R,0);m.add(c);}   // pontas arredondadas (antes abertas)
+  return m;}
+
+// ===================== LOTE 2 · BASE AÉREA =====================
+// ---------- HOJE (copiado do js-jet: jogo.js, montagem das bases) ----------
+function cvs(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;return c;}
+function texH(c){const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;t.anisotropy=4;return t;}
+const PISTA=1300;
+function texPistaC(fundo=true,ger=77){const L=4096,H=128,c=cvs(L,H),g=c.getContext('2d'),r=rnd(ger),pm=L/PISTA,py=H/46;
+  if(fundo){g.fillStyle='#3e4146';g.fillRect(0,0,L,H);
+    for(let i=0;i<9000;i++){const v=50+r()*40|0;g.fillStyle=`rgba(${v},${v},${v+4},.5)`;g.fillRect(r()*L,r()*H,2+r()*6,1+r()*2);}
+    g.fillStyle='rgba(20,20,22,.35)';g.fillRect(0,H*0.38,L,H*0.24);}
+  for(const e of[-1,1])for(let i=0;i<70;i++){const x=L/2+e*(L/2-(140+r()*260)*pm),y=H/2+(r()-0.5)*H*0.35;g.fillStyle='rgba(15,15,15,.28)';g.fillRect(x,y,(20+r()*60)*pm*e,2+r()*2);}
+  const W=fundo?'#f2f2f2':'rgba(238,238,232,.92)';g.fillStyle=W;for(const y of[1.5,44.5-0.9])g.fillRect(0,y*py,L,0.9*py);
+  for(let x=-560;x<=540;x+=50)g.fillRect((x+650)*pm,(23-0.5)*py,22*pm,1*py);
+  for(const e of[-1,1]){const x0=e<0?6*pm:L-36*pm;for(let k=0;k<12;k++)g.fillRect(x0,(4+k*3.3)*py,30*pm,1.8*py);
+    const xa=e<0?300*pm:L-345*pm;for(const y of[8,33])g.fillRect(xa,y*py,45*pm,4.5*py);
+    for(let k=0;k<3;k++){const xt=e<0?(150+k*60)*pm:L-(150+k*60+22)*pm;for(const y of[10,31])g.fillRect(xt,y*py,22*pm,1.6*py);}
+    g.save();g.translate(e<0?52*pm:L-52*pm,H/2);g.rotate(e<0?PI/2:-PI/2);g.font=`bold ${Math.round(12*pm)}px sans-serif`;g.textAlign='center';g.textBaseline='middle';g.scale(1,py/pm*1.6);g.fillText(e<0?'09':'27',0,0);g.restore();}
+  if(!fundo){g.globalCompositeOperation='destination-out';for(let i=0;i<26000;i++){g.fillStyle=`rgba(0,0,0,${0.25+r()*0.6})`;g.fillRect(r()*L,r()*H,1+r()*3,1+r()*2);}}   // tinta gasta
+  return c;}
+function texConcretoC(){const S=512,c=cvs(S,S),g=c.getContext('2d'),r=rnd(31);g.fillStyle='#8e8f8a';g.fillRect(0,0,S,S);
+  for(let i=0;i<4;i++)for(let j=0;j<4;j++){const v=128+r()*10|0;g.fillStyle=`rgb(${v},${v},${v-4})`;g.fillRect(i*128+1,j*128+1,126,126);}
+  for(let i=0;i<5000;i++){const v=120+r()*70|0;g.fillStyle=`rgba(${v},${v},${v},.35)`;g.fillRect(r()*S,r()*S,1+r()*3,1+r()*3);}
+  g.strokeStyle='rgba(60,60,60,.7)';g.lineWidth=2;for(let i=0;i<=4;i++){g.beginPath();g.moveTo(i*128,0);g.lineTo(i*128,S);g.moveTo(0,i*128);g.lineTo(S,i*128);g.stroke();}return c;}
+function texListras2(){const c=cvs(64,16),g=c.getContext('2d');for(let i=0;i<5;i++){g.fillStyle=i%2?'#f4f4f4':'#ff5a14';g.fillRect(i*13,0,13,16);}return c;}
+let _tC=null;const tCon=()=>{if(!_tC){_tC=texH(texConcretoC());_tC.wrapS=_tC.wrapT=THREE.RepeatWrapping;}return _tC;};
+function mHasA(){return new THREE.MeshStandardMaterial({map:tCon(),color:0xc8c4b8,roughness:0.95,side:THREE.DoubleSide});}
+function mConcA(){return new THREE.MeshStandardMaterial({map:tCon(),color:0xd8d8d8,roughness:0.9});}
+const mVi=M('#9fd4ff',0.2),mTe=M('#5a6066',0.7),mPo=M('#cfcfcf',0.5),mPred=M('#cfc6b4',0.85),mTanq=M('#e6e6e2',0.5),mAmar=M('#e8b818',0.7),mPorta=M('#3d4247',0.6);
+function chaoA(g,w,d,mat){const p=new THREE.Mesh(new THREE.PlaneGeometry(w,d),mat||M('#8e8f8a',0.95));p.rotation.x=-PI/2;p.position.y=0.03;p.receiveShadow=true;g.add(p);}
+function torreA(cor){const g=new THREE.Group();chaoA(g,60,50);cil(3.2,4.2,26,mConcA(),0,13,0,g,12);cil(7,5,6,mVi,0,29,0,g,10);cil(7.6,7.6,0.9,mTe,0,32.4,0,g,10);
+  cil(0.15,0.15,8,mPo,0,36.5,0,g,6);box(12,8,20,mPred,22,4,-6,g);cil(0.35,0.35,24,mPo,-14,12,20,g);const band=new THREE.Mesh(new THREE.PlaneGeometry(9,5.5),new THREE.MeshStandardMaterial({color:new THREE.Color(cor).convertSRGBToLinear(),side:THREE.DoubleSide}));band.position.set(-9.5,21,20);g.add(band);return g;}
+function hasA(){const g=new THREE.Group();chaoA(g,60,90);const h=new THREE.Mesh((()=>{const q=new THREE.CylinderGeometry(15,15,44,18,1,false,-PI/2,PI);q.rotateX(-PI/2);return q;})(),mHasA());h.castShadow=true;g.add(h);
+  const pt=new THREE.Mesh(new THREE.CircleGeometry(15,18,0,PI),mPorta);pt.position.set(0,0.05,-22.2);pt.rotation.y=PI;g.add(pt);box(1.2,0.3,45,mAmar,0,0.32,-57,g);return g;}
+function tanquesA(){const g=new THREE.Group();chaoA(g,70,60);for(const [x,z] of[[-9,-11.5],[9,11.5]]){cil(8,8,9,mTanq,x,4.5,z,g,16);cil(8.2,8.2,0.4,mTe,x,9.1,z,g,16);}return g;}
+function prediosA(){const g=new THREE.Group();chaoA(g,90,70);for(const [x,z,w,d,hh] of [[-20,-12,30,16,7],[22,10,22,22,9],[-18,20,40,14,6]]){box(w,hh,d,mPred,x,hh/2,z,g);box(w+1,0.6,d+1,mTe,x,hh+0.3,z,g);}return g;}
+function pistaA(){const g=new THREE.Group();chaoA(g,260,200,M('#5b7a3a',1));const t=texH(texPistaC());const p=new THREE.Mesh(new THREE.PlaneGeometry(PISTA,46),new THREE.MeshStandardMaterial({map:t,roughness:0.9}));p.rotation.x=-PI/2;p.position.set(-PISTA/2+60,0.3,0);p.receiveShadow=true;g.add(p);
+  cil(0.12,0.12,7,mPo,30,3.5,-60,g,6);const bi=new THREE.Mesh(new THREE.ConeGeometry(0.9,5,10,1,true),new THREE.MeshStandardMaterial({map:texH(texListras2()),side:THREE.DoubleSide}));bi.rotation.z=-PI/2;bi.position.set(32.5,6.6,-60);g.add(bi);
+  for(let x=-120;x<=60;x+=60)for(const sz of[-24,24])box(0.9,0.7,0.9,new THREE.MeshBasicMaterial({color:0xfff2c0}),x,0.5,sz,g);for(let k=-4;k<=4;k++)box(0.9,0.7,0.9,new THREE.MeshBasicMaterial({color:0x30ff60}),55,0.5,k*5,g);return g;}
+
+// ---------- PROPOSTA ----------
+const CONC=(cor='#bdbab2',tile=3)=>P('concreto',cor,{tile,r:0.95,ns:1.3}),REB=(cor='#ddd6c6')=>P('reboco',cor,{tile:2,r:0.95}),ZIN=(cor='#c3c8c9')=>P('zinco',cor,{tile:1.2,r:0.5,m:0.15});
+const BRANCO_PINT=()=>S('#ecebe4',0.42,0.08),AMARELO=S('#e2b21c',0.55,0.2),EMIS=(c,i=2)=>new THREE.MeshStandardMaterial({color:c,emissive:c,emissiveIntensity:i});
+function piso(g,w,d,mat,y=0.05){const geo=new THREE.PlaneGeometry(w,d),uv=geo.attributes.uv;for(let k=0;k<uv.count;k++)uv.setXY(k,uv.getX(k)*w,uv.getY(k)*d);const p=new THREE.Mesh(geo,mat);p.rotation.x=-PI/2;p.position.y=y;p.receiveShadow=true;g.add(p);return p;}
+function guarda(pai,pts,h=1.1,mat=AMARELO,passo=1.2){for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1],L=a.distanceTo(b),n=Math.max(1,Math.round(L/passo));
+  for(let k=0;k<n;k++){const p=new V3().lerpVectors(a,b,k/n);haste(p,p.clone().setY(p.y+h),0.025,mat,pai,5);}for(const y of[h,h*0.5])haste(a.clone().setY(a.y+y),b.clone().setY(b.y+y),0.025,mat,pai,5);}}
+function janelas(pai,mat,x0,x1,y,z,nx,w=1.4,h=1.3,face=1){const fr=S('#e9e6dd',0.6);for(let k=0;k<nx;k++){const x=x0+(x1-x0)*(k+0.5)/nx;bx(w,h,0.06,VIDRO,x,y,z,pai);bx(w+0.16,0.1,0.25,fr,x,y-h/2-0.05,z+face*0.08,pai);bx(0.06,h,0.08,fr,x,y,z+face*0.03,pai);}}
+function arcond(pai,x,y,z){bx(0.9,0.62,0.4,S('#d4d6d0',0.6,0.2),x,y,z,pai);const v=cl(0.24,0.24,0.03,S('#333',0.5),x+0.15,y,z+0.21,pai,16);v.rotation.x=PI/2;}
+function caixaDagua(pai,x,y,z){cl(0.9,0.75,1.1,S('#2f6fb0',0.45,0.1),x,y+0.55,z,pai,24);cl(0.95,0.95,0.12,S('#2a62a0',0.45),x,y+1.16,z,pai,24);}   // caixa d'água de fibra azul
+// bandeira que tremula (vértices)
+const BAND=[];function bandeira(pai,cor,x,z,h=14){haste(new V3(x,0,z),new V3(x,h,z),0.07,S('#d8d8d4',0.35,0.7),pai,10);const b=new THREE.Mesh(new THREE.PlaneGeometry(3.6,2.4,16,6),new THREE.MeshStandardMaterial({color:new THREE.Color(cor).convertSRGBToLinear(),side:THREE.DoubleSide,roughness:0.8}));
+  b.geometry.translate(1.8,0,0);b.position.set(x,h-1.3,z);pai.add(b);b.castShadow=true;BAND.push(b);const bola=new THREE.Mesh(new THREE.SphereGeometry(0.12,10,8),S('#c9a227',0.3,0.8));bola.position.set(x,h+0.1,z);pai.add(bola);return b;}
+function tremula(t){for(const b of BAND){const p=b.geometry.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i);p.setZ(i,Math.sin(x*1.6-t*5)*0.18*(x/3.6));}p.needsUpdate=true;b.geometry.computeVertexNormals();}}
+
+// ===================== LOTE 3 · ÁRVORES, NAVIOS, LANCHA, CAIXAS =====================
+// ---------- HOJE (copiado do js-jet) ----------
+function cascoA(comp,larg,alt,proa,mat,pai,y=0){const s=new THREE.Shape(),c=comp/2,l=larg/2;
+  s.moveTo(-c,-l*0.85);s.lineTo(-c,l*0.85);s.lineTo(-c+2,l);s.lineTo(c-proa,l);s.quadraticCurveTo(c-proa*0.3,l*0.7,c,0);s.quadraticCurveTo(c-proa*0.3,-l*0.7,c-proa,-l);s.lineTo(-c+2,-l);s.closePath();
+  const geo=new THREE.ExtrudeGeometry(s,{depth:alt,bevelEnabled:false});geo.rotateX(-PI/2);const m=new THREE.Mesh(geo,mat);m.position.y=y;m.castShadow=true;pai.add(m);return m;}
+function torreCanhaoA(mat,matC,x,y,pai,cano=12){const t=new THREE.Group();t.position.set(x,y,0);pai.add(t);cil(3.4,4,2.6,mat,0,1.3,0,t,12);box(5,2.4,5.4,mat,0.6,3.4,0,t);const c=cil(0.5,0.6,cano,matC,cano/2+2.5,3.6,0,t,8);c.rotation.z=PI/2-0.08;return t;}
+function bandeiraA(cor,x,y,pai){box(0.3,7,0.3,M('#3a3f44',0.6),x,y+3.5,0,pai);box(0.2,2.6,4,M(cor,0.7),x,y+5.6,2.1,pai);}
+function troncoA(w,h,d,k,mat,x,y,z,pai,kz){const g=new THREE.BoxGeometry(w,h,d),p=g.attributes.position;for(let i=0;i<p.count;i++)if(p.getY(i)>0){p.setX(i,p.getX(i)*k);p.setZ(i,p.getZ(i)*(kz??k));}g.computeVertexNormals();const m=new THREE.Mesh(g,mat);m.position.set(x,y,z);m.castShadow=true;pai.add(m);return m;}
+function navioAA(cor){const g=new THREE.Group(),cz=M('#7d878f',0.65),cz2=M('#a3adb5',0.55),esc_=M('#4b545c',0.7),ver=M('#9e2b25',0.8),pr=M('#1d2328',0.5),fx=M(cor,0.6);
+  cascoA(78,15,4,16,ver,g,-1.5);cascoA(78,15,6,16,cz,g,2.5);cascoA(74,13.4,0.4,15,esc_,g,8.5);
+  box(16,6,11,cz2,-4,11.5,0,g);box(10,4,9,cz2,-2,16.5,0,g);box(6.5,1.2,9.2,pr,1.4,16.8,0,g);box(1.2,0.6,11.2,fx,-4,14.6,0,g);
+  cil(0.5,0.8,12,esc_,-4,24.5,0,g,6);const pr1=new THREE.Group();pr1.position.set(-4,29,0);g.add(pr1);box(1.2,1.8,7,cz2,0,0,0,pr1);gira(pr1,0.03);
+  box(6,5,7,cz,-15,11,0,g);cil(2.2,2.6,5,esc_,-15,15.5,0,g,10);box(4.6,0.8,5.2,fx,-15,17.6,0,g);
+  box(9,1.2,8,M('#5b646b',0.6),16,9.1,0,g);for(let i=0;i<4;i++)for(let k=0;k<3;k++)box(1.6,0.4,1.6,pr,12.5+i*2.3,9.8,-2.4+k*2.4,g);
+  torreCanhaoA(cz2,esc_,26,8.7,g,11);esf(2.2,M('#e9ecef',0.4),-24,13,0,g);cil(2,2.4,3,cz2,-24,10.4,0,g);
+  box(14,0.3,12.4,M('#59626a',0.8),-31,8.9,0,g);bandeiraA(cor,-37,8.7,g);return g;}
+function navioBA(cor){const g=new THREE.Group(),cz=M('#646d75',0.6),cz2=M('#757f87',0.55),esc_=M('#3c444b',0.7),ver=M('#2b2f33',0.8),pr=M('#1b2126',0.4),fx=M(cor,0.6);
+  cascoA(80,14,4,22,ver,g,-1.5);cascoA(80,14,6,22,cz,g,2.5);troncoA(34,6,12.6,0.86,cz2,-4,11.5,0,g,0.8);troncoA(14,5,9.6,0.8,cz2,0,17,0,g,0.78);box(4.6,1,7.2,pr,5.2,17.6,0,g);
+  troncoA(7,9,6.4,0.55,cz2,-3,24,0,g,0.55);for(const z of[-1,1])box(3.2,3.2,0.2,pr,-3,23.5,z*2.4,g);box(0.6,2.2,12.8,fx,-12,12,0,g);troncoA(7,4,6,0.6,esc_,-18,16,0,g);
+  const t=new THREE.Group();t.position.set(23,8.5,0);g.add(t);troncoA(6,2.4,5.6,0.6,cz2,0,1.2,0,t);const c=cil(0.45,0.55,8,esc_,6,1.6,0,t,8);c.rotation.z=PI/2-0.06;
+  troncoA(8,1.4,8,0.7,esc_,14,9.2,0,g);box(13,0.3,12,M('#4a5258',0.8),-32,8.6,0,g);bandeiraA(cor,-38,8.5,g);return g;}
+function arvoresA(){const g=new THREE.Group();const r=rnd(4);
+  const gA=new THREE.ConeGeometry(1,1,6);gA.translate(0,0.5,0);for(let i=0;i<14;i++){const t=12+r()*14,m=new THREE.Mesh(gA,M('#1f421f',1));m.scale.set(t*0.38,t,t*0.38);m.position.set(-18+r()*20,-1,-14+r()*28);m.castShadow=true;g.add(m);}
+  const ga=new THREE.ConeGeometry(4,11,6);ga.translate(0,7.5,0);const tr=new THREE.CylinderGeometry(0.5,0.6,2.5,5);tr.translate(0,1.25,0);
+  for(let i=0;i<10;i++){const e=0.7+r()*0.9,x=6+r()*16,z=-14+r()*28;const a=new THREE.Mesh(ga,M(['#2f5d2a','#3a6b30','#254d24','#4a7a36'][i%4],0.9));a.material.flatShading=true;a.scale.setScalar(e);a.position.set(x,0,z);a.castShadow=true;g.add(a);const b=new THREE.Mesh(tr,M('#5a4030',0.9));b.scale.setScalar(e);b.position.set(x,0,z);g.add(b);}
+  return g;}
+function caixasA(){const g=new THREE.Group(),pal=M('#8a6a45',0.9);const mk=(tipo,x)=>{const c=new THREE.Group();c.position.x=x;g.add(c);box(1.4,0.15,1.4,pal,0,0.075,0,c);
+  if(tipo==='comb'){for(const [a,b] of[[-0.33,-0.33],[0.33,-0.33],[-0.33,0.33],[0.33,0.33]]){cil(0.29,0.29,0.88,M('#c0392b',0.5),a,0.59,b,c,12);cil(0.3,0.3,0.05,M('#e8e8e8',0.5),a,0.8,b,c,12);}}
+  else if(tipo==='mun'){for(let k=0;k<2;k++){box(1.3,0.45,0.9,M('#556b2f',0.8),0,0.38+k*0.47,0,c);box(1.32,0.08,0.92,M('#c9b037',0.6),0,0.5+k*0.47,0,c);}}
+  else{box(1.2,1.2,1.2,M('#f0f0f0',0.6),0,0.75,0,c);box(0.8,0.25,1.22,M('#d32f2f',0.6),0,0.75,0,c);box(0.25,0.8,1.22,M('#d32f2f',0.6),0,0.75,0,c);}};
+  mk('comb',-2.2);mk('mun',0);mk('blind',2.2);return g;}
+function lanchaA(){const g=new THREE.Group(),cas=M('#d9dcd8',0.55),fun=M('#3a3f44',0.7),cab=M('#e9ebe8',0.5),vid=M('#1d2a33',0.15),pr=M('#22262a',0.6),fx=M('#e8443a',0.6),bor=M('#2b2f33',0.85);
+  cascoA(12,3.4,0.6,4,fun,g,-0.35);cascoA(12,3.4,0.9,4,cas,g,0.25);cascoA(11.6,3.3,0.12,3.8,bor,g,1.1);box(10.4,0.06,3.0,M('#a8aca6',0.85),-0.4,1.17,0,g);
+  box(3.0,1.5,2.4,cab,-0.6,1.95,0,g);const pb=box(0.08,0.9,2.3,vid,0.95,2.15,0,g);pb.rotation.z=0.35;box(2.6,0.08,2.6,cab,-0.9,2.74,0,g);cil(0.05,0.05,1.4,pr,-1.6,3.45,0,g,6);box(0.5,0.12,0.5,pr,-1.6,4.1,0,g);
+  box(0.15,0.2,3.1,fx,-0.4,0.95,0,g);const ar=new THREE.Group();ar.position.set(3.7,1.2,0);g.add(ar);cil(0.08,0.1,0.9,pr,0,0.45,0,ar,6);const cano=cil(0.05,0.05,1.6,pr,0.75,0.95,0,ar,6);cano.rotation.z=PI/2;
+  for(const z of[-0.6,0.6]){box(0.5,0.7,0.4,M('#1c1c1c',0.5),-6.25,1.25,z,g);box(0.15,0.9,0.12,pr,-6.3,0.5,z,g);}return g;}
+
+// ---------- PROPOSTA ----------
+// água do mar (só na prévia; no jogo o mar já existe)
+const TEX_MAR_N=canvasTex(256,256,(c,w,h)=>{const r=rnd(12);c.fillStyle='rgb(128,128,255)';c.fillRect(0,0,w,h);for(let i=0;i<1400;i++){const x=r()*w,y=r()*h,s=4+r()*14;const gr=c.createRadialGradient(x,y,0,x,y,s);const k=r()<0.5;gr.addColorStop(0,k?'rgba(160,150,255,.5)':'rgba(96,106,255,.5)');gr.addColorStop(1,'rgba(128,128,255,0)');c.fillStyle=gr;c.fillRect(x-s,y-s,2*s,2*s);}},false);
+TEX_MAR_N.repeat.set(30,30);
+function agua(g){const m=new THREE.Mesh(new THREE.PlaneGeometry(2400,2400),new THREE.MeshStandardMaterial({color:0x1f4f6b,roughness:0.18,metalness:0.25,normalMap:TEX_MAR_N,normalScale:new THREE.Vector2(0.5,0.5),transparent:true,opacity:0.93}));m.rotation.x=-PI/2;m.position.y=0;m.receiveShadow=true;g.add(m);return g;}
+// casco de navio de verdade: seções com V, alargamento (flare), tosado (proa mais alta) e popa espelhada
+const NAV=cor=>{const t=tex('metalpint',2);return new THREE.MeshStandardMaterial({color:new THREE.Color(cor).convertSRGBToLinear(),normalMap:t.normalMap,normalScale:new THREE.Vector2(0.18,0.18),roughness:0.55,metalness:0.1});};
+function cascoNavio(L,B,D,T,o={}){const N=40,K=9,pos=[],cor=[],uv=[],idx=[];const cBase=new THREE.Color(o.cor||'#7d878f').convertSRGBToLinear(),cFundo=new THREE.Color(o.fundo||'#8e2b22').convertSRGBToLinear(),cFaixa=new THREE.Color('#16181a').convertSRGBToLinear();
+  const xP=o.proa??0.62,secoes=[];
+  for(let i=0;i<=N;i++){const u=i/N,x=-L/2+L*u;const t=Math.max(0,(u-xP)/(1-xP));const larg=B/2*(u<0.08?0.86+0.14*u/0.08:1)*(1-t*t*(0.35+0.65*t));
+    const conv=D+(o.tosado??0.035*L)*Math.pow(Math.max(0,u-0.4)/0.6,2);const quilha=-T+T*Math.pow(t,1.6)*0.95;const vee=0.25+0.6*t;
+    const ring=[];for(let k=0;k<=K;k++){const s=k/K;   // s=0 quilha, s=1 convés
+      let y,z;if(s<0.4){const q=s/0.4;y=quilha+(0-quilha)*Math.pow(q,1+vee)*0.92;z=larg*(0.15+0.85*Math.sin(q*PI/2))*(1-vee*0.35*(1-q));}else{const q=(s-0.4)/0.6;y=0+(conv-0)*q;z=larg*(1+(o.flare??0.06)*q*(0.4+t));}
+      ring.push([x,y,z]);}secoes.push(ring);}
+  const add=(p,c,uu,vv)=>{pos.push(...p);cor.push(c.r,c.g,c.b);uv.push(uu,vv);return pos.length/3-1;};
+  const colorDe=y=>y<-0.25?cFundo:y<0.45?cFaixa:cBase;
+  for(const lado of[1,-1]){const base=pos.length/3;for(let i=0;i<=N;i++)for(let k=0;k<=K;k++){const [x,y,z]=secoes[i][k];add([x,y,z*lado],colorDe(y),x/3,y/3);}
+    for(let i=0;i<N;i++)for(let k=0;k<K;k++){const a=base+i*(K+1)+k,b=a+K+1;if(lado>0)idx.push(a,b,a+1,b,b+1,a+1);else idx.push(a,a+1,b,b,a+1,b+1);}}
+  // popa (espelho)
+  const s0=secoes[0];const c0=add([s0[0][0],s0[0][1],0],cBase,0,0);for(let k=0;k<K;k++){const a=add([s0[k][0],s0[k][1],s0[k][2]],colorDe(s0[k][1]),s0[k][2]/3,s0[k][1]/3),b=add([s0[k+1][0],s0[k+1][1],s0[k+1][2]],colorDe(s0[k+1][1]),s0[k+1][2]/3,s0[k+1][1]/3),
+    a2=add([s0[k][0],s0[k][1],-s0[k][2]],colorDe(s0[k][1]),0,0),b2=add([s0[k+1][0],s0[k+1][1],-s0[k+1][2]],colorDe(s0[k+1][1]),0,0);idx.push(c0,b,a,c0,a2,b2);}
+  {const dP=add([s0[K][0],s0[K][1],s0[K][2]],cBase,0,0),dS=add([s0[K][0],s0[K][1],-s0[K][2]],cBase,0,0);idx.push(c0,dS,dP);}   /* fecha o miolo do espelho de popa (antes ficava aberto) */
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setAttribute('color',new THREE.Float32BufferAttribute(cor,3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));geo.setIndex(idx);geo.computeVertexNormals();
+  const t=tex('metalpint',2);const mat=new THREE.MeshStandardMaterial({vertexColors:true,normalMap:t.normalMap,normalScale:new THREE.Vector2(0.2,0.2),roughness:0.55,metalness:0.1,side:THREE.DoubleSide});   // tinta naval lisa (sem manchas)
+  const m=sombra(new THREE.Mesh(geo,mat));
+  // convés: tampa entre as bordas
+  const dp=[],di=[];for(let i=0;i<=N;i++){const [x,y,z]=secoes[i][K];dp.push(x,y-0.05,z*0.995,x,y-0.05,-z*0.995);}for(let i=0;i<N;i++){const a=i*2;di.push(a,a+2,a+1,a+1,a+2,a+3);}
+  const dg=new THREE.BufferGeometry();dg.setAttribute('position',new THREE.Float32BufferAttribute(dp,3));dg.setIndex(di);dg.computeVertexNormals();{const uvd=[];for(let i=0;i<dp.length;i+=3)uvd.push(dp[i]/2,dp[i+2]/2);dg.setAttribute('uv',new THREE.Float32BufferAttribute(uvd,2));}
+  const deck=new THREE.Mesh(dg,P('concreto',o.conves||'#5f666b',{tile:2,r:0.9,ns:0.6}));deck.receiveShadow=true;m.add(deck);
+  m.userData.secoes=secoes;m.userData.K=K;return m;}
+function bordaDe(m,i){const s=m.userData.secoes[i],K=m.userData.K;return s[K];}
+// balaustrada (corrimão + balaústres instanciados) ao longo da borda do convés
+function balaustrada(pai,casco,i0,i1,h=1.0){const S_=casco.userData.secoes,K=casco.userData.K,mat=S('#cfd3d4',0.4,0.5);
+  for(const lado of[1,-1]){const pts=[];for(let i=i0;i<=i1;i++){const [x,y,z]=S_[i][K];pts.push(new V3(x,y+h,z*lado*0.985));}
+    pai.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),pts.length*3,0.035,5),mat));
+    const pts2=pts.map(p=>p.clone().setY(p.y-h*0.5));pai.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts2),pts.length*3,0.025,5),mat));
+    const curva=new THREE.CatmullRomCurve3(pts),n=Math.round(curva.getLength()/1.5),inst=new THREE.InstancedMesh(new THREE.CylinderGeometry(0.03,0.03,h,5),mat,n),m4=new THREE.Matrix4();
+    for(let k=0;k<n;k++){const p=curva.getPoint(k/(n-1||1));m4.makeTranslation(p.x,p.y-h/2,p.z);inst.setMatrixAt(k,m4);}pai.add(inst);}}
+// casa com paredes inclinadas (furtiva)
+function tronco(w,h,d,k,mat,x,y,z,pai,kz){const g=new THREE.BoxGeometry(w,h,d),p=g.attributes.position;for(let i=0;i<p.count;i++)if(p.getY(i)>0){p.setX(i,p.getX(i)*k);p.setZ(i,p.getZ(i)*(kz??k));}
+  const uv=g.attributes.uv,D=[[d,h],[d,h],[w,d],[w,d],[w,h],[w,h]];for(let f=0;f<6;f++)for(let i=0;i<4;i++){const q=f*4+i;uv.setXY(q,uv.getX(q)*D[f][0]/2,uv.getY(q)*D[f][1]/2);}
+  g.computeVertexNormals();const m=sombra(new THREE.Mesh(g,mat));m.position.set(x,y,z);pai.add(m);return m;}
+function numeroCasco(pai,casco,i,txt,esc=1,tinta='#f4f4f0',yFix=null){const [x,y,z]=casco.userData.secoes[i][casco.userData.K-2];const t=canvasTex(512,256,(c,w,h)=>{c.clearRect(0,0,w,h);c.font='bold 200px Arial';c.textAlign='center';c.textBaseline='middle';c.fillStyle='rgba(0,0,0,.55)';c.fillText(txt,w/2+6,h/2+8);c.fillStyle=tinta;c.fillText(txt,w/2,h/2);});
+  for(const lado of[1,-1]){const p=new THREE.Mesh(new THREE.PlaneGeometry(5*esc,2.5*esc),new THREE.MeshStandardMaterial({map:t,transparent:true,roughness:0.6,polygonOffset:true,polygonOffsetFactor:-4}));p.position.set(x,yFix??y*0.55+0.6,z*lado+0.12*lado);p.rotation.y=lado>0?0:PI;pai.add(p);}}
+function canhao127(pai,mat,x,y,esc=1){const t=new THREE.Group();t.position.set(x,y,0);t.scale.setScalar(esc);pai.add(t);
+  cl(2.6,2.8,0.6,mat,0,0.3,0,t,24);const sh=new THREE.Shape();sh.moveTo(-3,0);sh.lineTo(2.2,0);sh.lineTo(3.4,1.2);sh.lineTo(1.4,2.7);sh.lineTo(-2.6,2.7);sh.lineTo(-3,0);
+  const geo=new THREE.ExtrudeGeometry(sh,{depth:4.2,bevelEnabled:true,bevelSize:0.06,bevelThickness:0.06,bevelSegments:1});geo.translate(0,0,-2.1);{const uv=geo.attributes.uv;for(let k=0;k<uv.count;k++)uv.setXY(k,uv.getX(k)/2,uv.getY(k)/2);}
+  const c=sombra(new THREE.Mesh(geo,mat));c.position.y=0.6;t.add(c);const ca=cl(0.17,0.2,7.2,S('#5e676d',0.5,0.5),6.4,2.2,0,t,14);ca.rotation.z=PI/2+0.1;   /* elevado ~6° */cl(0.32,0.32,1.2,mat,3.6,1.7,0,t,14).rotation.z=PI/2;return t;}
+function ciws(pai,x,y,z,ry=0){   /* (21/11) CIWS tipo Phalanx: pedestal, giro, berço, cúpula do radar em cima e 6 canos rotativos embaixo; ry = p/ onde aponta */
+  const g=new THREE.Group();g.position.set(x,y,z);g.rotation.y=ry;pai.add(g);const br=S('#e9ecea',0.45,0.1),cz=S('#c9cfd2',0.5,0.2),esc=S('#2a2d2f',0.4,0.6);
+  cl(0.95,1.1,0.7,cz,0,0.35,0,g,20);cl(1.0,1.0,0.25,esc,0,0.82,0,g,20);   // pedestal + anel de giro
+  const t=new THREE.Group();t.position.y=0.95;g.add(t);for(const s of[-0.62,0.62])bx(0.9,1.3,0.12,cz,0,0.65,s,t);   // braços do berço
+  const ber=new THREE.Group();ber.position.y=1.05;ber.rotation.z=0.22;t.add(ber);   // tudo que eleva (≈13°)
+  bx(1.3,0.85,1.0,br,-0.15,0,0,ber);cl(0.18,0.18,1.3,ACO(),0,0,0,ber,10).rotation.x=PI/2;   // corpo + munhão
+  const cu=cl(0.55,0.55,1.0,br,-0.35,0.95,0,ber,24);const dm=new THREE.Mesh(new THREE.SphereGeometry(0.55,24,12,0,PI*2,0,PI/2),br);dm.position.set(-0.35,1.45,0);ber.add(dm);bx(0.08,0.3,0.6,esc,0.2,1.0,0,ber);   // cúpula do radar ("R2-D2")
+  for(let k=0;k<6;k++){const a=k/6*PI*2;const c=cl(0.035,0.035,1.7,esc,1.35,-0.15+Math.sin(a)*0.11,Math.cos(a)*0.11,ber,6);c.rotation.z=PI/2;}   // 6 canos
+  for(const xx of[0.6,2.1]){const an=cl(0.17,0.17,0.12,esc,xx,-0.15,0,ber,14);an.rotation.z=PI/2;}   // braçadeiras dos canos
+  bx(0.7,0.6,0.7,cz,-0.2,-0.6,0.35,ber);   // tambor de munição
+  return g;}
+function vls(pai,x,y,nx,nz){const g=new THREE.Group();g.position.set(x,y,0);pai.add(g);bx(nx*1.6+0.6,0.5,nz*1.6+0.6,S('#545c61',0.7),0,0.25,0,g);for(let i=0;i<nx;i++)for(let k=0;k<nz;k++)bx(1.3,0.08,1.3,S('#3c4246',0.6),-(nx-1)*0.8+i*1.6,0.54,-(nz-1)*0.8+k*1.6,g);return g;}
+function bote(pai,x,y,z,cor='#e46f1c'){const g=new THREE.Group();g.position.set(x,y,z);pai.add(g);const c=cascoNavio(7,2.5,0.9,0.35,{cor,fundo:'#2a2a2a',proa:0.55,tosado:0.25,flare:0.1,conves:'#333'});g.add(c);
+  const t=new THREE.Mesh(new THREE.TorusGeometry(1,0.22,8,24),S('#ef7d22',0.7));t.scale.set(3.2,1,1.15);t.rotation.x=PI/2;t.position.y=0.9;g.add(t);bx(1,0.9,0.8,S('#2b2b2b',0.6),-1.6,1.2,0,g);return g;}
+function balsas(pai,x,y,z,n=3){for(let k=0;k<n;k++){const c=cl(0.45,0.45,1.5,S('#f2f2ee',0.5),x+k*1.2,y+0.5,z,pai,16);c.rotation.x=PI/2;for(const s of[-0.4,0.4]){const a=cl(0.47,0.47,0.08,S('#d84a24',0.6),x+k*1.2,y+0.5,z+s,pai,16);a.rotation.x=PI/2;}}bx(n*1.2+0.2,0.15,1.8,S('#7d878f',0.6),x+(n-1)*0.6,y,z,pai);}
+function mastroTrelica(pai,x,y,h,mat){const g=new THREE.Group();g.position.set(x,y,0);pai.add(g);const a=1.2;for(const [p,q] of[[a,a],[a,-a],[-a,a],[-a,-a]])haste(new V3(p,0,q),new V3(p*0.35,h,q*0.35),0.08,mat,g,6);
+  for(let k=0;k<5;k++){const y0=k*h/5,y1=(k+1)*h/5,s0=1-0.65*k/5,s1=1-0.65*(k+1)/5;for(const [p,q,r,s] of[[a,a,a,-a],[a,-a,-a,-a],[-a,-a,-a,a],[-a,a,a,a]]){haste(new V3(p*s0,y0,q*s0),new V3(r*s1,y1,s*s1),0.04,mat,g,5);haste(new V3(p*s1,y1,q*s1),new V3(r*s1,y1,s*s1),0.05,mat,g,5);}}
+  return g;}
+function heliconves(pai,x,y,w,d){const px=32,t=canvasTex(Math.round(d*px),Math.round(w*px),(c,W,H)=>{   /* canvas na proporção do convoo: o círculo sai redondo (antes esticava e ficava oval) */
+  c.fillStyle='#4d5357';c.fillRect(0,0,W,H);c.strokeStyle='#f2f2ee';c.lineWidth=0.3*px;c.strokeRect(0.4*px,0.4*px,W-0.8*px,H-0.8*px);const R=Math.min(W,H)*0.36;c.beginPath();c.arc(W/2,H/2,R,0,PI*2);c.stroke();
+  c.strokeStyle='#e8c21c';c.lineWidth=0.25*px;c.beginPath();c.moveTo(W/2,0.9*px);c.lineTo(W/2,H-0.9*px);c.stroke();c.beginPath();c.moveTo(W/2-R*0.7,H/2+R*0.75);c.lineTo(W/2+R*0.7,H/2+R*0.75);c.stroke();});
+  const p=new THREE.Mesh(new THREE.PlaneGeometry(d,w),new THREE.MeshStandardMaterial({map:t,roughness:0.85}));p.rotation.x=-PI/2;p.rotation.z=PI/2;   /* w = comprimento (proa-popa), d = largura (antes trocados: o convoo passava da popa) */p.position.set(x,y,0);p.receiveShadow=true;pai.add(p);
+  for(const s of[-1,1]){const r=new THREE.Mesh(new THREE.PlaneGeometry(w,1.2),new THREE.MeshStandardMaterial({color:0x3b4043,alphaMap:TEX_ALAMBRADO,alphaTest:0.5,side:THREE.DoubleSide}));r.position.set(x,y-0.1,s*(d/2+0.55));r.rotation.x=-PI/2+s*0.25;pai.add(r);}}
+function bandeiraPopa(pai,cor,x,y){haste(new V3(x,y,0),new V3(x-0.5,y+5,0),0.05,S('#d0d0cc',0.4,0.5),pai,8);const b=new THREE.Mesh(new THREE.PlaneGeometry(2.4,1.6,12,4),new THREE.MeshStandardMaterial({color:new THREE.Color(cor).convertSRGBToLinear(),side:THREE.DoubleSide,roughness:0.8}));
+  b.geometry.translate(-1.2,0,0);b.position.set(x-0.5,y+4.1,0);b.rotation.y=PI;pai.add(b);BAND.push(b);return b;}
+function convesY(c,x){const S_=c.userData.secoes,N=S_.length-1,x0=S_[0][0][0],x1=S_[N][0][0];const i=Math.max(0,Math.min(N,Math.round((x-x0)/(x1-x0)*N)));return S_[i][c.userData.K][1];}
+
+// ===== NAVIO A · fragata clássica (casco cinza, mastro treliça, canhão 127 mm, CIWS) =====
+function navioANovo(cor){const g=agua(new THREE.Group());const L=80,cz=NAV('#8a949b'),cz2=NAV('#a7b0b6'),esc=S('#4b545c',0.7);
+  const c=cascoNavio(L,13,7.5,4,{cor:'#808a91'});g.add(c);const D=7.5;balaustrada(g,c,1,36);numeroCasco(g,c,30,'F 40');
+  // superestrutura
+  bx(18,5,10.5,cz2,-5,D+2.5,0,g);bx(11,4,9,cz2,-1.5,D+7,0,g);const pv=bx(0.12,1.4,8.4,VIDRO,4.03,D+7.6,0,g);
+  bx(11.4,0.3,9.6,S('#3b4145',0.7),-1.5,D+9.15,0,g);for(const s of[-1,1])bx(3,0.3,2,cz2,1.2,D+6,s*5.3,g);   // asas da ponte
+  const mt=mastroTrelica(g,-3,D+9.3,13,S('#5a6268',0.6,0.3));const rad=new THREE.Group();rad.position.set(-3,D+22.5,0);g.add(rad);bx(1.2,0.9,7,S('#d5dadc',0.5),0,0,0,rad);bx(0.3,0.3,0.3,esc,0,-0.6,0,rad);gira(rad,0.04);
+  for(const y of[D+15,D+18.5])bx(0.15,0.15,4.4,esc,-3,y,0,g);const ld=new THREE.Mesh(new THREE.SphereGeometry(1.1,16,12),S('#eef0ef',0.4));ld.position.set(-3,D+20.3,0);g.add(ld);
+  // chaminé
+  const ch=tronco(6,5.5,5.5,0.82,cz,-10,D+7.75,0,g,0.85);bx(4.2,0.6,4.4,S(cor,0.55),-10,D+10.7,0,g);for(const z of[-0.8,0.8])cl(0.45,0.45,1.2,S('#1b1d1f',0.6),-10.6,D+11.3,z,g,12);   // chaminé em cima da casa
+  canhao127(g,cz2,24,convesY(c,24)-0.06,1);   /* base giratória assentada no convés (antes 0,4 m acima) */vls(g,13,convesY(c,13)-0.1,4,3);
+  bx(3.4,2.6,3.4,cz2,-21.5,D+1.3,0,g);ciws(g,-21.5,D+2.6,0,PI);   /* pedestal pequeno (antes um bloco de 12 × 10 m) */   /* aponta p/ a popa (antes mirava a própria superestrutura) */for(const s of[-1,1])balsas(g,-17.2,D+0.15,s*5.0,2);
+  heliconves(g,-31.6,D+0.12,15.8,10.4);   /* convoo ocupa a popa toda */bandeiraPopa(g,cor,-39.6,D+0.2);
+  return g;}
+// ===== NAVIO B · fragata furtiva (classe Tamandaré) =====
+function navioBNovo(cor){const g=agua(new THREE.Group());const L=82,cz=NAV('#737d84'),esc=S('#3c444b',0.7);
+  const c=cascoNavio(L,13.5,7.8,4.2,{cor:'#6e777e',flare:0.1});g.add(c);const D=7.8;balaustrada(g,c,1,37);numeroCasco(g,c,30,'F 200');
+  tronco(34,6.5,12.6,0.86,cz,-5,D+3.25,0,g,0.82);tronco(13,5,9.8,0.82,cz,1.5,D+8.6,0,g,0.8);
+  const jan=bx(0.12,1.2,7.6,VIDRO,7.25,D+9.4,0,g);jan.rotation.z=0.23;   /* janela colada na frente inclinada (antes saía 1,6 m p/ fora) */
+  // mastro integrado com 4 painéis de radar
+  const MX=1.5;   /* mastro centrado em cima da ponte (antes em -3: metade ficava no ar, atrás da ponte) */
+  tronco(7,10,7,0.5,cz,MX,D+16,0,g,0.5);for(const [nx,nz] of[[1,0],[-1,0],[0,1],[0,-1]]){const n=new V3(nx*10,1.75,nz*10).normalize(),ctr=new V3(MX+nx*2.73,D+15.5,nz*2.73);const p=new THREE.Mesh(new THREE.PlaneGeometry(2.6,2.6),new THREE.MeshStandardMaterial({map:TEX_FASE,color:0x6f777c,roughness:0.5}));p.position.copy(ctr).addScaledVector(n,0.04);p.lookAt(ctr.clone().add(n));g.add(p);}   // 4 painéis do radar no mastro integrado
+  cl(0.2,0.2,5,esc,MX,D+23.5,0,g,8);const d=new THREE.Group();d.position.set(MX,D+26,0);g.add(d);bx(0.5,0.5,4.5,S('#c9cfd2',0.5),0,0,0,d);gira(d,0.06);
+  tronco(7,4,6,0.6,esc,-14.5,D+8.5,0,g);tronco(4.75,0.6,4.1,0.93,S(cor,0.55),-14.5,D+10.0,0,g,0.93);   /* chaminé inteira em cima da casa (antes sobrava 2 m p/ fora) */   /* faixa do time no topo da chaminé (a da lateral ficava solta) */
+  const t=new THREE.Group();t.position.set(25,convesY(c,25)-0.06,0);g.add(t);tronco(6,2.6,5.4,0.55,cz,0,1.3,0,t);bx(0.9,0.9,1.3,cz,2.1,1.6,0,t).rotation.z=-0.5;   /* mantelete: liga o cano à torre */
+  const ca=cl(0.17,0.22,7,S('#5e676d',0.5,0.5),5.5,2.05,0,t,14);ca.rotation.z=PI/2+0.1;   /* cano saindo da torre, levemente p/ cima (antes apontava p/ o convés e ficava solto) */
+  vls(g,16.6,convesY(c,16.6)-0.1,4,2);   /* afastado da casa (antes entrava 0,5 m nela) */ciws(g,-24.3,D,0,PI);for(const s of[-1,1])balsas(g,-9,D+0.15,s*5.0,2);
+  heliconves(g,-33.3,D+0.12,13,11.2);bandeiraPopa(g,cor,-40.6,D+0.2);return g;}
+// ===== NAVIO C · corveta clássica (duas chaminés, mastro treliça, botes) =====
+function navioCNovo(cor){const g=agua(new THREE.Group());const L=76,cz=NAV('#8f989d'),br=NAV('#d4cfc1'),esc=S('#4a4f53',0.7);
+  const c=cascoNavio(L,12.4,7,3.8,{cor:'#8b949a',conves:'#7a5f42'});g.add(c);const D=7;balaustrada(g,c,1,36);numeroCasco(g,c,30,'V 32');
+  bx(13,5,9,br,-2,D+2.5,0,g);bx(7,4,8,br,-0.5,D+7,0,g);bx(0.12,1.3,7.4,VIDRO,3.03,D+7.4,0,g);bx(7.4,0.3,8.4,S('#3b4145',0.7),-0.5,D+9.15,0,g);
+  for(const x of[-12,-18.5]){cl(1.6,1.9,8,cz,x,D+4,0,g,20);cl(1.62,1.62,1.2,S(cor,0.55),x,D+7.4,0,g,20);cl(1.64,1.64,0.8,S('#1c1d1e',0.6),x,D+8.4,0,g,20);}
+  mastroTrelica(g,1,D+9.3,12,S('#5a6268',0.6,0.3));const rad=new THREE.Group();rad.position.set(1,D+21.5,0);g.add(rad);bx(0.9,0.7,5,S('#d5dadc',0.5),0,0,0,rad);gira(rad,0.04);
+  canhao127(g,br,21,convesY(c,21)-0.06,0.85);canhao127(g,br,-28,convesY(c,-28)-0.06,0.75).rotation.y=PI;
+  for(const s of[-1,1]){bote(g,-15.2,D+0.75,s*4.6,'#ece6d6');for(const x of[-17.4,-13])bx(0.4,0.6,1.6,esc,x,D+0.3,s*4.6,g);for(const x of[-18.2,-12.2]){haste(new V3(x,D,s*5.7),new V3(x,D+3.2,s*5.7),0.08,esc,g);haste(new V3(x,D+3.2,s*5.7),new V3(x,D+3.2,s*4.6),0.07,esc,g);}}
+  bandeiraPopa(g,cor,-37.6,D+0.2);return g;}
+
+// ===== LANCHA de patrulha (~12 m) =====
+function lanchaNovo(){const g=agua(new THREE.Group());const c=cascoNavio(12,3.5,1.45,0.65,{cor:'#e3e6e2',fundo:'#2f3438',proa:0.5,tosado:0.35,flare:0.08,conves:'#9aa09a'});c.position.y=0;g.add(c);
+  const D=1.45;const def=[];for(let i=1;i<=38;i++){const [x,y,z]=c.userData.secoes[i][c.userData.K];def.push(new V3(x,y-0.1,z+0.08));}
+  for(const s of[1,-1]){const pts=def.map(p=>new V3(p.x,p.y,p.z*s));g.add(sombra(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),80,0.14,8),S('#2b2f33',0.85))));}   // defensa de borracha
+  const cab=new THREE.Group();cab.position.set(-0.6,D,0);g.add(cab);const pin=NAV('#eef0ec');
+  bx(3.2,1.6,2.5,pin,0,0.8,0,cab);const pb=bx(0.06,0.75,2.3,VIDRO,1.55,1.2,0,cab);pb.rotation.z=0.28;bx(0.08,0.08,2.5,pin,1.68,0.78,0,cab);   /* para-brisa inclinado na própria frente (antes era um bloco saindo) */
+  for(const s of[-1,1])bx(1.8,0.65,0.05,VIDRO,-0.2,1.15,s*1.26,cab);bx(3.6,0.1,2.8,pin,-0.3,1.66,0,cab);
+  // arco do radar
+  for(const s of[-1,1])haste(new V3(-1.8,1.66,s*1.2),new V3(-2.1,2.9,s*0.9),0.06,S('#d8dcda',0.3,0.7),cab);haste(new V3(-2.1,2.9,-0.9),new V3(-2.1,2.9,0.9),0.06,S('#d8dcda',0.3,0.7),cab);
+  const rr=new THREE.Group();rr.position.set(-2.1,3.05,0);cab.add(rr);bx(0.3,0.1,1.2,S('#f4f4f0',0.4),0,0,0,rr);gira(rr,0.15);haste(new V3(-2.1,2.9,0.5),new V3(-2.1,4.2,0.5),0.02,S('#222',0.4),cab);
+  for(const [s,cc] of[[1,0x18e04a],[-1,0xff2a1a]]){const l=new THREE.Mesh(new THREE.BoxGeometry(0.12,0.1,0.06),EMIS(cc,1.5));l.position.set(1.0,1.5,s*1.27);cab.add(l);}
+  // metralhadora .50 com escudo, no aro da proa
+  const ar=new THREE.Group();ar.position.set(3.4,D,0);g.add(ar);cl(0.12,0.16,0.9,S('#2a2d2a',0.5,0.5),0,0.45,0,ar,10);const gun=new THREE.Group();gun.position.y=1.0;ar.add(gun);
+  bx(0.9,0.22,0.2,S('#252826',0.45,0.6),0.15,0,0,gun);const cano=cl(0.035,0.04,1.15,S('#1c1e1d',0.4,0.7),1.15,0.02,0,gun,8);cano.rotation.z=PI/2;bx(0.06,0.65,0.95,S('#3c443a',0.6,0.3),0.42,0.1,0,gun);bx(0.3,0.25,0.25,S('#5a6040',0.8),-0.1,-0.22,0.2,gun);
+  // 2 motores de popa com capô
+  for(const z of[-0.65,0.65]){const m=new THREE.Group();m.position.set(-6.25,D-0.55,z);m.rotation.z=-0.06;   /* hélice abaixo da linha d'água */g.add(m);   /* (21/11) motor de popa de verdade: capô, perna, placa anticavitação e hélice */
+    const pre=S('#24272a',0.35,0.25),cin=S('#3a3e42',0.5,0.4);
+    bx(0.42,0.55,0.42,cin,0.16,0.3,0,m);   // suporte encostado no espelho de popa
+    bx(0.62,0.5,0.46,pre,-0.08,0.35,0,m);const cp=new THREE.Mesh(new THREE.SphereGeometry(0.33,16,10,0,PI*2,0,PI/2),pre);cp.scale.set(1.0,0.7,0.72);cp.position.set(-0.08,0.6,0);sombra(cp);m.add(cp);   // capô
+    for(const s2 of[-1,1])bx(0.5,0.05,0.005,S('#d8dbd8',0.4),-0.1,0.42,s2*0.232,m);   // faixa da marca nas laterais
+    bx(0.16,1.25,0.1,cin,-0.05,-0.6,0,m);bx(0.5,0.03,0.26,cin,-0.02,-1.0,0,m);   // perna + placa anticavitação
+    const tp=cl(0.08,0.06,0.42,cin,-0.05,-1.15,0,m,10);tp.rotation.z=PI/2;   // torpedo da rabeta
+    const hel=new THREE.Group();hel.position.set(-0.3,-1.15,0);m.add(hel);for(let k=0;k<3;k++){const p=bx(0.04,0.22,0.09,S('#8c9196',0.3,0.8),0,0,0,hel);p.rotation.x=k/3*PI*2;p.translateY(0.12);}}
+  numeroCasco(g,c,25,'P-01',0.3,'#1d2a3a',0.72);   /* abaixo da defensa, inteiro */for(const [x,z] of[[2.6,0],[-1.2,0.7]])pessoa(g,x,z,PI/2).position.y=D;
+  // espuma na proa e esteira
+  const es=new THREE.Mesh(new THREE.PlaneGeometry(26,7),new THREE.MeshBasicMaterial({map:canvasTex(256,64,(c2,w,h)=>{const r=rnd(8);const gr=c2.createLinearGradient(w,0,0,0);gr.addColorStop(0,'rgba(255,255,255,.85)');gr.addColorStop(1,'rgba(255,255,255,0)');c2.fillStyle=gr;for(let i=0;i<900;i++){const x=r()*w,y=h/2+(r()-0.5)*h*(x/w*0.2+0.8*(1-x/w));c2.globalAlpha=0.3+0.5*(x/w);c2.fillRect(x,y,2+r()*4,1+r()*2);}}),transparent:true,depthWrite:false}));
+  es.rotation.x=-PI/2;es.position.set(-19,0.05,0);g.add(es);return g;}
+
+// ===== ÁRVORES: mata atlântica, araucária e coqueiro (geometria única por espécie, instanciável) =====
+function folhagem(raio,det,ruido,cor1,cor2,sem){const geo=new THREE.IcosahedronGeometry(raio,det),p=geo.attributes.position,r=rnd(sem),cor=[],c1=new THREE.Color(cor1).convertSRGBToLinear(),c2=new THREE.Color(cor2).convertSRGBToLinear(),c=new THREE.Color();
+  const mapa=new Map();for(let i=0;i<p.count;i++){const k=p.getX(i).toFixed(2)+','+p.getY(i).toFixed(2)+','+p.getZ(i).toFixed(2);if(!mapa.has(k))mapa.set(k,1+(r()-0.5)*ruido);const f=mapa.get(k);p.setXYZ(i,p.getX(i)*f,p.getY(i)*f*0.85,p.getZ(i)*f);
+    const y=p.getY(i)/raio;c.copy(c1).lerp(c2,Math.min(1,Math.max(0,0.5+y*0.6+(r()-0.5)*0.25)));cor.push(c.r,c.g,c.b);}
+  geo.setAttribute('color',new THREE.Float32BufferAttribute(cor,3));geo.computeVertexNormals();return geo;}
+const M_FOLHA=new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.9,flatShading:true});
+function troncoCurvo(pai,pts,r0,r1){const mat=P('casca','#8a7a66',{tile:1,r:1,ns:1.2});const cur=new THREE.CatmullRomCurve3(pts),geo=new THREE.TubeGeometry(cur,12,1,8,false),p=geo.attributes.position;
+  // afina o tubo do pé ao topo
+  for(let i=0;i<p.count;i++){const seg=Math.floor(i/9)/12,k=r0+(r1-r0)*seg,c=cur.getPointAt(seg);p.setXYZ(i,c.x+(p.getX(i)-c.x)*k,c.y+(p.getY(i)-c.y)*k,c.z+(p.getZ(i)-c.z)*k);}
+  geo.computeVertexNormals();const m=sombra(new THREE.Mesh(geo,mat));pai.add(m);return m;}
+function arvoreMata(pai,x,z,e,sem){const g=new THREE.Group();g.position.set(x,0,z);g.scale.setScalar(e);g.rotation.y=sem;pai.add(g);const r=rnd(sem*97+3);
+  troncoCurvo(g,[new V3(0,-0.3,0),new V3(0.3,4,0.2),new V3(-0.2,8,0.1),new V3(0.1,11,0)],0.55,0.25);
+  for(const [a,h,L] of[[0.3,8,3.5],[2.4,9,3],[4.3,7.5,3.2]])troncoCurvo(g,[new V3(0,h,0),new V3(Math.cos(a)*L*0.5,h+1.2,Math.sin(a)*L*0.5),new V3(Math.cos(a)*L,h+2.4,Math.sin(a)*L)],0.22,0.1);
+  for(let k=0;k<7;k++){const a=r()*PI*2,d=k?1.5+r()*2.4:0,f=new THREE.Mesh(folhagem(2.4+r()*1.4,1,0.35,'#1f3d1c','#5d8a3a',sem*10+k),M_FOLHA);f.position.set(Math.cos(a)*d,11+r()*2.2-(k?0.8:0),Math.sin(a)*d);f.castShadow=true;g.add(f);}
+  return g;}
+function araucaria(pai,x,z,e,sem){const g=new THREE.Group();g.position.set(x,0,z);g.scale.setScalar(e);g.rotation.y=sem;pai.add(g);const r=rnd(sem*31+7);
+  troncoCurvo(g,[new V3(0,-0.3,0),new V3(0,8,0),new V3(0,16,0),new V3(0,20,0)],0.5,0.28);
+  // galhos em candelabro, curvando p/ cima, com tufos nas pontas
+  const n=11;for(let k=0;k<n;k++){const a=k/n*PI*2+r()*0.4,L=4+r()*2.2,h=16.5+r()*2.5;const p0=new V3(0,h,0),p1=new V3(Math.cos(a)*L*0.6,h+0.3,Math.sin(a)*L*0.6),p2=new V3(Math.cos(a)*L,h+2.2+r(),Math.sin(a)*L);
+    troncoCurvo(g,[p0,p1,p2],0.13,0.07);const f=new THREE.Mesh(folhagem(1.25,1,0.3,'#20361d','#4c6e33',sem*13+k),M_FOLHA);f.scale.set(1.25,0.55,1.25);f.position.copy(p2).setY(p2.y+0.25);f.castShadow=true;g.add(f);}
+  const f=new THREE.Mesh(folhagem(1.6,1,0.3,'#20361d','#4c6e33',sem),M_FOLHA);f.scale.set(1.3,0.5,1.3);f.position.y=20.3;g.add(f);
+  return g;}
+function coqueiro(pai,x,z,e,sem){const g=new THREE.Group();g.position.set(x,0,z);g.scale.setScalar(e);g.rotation.y=sem;pai.add(g);const r=rnd(sem*7+1);
+  const topo=new V3(1.6+r(),9.5,0.4);troncoCurvo(g,[new V3(0,-0.3,0),new V3(0.3,3,0),new V3(0.9,6.5,0.2),topo],0.3,0.2);
+  const fol=S('#4c7a2c',0.8);fol.side=THREE.DoubleSide;for(let k=0;k<9;k++){const a=k/9*PI*2+r()*0.3,L=4.2+r()*0.8;const pts=[];for(let i=0;i<=8;i++){const t=i/8;pts.push(new V3(topo.x+Math.cos(a)*L*t,topo.y+0.6*Math.sin(t*PI*0.9)*1.4-t*t*2.4,topo.z+Math.sin(a)*L*t));}
+    const cur=new THREE.CatmullRomCurve3(pts);const pos=[],idx=[];for(let i=0;i<=16;i++){const t=i/16,c=cur.getPoint(t),tg=cur.getTangent(t),lat=new V3(-tg.z,0,tg.x).normalize().multiplyScalar(0.55*Math.sin(t*PI)*(1-t*0.3));
+      pos.push(c.x-lat.x,c.y-0.15*Math.sin(t*PI),c.z-lat.z,c.x,c.y,c.z,c.x+lat.x,c.y-0.15*Math.sin(t*PI),c.z+lat.z);if(i<16){const b=i*3;idx.push(b,b+3,b+1,b+1,b+3,b+4,b+1,b+4,b+2,b+2,b+4,b+5);}}
+    const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setIndex(idx);geo.computeVertexNormals();const fo=new THREE.Mesh(geo,fol);fo.castShadow=true;g.add(fo);}
+  for(let k=0;k<4;k++){const c=new THREE.Mesh(new THREE.SphereGeometry(0.22,10,8),S('#6b5a2a',0.7));c.position.set(topo.x+Math.cos(k*1.6)*0.35,topo.y-0.35,topo.z+Math.sin(k*1.6)*0.35);g.add(c);}
+  return g;}
+function arvoresNovo(){const g=new THREE.Group();const r=rnd(21);
+  for(let i=0;i<6;i++)arvoreMata(g,-22+r()*14,-14+r()*28,0.85+r()*0.5,i+1);
+  for(let i=0;i<4;i++)araucaria(g,-4+r()*9,-12+r()*24,0.85+r()*0.35,i+11);
+  const areia=new THREE.Mesh(new THREE.CircleGeometry(12,32),P('reboco','#d9c79a',{tile:2,r:1,ns:1.5}));areia.rotation.x=-PI/2;areia.position.set(16,0.03,0);areia.receiveShadow=true;g.add(areia);
+  for(let i=0;i<4;i++)coqueiro(g,11+r()*10,-7+r()*14,0.9+r()*0.3,i+21);
+  pessoa(g,4,14,0.5);return g;}
+
+// ===== CAIXAS do gancho: tambores, munição e kit de reparo, com eslinga p/ içar =====
+const TEX_MADEIRA=canvasTex(256,256,(c,w,h)=>{const r=rnd(5);c.fillStyle='#a4824f';c.fillRect(0,0,w,h);for(let i=0;i<600;i++){c.strokeStyle=`rgba(${80+r()*40|0},${55+r()*25|0},${30+r()*15|0},${0.15+r()*0.25})`;c.lineWidth=1+r()*2;const y=r()*h;c.beginPath();c.moveTo(0,y);c.bezierCurveTo(w*0.3,y+(r()-0.5)*6,w*0.7,y+(r()-0.5)*6,w,y+(r()-0.5)*4);c.stroke();}
+  c.fillStyle='rgba(40,25,10,.5)';for(let i=0;i<5;i++)c.fillRect(0,i*h/5,w,2);});
+const MAD=()=>new THREE.MeshStandardMaterial({map:TEX_MADEIRA,roughness:0.85});
+function palete(pai){for(const z of[-0.55,0,0.55])bx(1.4,0.1,0.14,MAD(),0,0.05,z,pai);bx(1.4,0.04,1.3,MAD(),0,0.12,0,pai);for(let k=0;k<6;k++)bx(1.4,0.025,0.18,MAD(),0,0.155,-0.55+k*0.22,pai);}
+function eslinga(pai,cantos,yTopo,h){const anel=new THREE.Mesh(new THREE.TorusGeometry(0.12,0.03,6,16),S('#8f969b',0.4,0.7));anel.position.y=yTopo+h;pai.add(anel);
+  for(const [x,y,z] of cantos)haste(new V3(x,y,z),new V3(0,yTopo+h-0.1,0),0.018,S('#e2a71a',0.7),pai,5);}
+function rotulo(txt,cor='#f2f2ee',fundo='rgba(0,0,0,0)',w=256,h=128,fs=46){return canvasTex(w,h,(c,W,H)=>{c.fillStyle=fundo;c.fillRect(0,0,W,H);c.fillStyle=cor;c.font=`bold ${fs}px Arial`;c.textAlign='center';c.textBaseline='middle';txt.split('\n').forEach((l,i,a)=>c.fillText(l,W/2,H/2+(i-(a.length-1)/2)*fs*1.05));});}
+function decal(pai,tex,w,h,x,y,z,ry){const p=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({map:tex,transparent:true,roughness:0.7,polygonOffset:true,polygonOffsetFactor:-4}));p.position.set(x,y,z);p.rotation.y=ry;pai.add(p);return p;}
+function caixaComb(pai,x){const g=new THREE.Group();g.position.x=x;pai.add(g);palete(g);const tb=P('metalpint','#b8312a',{tile:0.8,r:0.5,m:0.2,ns:0.8});const lab=rotulo('JET A-1','#f2f2ee','rgba(0,0,0,0)',256,64,40);
+  for(const [a,b] of[[-0.33,-0.33],[0.33,-0.33],[-0.33,0.33],[0.33,0.33]]){cl(0.29,0.29,0.88,tb,a,0.61,b,g,24);for(const y of[0.37,0.85])cl(0.3,0.3,0.03,S('#9c2822',0.5,0.3),a,y,b,g,24);
+    cl(0.29,0.29,0.012,S('#a92c25',0.5,0.3),a,1.055,b,g,24);cl(0.04,0.04,0.03,S('#c9c9c4',0.4,0.6),a+0.14,1.07,b,g,8);const lb=new THREE.Mesh(new THREE.CylinderGeometry(0.295,0.295,0.16,24,1,true,a>0?0.2:PI+0.2,1.2),new THREE.MeshStandardMaterial({map:lab,transparent:true}));lb.position.set(a,0.62,b);lb.rotation.y=b>0?0:PI;g.add(lb);}
+  for(const y of[0.45,0.8]){const t=new THREE.Mesh(new THREE.TorusGeometry(0.66,0.012,4,4),S('#e2a71a',0.7));t.rotation.set(PI/2,0,PI/4);t.scale.set(1.12,1.12,1);t.position.y=y;g.add(t);}
+  eslinga(g,[[-0.62,0.16,-0.62],[0.62,0.16,-0.62],[-0.62,0.16,0.62],[0.62,0.16,0.62]],1.1,1.3);return g;}
+function caixaMun(pai,x){const g=new THREE.Group();g.position.x=x;pai.add(g);palete(g);const ol=P('metalpint','#4f5d34',{tile:0.8,r:0.75,ns:0.7});const lab=rotulo('CART 30 MM\nLOTE 14-26','#f0e6b0','rgba(0,0,0,0)',256,128,34);
+  for(let k=0;k<2;k++){const y=0.39+k*0.47;bx(1.3,0.45,0.9,ol,0,y,0,g);bx(1.32,0.06,0.92,S('#3c4727',0.7),0,y+0.2,0,g);for(const s of[-0.5,0.5]){bx(0.1,0.06,0.04,S('#888',0.4,0.7),s,y+0.12,0.47,g);}
+    for(const s of[-1,1]){const al=new THREE.Mesh(new THREE.TorusGeometry(0.07,0.015,5,10,PI),S('#2a2a24',0.8));al.position.set(s*0.66,y+0.05,0);al.rotation.y=PI/2;al.rotation.z=PI;g.add(al);}
+    decal(g,lab,0.9,0.36,0,y,0.451,0);}
+  for(const z of[-0.3,0.3]){const t=new THREE.Mesh(new THREE.TorusGeometry(0.5,0.01,4,4),S('#e2a71a',0.7));t.rotation.set(0,0,PI/4);t.scale.set(1.35,1.0,1);t.position.set(0,0.6,z);g.add(t);}
+  eslinga(g,[[-0.62,0.16,-0.42],[0.62,0.16,-0.42],[-0.62,0.16,0.42],[0.62,0.16,0.42]],1.1,1.4);return g;}
+function caixaRep(pai,x){const g=new THREE.Group();g.position.x=x;pai.add(g);palete(g);const ci=P('metalpint','#7b8287',{tile:0.8,r:0.5,m:0.3,ns:0.7});
+  bx(1.25,0.75,0.95,ci,0,0.55,0,g);for(const y of[0.25,0.85])bx(1.27,0.05,0.97,S('#55595c',0.5,0.5),0,y,0,g);for(const s of[-0.62,0.62])bx(0.05,0.75,0.97,S('#55595c',0.5,0.5),s,0.55,0,g);
+  decal(g,rotulo('REPARO\nBLINDAGEM','#ffd21a','rgba(0,0,0,0)',256,128,38),0.9,0.42,0,0.58,0.478,0);
+  const cruz=rotulo('+','#ffffff','#d32f2f',64,64,60);decal(g,cruz,0.28,0.28,0.45,0.75,0.478,0);
+  for(let k=0;k<3;k++)bx(1.1,0.05,0.8,P('metal','#9ba3a8',{tile:0.5,r:0.45,m:0.6}),0,0.96+k*0.06,0,g);   // chapas de blindagem
+  eslinga(g,[[-0.62,0.16,-0.47],[0.62,0.16,-0.47],[-0.62,0.16,0.47],[0.62,0.16,0.47]],1.1,1.3);return g;}
+function caixasNovo(){const g=new THREE.Group();bx(9,0.06,5,P('concreto','#a8a59c',{tile:2}),0,0.03,0,g);caixaComb(g,-2.4);caixaMun(g,0);caixaRep(g,2.4);pessoa(g,0.2,-1.6,0.3);
+  for(const [x,c] of[[-2.4,0xff5040],[0,0xd8c040],[2.4,0xffffff]]){const a=new THREE.Mesh(new THREE.RingGeometry(1.0,1.1,32),new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:0.55,side:THREE.DoubleSide}));a.rotation.x=-PI/2;a.position.set(x,0.08,0);g.add(a);}
+  return g;}
+function navioCAh(cor){const g=new THREE.Group(),cz=M('#8b949a',0.7),br=M('#c9c2b2',0.7),esc_=M('#4a4f53',0.7),ver=M('#7a2620',0.8),pr=M('#22282d',0.5),fx=M(cor,0.6),mad=M('#8a6a45',0.8);
+  cascoA(74,13,4,12,ver,g,-1.5);cascoA(74,13,6,12,cz,g,2.5);cascoA(70,11.6,0.4,11,mad,g,8.5);box(12,5,9,br,-2,11.5,0,g);box(7,4,8,br,-0.5,16,0,g);box(4,1.2,8.2,pr,2.6,16.6,0,g);
+  for(const x of[-12,-19]){cil(1.8,2,9,cz,x,13,0,g,12);cil(1.9,1.9,1.4,fx,x,16.8,0,g,12);cil(1.95,1.95,1,M('#222',0.6),x,17.9,0,g,12);}
+  for(const z of[-0.6,0.6]){const p=cil(0.25,0.25,22,esc_,1.5,26,z*1.6,g,5);p.rotation.x=z*0.08;}for(let i=0;i<5;i++)box(0.25,0.25,3.6,esc_,1.5,18+i*3.6,0,g);
+  torreCanhaoA(br,esc_,21,8.7,g,10);torreCanhaoA(br,esc_,-29,8.7,g,10).rotation.y=PI;for(const z of[-5.6,5.6])esf(1.6,M('#e8e2d0',0.7),-8,10.6,z,g,3,0.6,1);bandeiraA(cor,-36,8.7,g);return g;}
+
+// ---------- palco ----------
+const cv=document.getElementById('tela'),R=new THREE.WebGLRenderer({canvas:cv,antialias:true});R.setPixelRatio(Math.min(2,devicePixelRatio));
+R.outputEncoding=THREE.sRGBEncoding;R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.05;R.shadowMap.enabled=true;R.shadowMap.type=THREE.PCFSoftShadowMap;R.setScissorTest(true);
+const TEX_GRAMA=canvasTex(512,512,(g,w,h)=>{const r=rnd(3);g.fillStyle='#5a7a3a';g.fillRect(0,0,w,h);for(let i=0;i<9000;i++){g.fillStyle=['#4d6c31','#678a42','#56763a','#738f4c','#45632d'][i%5];g.fillRect(r()*w,r()*h,2+r()*3,2+r()*5);}});TEX_GRAMA.repeat.set(60,60);
+function cena(){const s=new THREE.Scene();s.background=new THREE.Color('#a9c6e4');s.fog=new THREE.Fog('#a9c6e4',160,520);
+  s.add(new THREE.HemisphereLight(0xcfe2ff,0x5a5a3c,0.75));const d=new THREE.DirectionalLight(0xfff1dc,2.1);d.position.set(40,70,25);d.castShadow=true;d.shadow.mapSize.set(2048,2048);
+  Object.assign(d.shadow.camera,{left:-70,right:70,top:70,bottom:-70,near:1,far:200});d.shadow.bias=-0.0004;d.shadow.normalBias=0.03;s.add(d);
+  const ch=new THREE.Mesh(new THREE.PlaneGeometry(900,900),new THREE.MeshStandardMaterial({map:TEX_GRAMA,roughness:1}));ch.rotation.x=-PI/2;ch.position.y=-0.02;ch.receiveShadow=true;s.add(ch);return s;}
+const cA=cena(),cD=cena();let oA=null,oD=null;
+const cam=new THREE.PerspectiveCamera(40,1,0.3,1500),ctl=new THREE.OrbitControls(cam,cv);ctl.enableDamping=true;ctl.maxPolarAngle=PI*0.49;ctl.minDistance=4;ctl.maxDistance=220;
+
+const OBJ={
+  arvores:{nome:'Árvores',antes:()=>arvoresA(),depois:()=>arvoresNovo(),cam:[30,14,34],alvo:[0,8,0],
+    texto:'Três espécies da Ilha no lugar dos cones: árvores de copa da mata atlântica, araucárias em candelabro nas partes altas e coqueiros na praia. Cada espécie vira uma malha só, repetida milhares de vezes (instâncias).',
+    dados:[['Mata atlântica','12–18 m'],['Araucária','18–24 m'],['Coqueiro','9–12 m'],['Tronco','textura de casca']],
+    lista:['Troncos curvos com galhos e casca de verdade','Copas irregulares com luz e sombra no verde','Araucária com galhos em taça (bem Santa Catarina)','Coqueiros com folhas caídas e cocos, na areia']},
+  navioA:{nome:'Fragata clássica',antes:()=>agua(navioAA('#3a7bd5')),depois:()=>navioANovo('#3a7bd5'),cam:[60,26,58],alvo:[0,8,0],
+    texto:'Fragata de linhas clássicas: casco com proa alta e alargada, número no costado, mastro treliçado com radar girando, canhão de 127 mm facetado, células de míssil, CIWS e convoo na popa.',
+    dados:[['Comprimento','80 m'],['Boca','13 m'],['Casco','cinza + antivegetativa'],['Número','F 40']],
+    lista:['Casco de verdade: proa em V, tosado e borda alargada','Balaustrada em volta do convés','Canhão facetado, VLS, CIWS e balsas salva-vidas','Convoo com marcação e redes de proteção']},
+  navioB:{nome:'Fragata furtiva',antes:()=>agua(navioBA('#3a7bd5')),depois:()=>navioBNovo('#3a7bd5'),cam:[60,26,58],alvo:[0,8,0],
+    texto:'Fragata furtiva no estilo da classe Tamandaré: superestrutura de paredes inclinadas, mastro integrado com 4 painéis de radar, canhão com escudo furtivo e convoo grande.',
+    dados:[['Comprimento','82 m'],['Boca','13,5 m'],['Radar','4 painéis fixos'],['Número','F 200']],
+    lista:['Mastro integrado com os 4 painéis de radar','Paredes inclinadas e chaminé baixa','Canhão com escudo furtivo e VLS','Faixa da cor do time na lateral']},
+  navioC:{nome:'Corveta clássica',antes:()=>agua(navioCAh('#3a7bd5')),depois:()=>navioCNovo('#3a7bd5'),cam:[56,24,54],alvo:[0,8,0],
+    texto:'Corveta à moda antiga: duas chaminés com a cor do time, mastro treliçado, dois canhões (proa e popa), convés de madeira e botes nos turcos.',
+    dados:[['Comprimento','76 m'],['Boca','12,4 m'],['Convés','madeira'],['Número','V 32']],
+    lista:['Duas chaminés com faixa do time e topo preto','Botes em berços com turcos','Canhões na proa e na popa','Convés de madeira e balaustrada']},
+  lancha:{nome:'Lancha de patrulha',antes:()=>agua(lanchaA()),depois:()=>lanchaNovo(),cam:[14,6,12],alvo:[0,1.5,0],
+    texto:'Lancha de patrulha de 12 m: casco em V com defensa de borracha, cabine com para-brisa, arco com radar e luzes de navegação, metralhadora .50 com escudo e dois motores de popa.',
+    dados:[['Comprimento','12 m'],['Velocidade','~40 nós'],['Arma','.50 com escudo'],['Tripulação','2']],
+    lista:['Casco em V de verdade e defensa de borracha','Arco do radar girando, luzes verde e vermelha','Metralhadora com escudo no aro da proa','Motores de popa com capô e esteira de espuma']},
+  caixas:{nome:'Caixas do gancho',antes:()=>caixasA(),depois:()=>caixasNovo(),cam:[5,3.2,6],alvo:[0,0.9,0],
+    texto:'Cargas de içamento do helicóptero, em palete de madeira e com eslinga de 4 pernas até o anel do gancho: tambores de combustível, caixas de munição e kit de reparo de blindagem.',
+    dados:[['Palete','1,4 × 1,3 m'],['Tambor','200 L · JET A-1'],['Munição','CART 30 MM'],['Eslinga','4 pernas + anel']],
+    lista:['Eslinga amarela até o anel: dá pra ver por onde o gancho pega','Tambores com aros, tampa, bujão e rótulo','Caixas de munição com estêncil, alças e travas','Kit de reparo com chapas de blindagem']}};
+const abas=document.getElementById('abas');let atual='navioB',modo='lado',giraAuto=true;
+for(const k in OBJ){const b=document.createElement('button');b.textContent=OBJ[k].nome;b.id='aba-'+k;b.setAttribute('aria-pressed',k===atual);b.onclick=()=>mostra(k);abas.appendChild(b);}
+function tris(o){let n=0;o.traverse(m=>{if(m.isMesh){const g=m.geometry,c=(g.index?g.index.count:g.attributes.position.count)/3;n+=m.isInstancedMesh?c*m.count:c;}});return n;}
+function mostra(k){atual=k;GIR.length=0;BAND.length=0;for(const b of abas.children)b.setAttribute('aria-pressed',b.id==='aba-'+k);
+  if(oA)cA.remove(oA);if(oD)cD.remove(oD);const O=OBJ[k];oA=O.antes();oD=O.depois();cA.add(oA);cD.add(oD);
+  cam.position.set(...O.cam);ctl.target.set(...O.alvo);ctl.update();
+  document.getElementById('fNome').textContent=O.nome;document.getElementById('fTexto').textContent=O.texto;
+  const dl=document.getElementById('fDados');dl.innerHTML='';for(const [a,b] of[...O.dados,['Triângulos hoje',tris(oA).toLocaleString('pt-BR')],['Triângulos proposta',Math.round(tris(oD)).toLocaleString('pt-BR')]]){const t=document.createElement('dt');t.textContent=a;const d=document.createElement('dd');d.textContent=b;dl.append(t,d);}
+  const ul=document.getElementById('fLista');ul.innerHTML='';for(const s of O.lista){const li=document.createElement('li');li.textContent=s;ul.appendChild(li);}}
+const bt=id=>document.getElementById(id);
+function setModo(m){modo=m;for(const [id,v] of[['mLado','lado'],['mAntes','antes'],['mDepois','depois']])bt(id).setAttribute('aria-pressed',m===v);bt('rA').hidden=m==='depois';bt('rD').hidden=m==='antes';posRot();}
+bt('mLado').onclick=()=>setModo('lado');bt('mAntes').onclick=()=>setModo('antes');bt('mDepois').onclick=()=>setModo('depois');
+bt('mGira').onclick=()=>{giraAuto=!giraAuto;bt('mGira').setAttribute('aria-pressed',giraAuto);};
+ctl.addEventListener('start',()=>{giraAuto=false;bt('mGira').setAttribute('aria-pressed',false);});
+function posRot(){const w=cv.clientWidth,h=cv.clientHeight,vert=w<h;const rA=bt('rA'),rD=bt('rD');rA.style.left='10px';rD.style.top='10px';
+  if(modo==='lado'){if(vert){rD.style.left='10px';rD.style.top=(h/2+10)+'px';}else{rD.style.left=(w/2+10)+'px';}}else{rD.style.left='10px';}}
+let W0=0,H0=0,tAnt=performance.now();
+function quadro(){requestAnimationFrame(quadro);const t=performance.now(),dt=Math.min(0.05,(t-tAnt)/1000);tAnt=t;
+  const w=cv.clientWidth,h=cv.clientHeight;if(w!==W0||h!==H0){W0=w;H0=h;R.setSize(w,h,false);posRot();}
+  for(const [o,v] of GIR)o.rotation.y+=v*60*dt;tremula(t/1000);if(giraAuto){const a=dt*0.12,x=cam.position.x-ctl.target.x,z=cam.position.z-ctl.target.z;cam.position.x=ctl.target.x+x*Math.cos(a)-z*Math.sin(a);cam.position.z=ctl.target.z+x*Math.sin(a)+z*Math.cos(a);}
+  ctl.update();const vert=w<h;
+  const vista=(s,x,y,vw,vh)=>{R.setViewport(x,y,vw,vh);R.setScissor(x,y,vw,vh);cam.aspect=vw/vh;cam.updateProjectionMatrix();R.render(s,cam);};
+  if(modo==='antes')vista(cA,0,0,w,h);else if(modo==='depois')vista(cD,0,0,w,h);
+  else if(vert){vista(cA,0,h/2,w,h/2);vista(cD,0,0,w,h/2);}else{vista(cA,0,0,w/2,h);vista(cD,w/2,0,w/2,h);}}
+mostra('navioB');setModo('lado');quadro();
+</script>
