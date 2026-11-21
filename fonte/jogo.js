@@ -781,7 +781,7 @@ function conectar(){conTela(true);const url=window.JJ_SERVIDOR?'wss://'+JJ_SERVI
   ws.onopen=()=>{conectado=true;envia({t:'entrar',nome:EU.nome,sala:SALA,token:CONTA?CONTA.token:null,missao:SALA==='missao'?MIS_N:undefined});};
   ws.onclose=()=>{conTela(false);const era=conectado;conectado=false;if(jogando){jogando=false;document.body.classList.remove('jogando');$('#menu').style.display='flex';
       $('#erro').textContent=EXPULSO||(era?'⚠️ Conexão perdida. Escolha a sala para voltar.':window.JJ_SERVIDOR?'⏳ O servidor está acordando (até 1 min). Tente de novo já já.':'⚠️ Não consegui falar com o servidor.');EXPULSO='';}};
-  ws.onmessage=e=>{let d;try{d=JSON.parse(e.data);}catch{return;}
+  const _meuWs=ws;ws.onmessage=e=>{if(ws!==_meuWs)return;   /* (21/11) mensagem atrasada da conexão anterior não suja a partida nova */let d;try{d=JSON.parse(e.data);}catch{return;}
     if(d.t==='expulso'){EXPULSO='⚠️ '+d.msg;}
     if(d.t==='bemvindo'){conTela(false);EU.id=d.id;EU.cor=d.cor;if(d.nome)EU.nome=d.nome;SALA=d.sala||'bots';MINHA_BASE=d.base??null;if(d.zona)ZONA=d.zona;if(d.rsam)R_SAM=d.rsam;LIMITE=SALA==='pvp'||SALA==='missao'?20900:SALA==='bots'?7600:5200;MEU_TIME=d.time||(SALA==='live'?'azul':null);NASCE=d.nasce||null;tempestade(d.clima==='tempestade');if(SALA==='missao'){$('#placar').innerHTML='';radio('Torre','Harpia 1, decolagem autorizada. Aguarde instruções.');}VS_ANT=null;placarVs(SALA==='live'?[0,0]:null);mostrarBases();
       if(JATO)cena.remove(JATO);JATO=criarJato(d.cor);nascer();}
@@ -1540,6 +1540,13 @@ function sair(){if(typeof heliSair==='function')heliSair();for(const b of BOMBV.
   for(const o of OUT.values()){cena.remove(o.g);o.rot.remove();o.aq?.remove();}OUT.clear();for(const m of MISV.values())cena.remove(m.g);MISV.clear();
   if(JATO){cena.remove(JATO);JATO=null;}for(const k in TEC)TEC[k]=false;
   for(const id of['#mira','#seta','#trava','#alerta','#aviso','#morte','#dicaDec'])$(id).style.display='none';
-  $('#placar').innerHTML='';$('#feed').innerHTML='';$('#erro').textContent='';$('#radio').style.display='none';tempestade(false);$('#menu').style.display='flex';}
+  $('#placar').innerHTML='';$('#feed').innerHTML='';$('#erro').textContent='';$('#radio').style.display='none';tempestade(false);$('#menu').style.display='flex';limpaCenario();}
+/* (21/11) volta o cenário ao estado inicial (tentar de novo / jogar de novo / menu): nada da partida anterior fica no mapa */
+function limpaCenario(){for(const D of DESTROCOS)cena.remove(D.g);DESTROCOS.length=0;MEU_DESTROCO=null;KC=null;
+  for(const P of PILOTOS){cena.remove(P.g);if(P.pq)cena.remove(P.pq);}PILOTOS.length=0;FUMOS.length=0;
+  for(const f of FX)cena.remove(f.s);FX.length=0;for(const b of BALAS){b.ativa=false;b.m.visible=false;}
+  for(const [k,T] of TRILHAS){for(const F of T.f){cena.remove(F.m);F.m.geometry.dispose();}}TRILHAS.clear();_fwAnt.clear();
+  for(const B of BASES){if(!B.lanc)continue;for(const Lc of B.lanc){Lc.vivo=true;Lc.L.visible=true;Lc.q.visible=false;}B.samOn=true;}
+  clearTimeout(tRadio);EU.vida=100;}
 $('#bVisao').addEventListener('pointerdown',e=>{e.stopPropagation();trocaVisao();});
 $('#bTrem').addEventListener('pointerdown',e=>{e.stopPropagation();e.preventDefault();trocaTrem();});
